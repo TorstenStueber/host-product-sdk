@@ -89,7 +89,7 @@ Thin wrappers over `scale-ts` for Polkadot-specific needs. Previously provided b
 | `lazy(fn)` | Deferred codec for recursive types |
 | `OptionBool` | Optimized `Option(bool)` encoding (0=none, 1=false, 2=true) |
 
-Error enums (e.g. `SigningErr`, `StorageErr`) use plain `Enum` -- the SCALE bytes are identical to the original `@novasamatech/scale` `ErrEnum`, but decoding produces plain `{tag, value}` objects on the wire. Proper `Error` class instances are constructed separately (see 1.12 Error Classes below).
+Error enums (e.g. `SigningErr`, `StorageErr`) use plain `Enum` -- the SCALE bytes are identical to the original `@novasamatech/scale` `ErrEnum`, but decoding produces plain `{tag, value}` discriminated unions instead of `CodecError` class instances. This is simpler and works naturally with neverthrow's `Result` pattern (see 1.12 Error Representation).
 
 Also exports `HexString` type (`` `0x${string}` ``) and `toHexString()` validator.
 
@@ -169,7 +169,7 @@ export type { AccountType as Account } from '../codec/scale/v1/accounts.js';
 export type { SigningResultType as SigningResult } from '../codec/scale/v1/sign.js';
 ```
 
-Error types are NOT exported here -- they are provided as proper `Error` classes from `codec/scale/errors.ts` (see 1.12 below).
+Error types are plain `{tag, value}` discriminated unions (see 1.12 Error Representation).
 
 Optional values use `undefined` (not `null`) because SCALE's `Option` codec maps absent values to `undefined`. The exception is `Nullable` (our custom primitive) which uses `null` -- used for fields like `TxPayloadV1.signer` where the original wire format requires `null` semantics.
 
@@ -221,59 +221,31 @@ Post-handshake codec upgrade flow.
 
 Single flat file re-exporting everything from leaf modules. No barrel chains.
 
-### 1.12 Error Classes (`codec/scale/errors.ts`)
+### 1.12 Error Representation
 
-Protocol error classes that match the `CodecError` hierarchy from `triangle-js-sdks` / `@novasamatech/scale`. Each error enum has a namespace with a class per variant, all extending `Error` directly:
+Errors use plain `{tag, value}` discriminated unions -- the same representation that the SCALE codecs produce. This follows the pattern encouraged by `neverthrow`, where the `E` type parameter in `Result<T, E>` / `ResultAsync<T, E>` is a data type, not an Error class:
 
 ```typescript
-import { SigningErr, NavigateToErr, GenericError } from '@polkadot/shared';
+// Host handler returns a plain error object:
+ctx.err({ tag: 'Rejected', value: undefined });
+ctx.err({ tag: 'Unknown', value: { reason: 'Not configured' } });
 
-// Host handler creates proper Error instances:
-ctx.err(new SigningErr.Rejected());
-ctx.err(new NavigateToErr.Unknown({ reason: 'blocked' }));
-
-// Product consumer receives proper Error instances:
-err instanceof SigningErr.Rejected  // true
-err.name      // 'SigningErr::Rejected'
-err.message   // 'Rejected'
-err.instance  // 'Rejected'
-err.tag       // 'Rejected'
-err.payload   // undefined (alias for .value)
+// Product consumer narrows via the tag discriminant:
+result.match(
+  (ok) => ok.value,
+  (err) => {
+    switch (err.value.tag) {
+      case 'Rejected':     // err.value.value is undefined
+      case 'Unknown':      // err.value.value is { reason: string }
+      case 'PermissionDenied':  // err.value.value is undefined
+    }
+  },
+);
 ```
 
-**Wire format constraint** -- structured clone does not preserve custom `Error` properties (only `.message`, `.name`, `.stack` survive). Therefore error class instances cannot cross the iframe boundary directly. Instead:
+TypeScript narrows `value` automatically when the `tag` is checked, giving full type safety without error classes. This approach also avoids the structured clone limitation (custom Error properties are stripped during postMessage), keeping the wire format clean for both SCALE and structured clone codecs.
 
-1. **Host side** (`wireRequest`): the handler returns an error class instance via `ctx.err(new SigningErr.Rejected())`. Before encoding, `wireRequest` flattens it to a plain `{tag, value}` object: `{ tag: error.tag, value: error.value }`. This plain object is safe for both SCALE encoding and structured clone.
-
-2. **Wire**: plain `{tag: 'Rejected', value: undefined}` travels across the iframe boundary.
-
-3. **Product side** (`hostApi`): each method calls `makeRequest()` which returns the plain error, then `.mapErr()` hydrates it into the correct error class instance using the error enum's `fromPlain()` method:
-   ```typescript
-   signPayload(payload) {
-     return makeRequest(transport, 'host_sign_payload', payload)
-       .mapErr(e => hydrate(e, SigningErr.fromPlain));
-   }
-   ```
-
-This gives both sides proper `Error` instances with `instanceof` support, `.name`, `.message`, `.payload`, and `.instance` properties matching `triangle-js-sdks`, while keeping the wire format compatible with both codecs.
-
-**Error enums defined** (12 enums + 1 standalone class):
-
-| Error enum | Variants | Used by |
-|---|---|---|
-| `GenericError` | (standalone) | `host_feature_supported`, `host_push_notification`, `host_device_permission`, `remote_permission`, chain methods, JSON-RPC |
-| `HandshakeErr` | `Timeout`, `UnsupportedProtocolVersion`, `Unknown` | `host_handshake` |
-| `RequestCredentialsErr` | `NotConnected`, `Rejected`, `DomainNotValid`, `Unknown` | `host_account_get`, `host_account_get_alias`, `host_get_non_product_accounts` |
-| `CreateProofErr` | `RingNotFound`, `Rejected`, `Unknown` | `host_account_create_proof` |
-| `SigningErr` | `FailedToDecode`, `Rejected`, `PermissionDenied`, `Unknown` | `host_sign_payload`, `host_sign_raw` |
-| `CreateTransactionErr` | `FailedToDecode`, `Rejected`, `NotSupported`, `PermissionDenied`, `Unknown` | `host_create_transaction`, `host_create_transaction_with_non_product_account` |
-| `StorageErr` | `Full`, `Unknown` | `host_local_storage_read`, `host_local_storage_write`, `host_local_storage_clear` |
-| `NavigateToErr` | `PermissionDenied`, `Unknown` | `host_navigate_to` |
-| `ChatRoomRegistrationErr` | `PermissionDenied`, `Unknown` | `host_chat_create_room` |
-| `ChatBotRegistrationErr` | `PermissionDenied`, `Unknown` | `host_chat_register_bot` |
-| `ChatMessagePostingErr` | `MessageTooLarge`, `Unknown` | `host_chat_post_message` |
-| `StatementProofErr` | `UnableToSign`, `UnknownAccount`, `Unknown` | `remote_statement_store_create_proof` |
-| `PreimageSubmitErr` | `Unknown` | `remote_preimage_submit` |
+This differs from triangle-js-sdks, which uses `CodecError` class instances baked into the SCALE codec via `ErrEnum`. Their approach gives `instanceof` checks and `.message` strings but couples the codec layer to a class hierarchy. Our plain objects are simpler, work naturally with neverthrow's `.match()` / `.mapErr()` / `.andThen()`, and require no flatten/hydrate layer between host and product.
 
 ---
 
@@ -340,7 +312,7 @@ interface Container {
 }
 ```
 
-Handler context provides `ctx.ok(value)` and `ctx.err(error)`. No manual type annotations -- all param/ok/err types flow from `hostApiProtocol`. Handlers use error class instances: `ctx.err(new SigningErr.Rejected())`. The container flattens these to `{tag, value}` before encoding for wire safety.
+Handler context provides `ctx.ok(value)` and `ctx.err(error)`. No manual type annotations -- all param/ok/err types flow from `hostApiProtocol`. Errors are plain `{tag, value}` objects: `ctx.err({ tag: 'Rejected', value: undefined })`.
 
 ### 2.4 Handlers (`handlers/`)
 
@@ -354,11 +326,11 @@ Handler context provides `ctx.ok(value)` and `ctx.err(error)`. No manual type an
 
 **`accounts.ts`** -- `accountGet` derives product-specific public key via HDKD from session. `getNonProductAccounts` returns root account. `connectionStatusSubscribe` pushes connected/disconnected. `getAlias`/`createProof` are stubs.
 
-**`signing.ts`** -- `signPayload`/`signRaw` delegate to config callbacks. Return `new SigningErr.PermissionDenied()` if no session. `createTransaction` returns `new CreateTransactionErr.NotSupported('...')` by default.
+**`signing.ts`** -- `signPayload`/`signRaw` delegate to config callbacks. Return `{tag: 'PermissionDenied', value: undefined}` if no session. `createTransaction` returns `{tag: 'NotSupported', value: '...'}` by default.
 
 **`chain.ts`** -- Wires `container.handleChainConnection(config.chainProvider)`.
 
-**`chat.ts`**, **`statementStore.ts`**, **`preimage.ts`** -- Stubs returning error class instances (e.g. `new ChatRoomRegistrationErr.PermissionDenied()`).
+**`chat.ts`**, **`statementStore.ts`**, **`preimage.ts`** -- Stubs returning plain error objects (e.g. `{tag: 'PermissionDenied', value: undefined}`).
 
 ### 2.5 Chain Subsystem
 
@@ -422,38 +394,32 @@ Creates transport with `idPrefix: 'p:'` and `scaleCodecAdapter`. Exports singlet
 
 ### 3.2 Host API (`hostApi.ts`)
 
-Product-side facade. Wraps every transport method (~35 methods) with strong types derived from the protocol codecs. Each request method hydrates errors into proper `Error` class instances via `.mapErr()`:
+Product-side facade. Wraps every transport method (~35 methods) with strong types derived from the protocol codecs. Version tagging is handled internally -- callers pass raw payloads and receive unwrapped results:
 
 ```typescript
 const hostApi = createHostApi(sandboxTransport);
 
-// Request methods return ResultAsync with typed ok/err
-hostApi.signPayload(payload).match(
-  (ok) => ok.value,                        // Tagged<'v1', SigningResult>
+// Request methods take raw payloads, return ResultAsync<Ok, Err> directly
+hostApi.signPayload(signingPayload).match(
+  (result) => result.signature,    // SigningResult — no version wrapper
   (err) => {
-    const error = err.value;               // SigningErr.Rejected | SigningErr.Unknown | ...
-    error instanceof SigningErr.Rejected;   // true
-    error.name;                            // 'SigningErr::Rejected'
-    error.message;                         // 'Rejected'
-    error.payload;                         // undefined
+    // err is the error discriminated union directly:
+    //   { tag: 'Rejected'; value: undefined }
+    // | { tag: 'PermissionDenied'; value: undefined }
+    // | { tag: 'Unknown'; value: { reason: string } }
+    switch (err.tag) {
+      case 'Unknown': console.log(err.value.reason); // narrowed
+    }
   },
 );
 
-// Subscription methods return Subscription with typed payloads
-const sub = hostApi.chainHeadFollow(args, callback);
-sub.unsubscribe();
+// Subscription methods receive unwrapped payloads
+hostApi.accountConnectionStatusSubscribe(undefined, (status) => {
+  // status is AccountConnectionStatus directly — no version wrapper
+});
 ```
 
-The internal `makeRequest<M, V>()` returns plain `{tag, value}` errors from the wire. Each per-method wrapper then hydrates via the error enum's `fromPlain()`:
-
-```typescript
-signPayload(payload) {
-  return makeRequest(transport, 'host_sign_payload', payload)
-    .mapErr(e => hydrate(e, SigningErr.fromPlain));
-}
-```
-
-This gives each method a specific error return type (e.g. `SigningErr` variants for signing, `StorageErr` variants for storage) rather than a generic error type.
+The internal `makeRequest(transport, method, version, payload)` wraps the payload in `{tag: version, value: payload}` before sending, and unwraps the response by stripping the version tag and splitting the `{success: true/false, value}` Result envelope. Callers never see the versioned wire format. `makeSubscription` similarly wraps start payloads and unwraps received payloads.
 
 ### 3.3 Accounts (`accounts.ts`)
 
@@ -522,9 +488,9 @@ Wraps `hostApi.localStorageWrite/Read/Clear` with convenience methods.
 - `constants.spec.ts` (13 tests) -- all chains present, hex format
 - `storage.spec.ts` (3 tests) -- API shape verification
 
-### 4.2 E2E Tests (1 file, 78 tests)
+### 4.2 E2E Tests (1 file, 51 tests)
 
-Playwright + headless Chromium. A Vite dev server serves two pages: host (creates Container + handlers with mock implementations using error classes) and product (inside iframe with its own Transport and HostApi). Real `postMessage` across the iframe boundary.
+Playwright + headless Chromium. A Vite dev server serves two pages: host (creates Container + handlers with mock implementations) and product (inside iframe with its own Transport). Real `postMessage` across the iframe boundary.
 
 Every test runs three times via `?codec=` query parameter:
 - **`structured_clone`** -- both sides use structured clone codec throughout
@@ -533,9 +499,7 @@ Every test runs three times via `?codec=` query parameter:
 
 **Happy-path tests** (12 per codec): handshake, feature check, account get, non-product accounts, sign payload, sign raw, localStorage write/read/clear, connection status subscription, navigate, device permission, multiple sequential requests.
 
-**Error wire-format tests** (5 per codec): verify that `Result` error envelopes (`success: false`) with plain `{tag, value}` survive the round-trip through encoding, iframe boundary, and decoding. Tests: sign payload rejected, create transaction not supported, account get alias unknown with reason, navigate to permission denied, storage write full.
-
-**Error class hydration tests** (9 per codec): verify the full error class round-trip — host creates error class instances (e.g. `new SigningErr.Rejected()`), they are flattened to `{tag, value}` on the wire, and the product receives proper `Error` instances with correct `.name`, `.message`, `.instance`, `.payload`, and `instanceof` behavior. Tests cover: `SigningErr.Rejected`, `CreateTransactionErr.NotSupported`, `NavigateToErr.PermissionDenied`, `StorageErr.Full`, `RequestCredentialsErr.Unknown`, `CreateProofErr.Unknown`, `ChatRoomRegistrationErr.PermissionDenied`, `ChatMessagePostingErr.Unknown`, `StatementProofErr.Unknown`.
+**Error-path tests** (5 per codec): sign payload rejected (`Rejected` tag, no value), create transaction not supported (`NotSupported` tag with string value), account get alias unknown (`Unknown` tag with `{reason}` struct), navigate to permission denied (`PermissionDenied` tag, no value), storage write full (`Full` tag, no value). These verify that `Result` error envelopes (`success: false`) with plain `{tag, value}` discriminated unions survive the round-trip through encoding, iframe boundary, and decoding across all three codec modes.
 
 ---
 

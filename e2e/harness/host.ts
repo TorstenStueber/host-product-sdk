@@ -13,10 +13,6 @@ import { createContainer, createIframeProvider } from '@polkadot/host';
 import type { Container } from '@polkadot/host';
 import {
   structuredCloneCodecAdapter, scaleCodecAdapter,
-  SigningErr, CreateTransactionErr, NavigateToErr, StorageErr,
-  RequestCredentialsErr, CreateProofErr,
-  ChatRoomRegistrationErr, ChatBotRegistrationErr, ChatMessagePostingErr,
-  StatementProofErr,
 } from '@polkadot/shared';
 import type { CodecAdapter, CodecAdapterMap } from '@polkadot/shared';
 
@@ -82,7 +78,7 @@ container.handlePermission((_req, ctx) => ctx.ok(false));
 // --- Navigation ---
 container.handleNavigateTo((url, ctx) => {
   if (url === 'blocked://denied') {
-    return ctx.err(new NavigateToErr.PermissionDenied());
+    return ctx.err({ tag: 'PermissionDenied' as const, value: undefined });
   }
   // Don't actually open, just record
   (window as unknown as Record<string, unknown>).__lastNavUrl = url;
@@ -107,7 +103,7 @@ container.handleLocalStorageRead((key, ctx) => {
 container.handleLocalStorageWrite((params, ctx) => {
   const [key, value] = params as [string, Uint8Array];
   if (key === '__FULL__') {
-    return ctx.err(new StorageErr.Full());
+    return ctx.err({ tag: 'Full' as const, value: undefined });
   }
   const fullKey = storagePrefix + key;
   storageData[fullKey] = value;
@@ -144,18 +140,18 @@ container.handleAccountConnectionStatusSubscribe((_params, send, _interrupt) => 
 });
 
 container.handleAccountGetAlias((_params, ctx) => {
-  return ctx.err(new RequestCredentialsErr.Unknown({ reason: 'Not supported' }));
+  return ctx.err({ tag: 'Unknown' as const, value: { reason: 'Not supported' } });
 });
 
 container.handleAccountCreateProof((_params, ctx) => {
-  return ctx.err(new CreateProofErr.Unknown({ reason: 'Not supported' }));
+  return ctx.err({ tag: 'Unknown' as const, value: { reason: 'Not supported' } });
 });
 
 // --- Signing ---
 container.handleSignPayload((params, ctx) => {
   const p = params as { address?: string };
   if (p.address === 'REJECT_ME') {
-    return ctx.err(new SigningErr.Rejected());
+    return ctx.err({ tag: 'Rejected' as const, value: undefined });
   }
   e2e.signPayloadCalls.push(params);
   return ctx.ok({
@@ -173,23 +169,23 @@ container.handleSignRaw((params, ctx) => {
 });
 
 container.handleCreateTransaction((_params, ctx) => {
-  return ctx.err(new CreateTransactionErr.NotSupported('Not implemented in E2E'));
+  return ctx.err({ tag: 'NotSupported' as const, value: 'Not implemented in E2E' });
 });
 
 container.handleCreateTransactionWithNonProductAccount((_params, ctx) => {
-  return ctx.err(new CreateTransactionErr.NotSupported('Not implemented in E2E'));
+  return ctx.err({ tag: 'NotSupported' as const, value: 'Not implemented in E2E' });
 });
 
 // --- Chat (no-op) ---
-container.handleChatCreateRoom((_p, ctx) => ctx.err(new ChatRoomRegistrationErr.PermissionDenied()));
-container.handleChatRegisterBot((_p, ctx) => ctx.err(new ChatBotRegistrationErr.PermissionDenied()));
-container.handleChatPostMessage((_p, ctx) => ctx.err(new ChatMessagePostingErr.Unknown({ reason: 'disabled' })));
+container.handleChatCreateRoom((_p, ctx) => ctx.err({ tag: 'PermissionDenied' as const, value: undefined }));
+container.handleChatRegisterBot((_p, ctx) => ctx.err({ tag: 'PermissionDenied' as const, value: undefined }));
+container.handleChatPostMessage((_p, ctx) => ctx.err({ tag: 'Unknown' as const, value: { reason: 'disabled' } }));
 container.handleChatListSubscribe((_p, _s, interrupt) => { interrupt(); return () => {}; });
 container.handleChatActionSubscribe((_p, _s, interrupt) => { interrupt(); return () => {}; });
 container.handleChatCustomMessageRenderSubscribe((_p, _s, interrupt) => { interrupt(); return () => {}; });
 
 // --- Statement store (no-op) ---
-container.handleStatementStoreCreateProof((_p, ctx) => ctx.err(new StatementProofErr.Unknown({ reason: 'disabled' })));
+container.handleStatementStoreCreateProof((_p, ctx) => ctx.err({ tag: 'Unknown' as const, value: { reason: 'disabled' } }));
 container.handleStatementStoreSubmit((_p, ctx) => ctx.err({ reason: 'disabled' }));  // GenericErr — plain object
 container.handleStatementStoreSubscribe((_p, _s, interrupt) => { interrupt(); return () => {}; });
 

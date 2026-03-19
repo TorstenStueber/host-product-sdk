@@ -20,14 +20,6 @@ import type {
 } from './types.js';
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function enumValue<V extends string, T>(tag: V, value: T): { tag: V; value: T } {
-  return { tag, value };
-}
-
-// ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
@@ -51,11 +43,9 @@ export const createStatementStore = (transport: Transport = sandboxTransport) =>
       callback: (statements: SignedStatement[]) => void,
     ) {
       return hostApi.statementStoreSubscribe(
-        enumValue('v1', topics),
-        (payload: { tag: string; value: unknown }) => {
-          if (payload.tag === 'v1') {
-            callback(payload.value as SignedStatement[]);
-          }
+        topics,
+        (payload) => {
+          callback(payload);
         },
       );
     },
@@ -70,18 +60,15 @@ export const createStatementStore = (transport: Transport = sandboxTransport) =>
       statement: Statement,
     ): Promise<unknown> {
       const result = await hostApi.statementStoreCreateProof(
-        enumValue('v1', [accountId, statement]),
+        [accountId, statement],
       );
 
       return result.match(
-        (payload: { tag: string; value: unknown }) => {
-          if (payload.tag === 'v1') {
-            return payload.value;
-          }
-          throw new Error(`Unknown response version ${payload.tag}`);
+        (payload) => {
+          return payload;
         },
-        (err: { tag: string; value: unknown }) => {
-          throw err.value;
+        (err) => {
+          throw err;
         },
       );
     },
@@ -91,18 +78,15 @@ export const createStatementStore = (transport: Transport = sandboxTransport) =>
      */
     async submit(signedStatement: SignedStatement): Promise<void> {
       const result = await hostApi.statementStoreSubmit(
-        enumValue('v1', signedStatement),
+        signedStatement,
       );
 
       return result.match(
-        (payload: { tag: string; value: unknown }) => {
-          if (payload.tag === 'v1') {
-            return;
-          }
-          throw new Error(`Unknown response version ${payload.tag}`);
+        () => {
+          return;
         },
-        (err: { tag: string; value: unknown }) => {
-          throw err.value;
+        (err) => {
+          throw err;
         },
       );
     },

@@ -129,13 +129,6 @@ export type {
   SubscriptionParams, SubscriptionPayload,
 } from './codec/scale/protocol.js';
 export { structuredCloneCodecAdapter } from './codec/structured/index.js';
-export {
-  GenericError,
-  HandshakeErr, RequestCredentialsErr, CreateProofErr,
-  SigningErr, CreateTransactionErr, StorageErr, NavigateToErr,
-  ChatRoomRegistrationErr, ChatBotRegistrationErr, ChatMessagePostingErr,
-  StatementProofErr, PreimageSubmitErr,
-} from './codec/scale/errors.js';
 export { UPGRADE_TIMEOUT, requestCodecUpgrade, handleCodecUpgrade } from './codec/negotiation.js';
 export type {
   CodecFormat,

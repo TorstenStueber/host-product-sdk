@@ -59,29 +59,6 @@ import type { HexString, VersionedTxPayload } from './types.js';
 // Helpers
 // ---------------------------------------------------------------------------
 
-const UNSUPPORTED_VERSION_ERROR = 'Unsupported message version';
-
-function enumValue<V extends string, T>(tag: V, value: T): { tag: V; value: T } {
-  return { tag, value };
-}
-
-function assertEnumVariant<V extends string>(
-  value: { tag: string; value: unknown },
-  variant: V,
-  errorMessage: string,
-): asserts value is { tag: V; value: unknown } {
-  if (value.tag !== variant) {
-    throw new Error(errorMessage);
-  }
-}
-
-function toHex(bytes: Uint8Array): HexString {
-  const hex = Array.from(bytes)
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-  return `0x${hex}` as HexString;
-}
-
 function fromHex(hex: string): Uint8Array {
   const clean = hex.startsWith('0x') ? hex.slice(2) : hex;
   const bytes = new Uint8Array(clean.length / 2);
@@ -131,27 +108,19 @@ export async function createNonProductExtensionEnableFactory(
   async function enable(_origin?: string): Promise<Injected> {
     async function getAccounts(): Promise<InjectedAccount[]> {
       const response = await hostApi.getNonProductAccounts(
-        enumValue('v1', undefined),
+        undefined,
       );
 
       return response.match(
-        (response: { tag: string; value: unknown }) => {
-          assertEnumVariant(response, 'v1', UNSUPPORTED_VERSION_ERROR);
-
-          const accounts = response.value as Array<{
-            publicKey: Uint8Array;
-            name: string | null;
-          }>;
-
-          return accounts.map<InjectedAccount>(account => ({
+        (response) => {
+          return response.map<InjectedAccount>(account => ({
             name: account.name ?? undefined,
             address: accountId.dec(account.publicKey),
             type: 'sr25519',
           }));
         },
-        (err: { tag: string; value: unknown }) => {
-          assertEnumVariant(err, 'v1', UNSUPPORTED_VERSION_ERROR);
-          throw err.value;
+        (err) => {
+          throw err;
         },
       );
     }
@@ -179,24 +148,18 @@ export async function createNonProductExtensionEnableFactory(
                 : { tag: 'Payload' as const, value: raw.data },
           };
 
-          const response = await hostApi.signRaw(enumValue('v1', payload));
+          const response = await hostApi.signRaw(payload);
 
           return response.match(
-            (response: { tag: string; value: unknown }) => {
-              assertEnumVariant(response, 'v1', UNSUPPORTED_VERSION_ERROR);
-              const result = response.value as {
-                signature: HexString;
-                signedTransaction: HexString | null;
-              };
+            (response) => {
               return {
                 id: 0,
-                signature: result.signature,
-                signedTransaction: result.signedTransaction,
+                signature: response.signature,
+                signedTransaction: response.signedTransaction,
               };
             },
-            (err: { tag: string; value: unknown }) => {
-              assertEnumVariant(err, 'v1', UNSUPPORTED_VERSION_ERROR);
-              throw err.value;
+            (err) => {
+              throw err;
             },
           );
         },
@@ -222,25 +185,19 @@ export async function createNonProductExtensionEnableFactory(
           };
 
           const response = await hostApi.signPayload(
-            enumValue('v1', codecPayload),
+            codecPayload,
           );
 
           return response.match(
-            (response: { tag: string; value: unknown }) => {
-              assertEnumVariant(response, 'v1', UNSUPPORTED_VERSION_ERROR);
-              const result = response.value as {
-                signature: HexString;
-                signedTransaction: HexString | null;
-              };
+            (response) => {
               return {
                 id: 0,
-                signature: result.signature,
-                signedTransaction: result.signedTransaction,
+                signature: response.signature,
+                signedTransaction: response.signedTransaction,
               };
             },
-            (err: { tag: string; value: unknown }) => {
-              assertEnumVariant(err, 'v1', UNSUPPORTED_VERSION_ERROR);
-              throw err.value;
+            (err) => {
+              throw err;
             },
           );
         },
@@ -250,17 +207,15 @@ export async function createNonProductExtensionEnableFactory(
         ): Promise<HexString> {
           const response =
             await hostApi.createTransactionWithNonProductAccount(
-              enumValue('v1', payload),
+              payload,
             );
 
           return response.match(
-            (response: { tag: string; value: unknown }) => {
-              assertEnumVariant(response, 'v1', UNSUPPORTED_VERSION_ERROR);
-              return toHex(response.value as Uint8Array);
+            (response) => {
+              return response;
             },
-            (err: { tag: string; value: unknown }) => {
-              assertEnumVariant(err, 'v1', UNSUPPORTED_VERSION_ERROR);
-              throw err.value;
+            (err) => {
+              throw err;
             },
           );
         },

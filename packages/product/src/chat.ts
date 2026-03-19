@@ -24,14 +24,6 @@ import type {
 } from './types.js';
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function enumValue<V extends string, T>(tag: V, value: T): { tag: V; value: T } {
-  return { tag, value };
-}
-
-// ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
@@ -61,22 +53,15 @@ export const createProductChatManager = (transport: Transport = sandboxTransport
         return existingRegistration;
       }
 
-      const result = await hostApi.chatCreateRoom(enumValue('v1', params));
+      const result = await hostApi.chatCreateRoom(params);
 
       return result.match(
-        (payload: { tag: string; value: unknown }) => {
-          switch (payload.tag) {
-            case 'v1': {
-              const v = payload.value as { status: ChatRoomRegistrationStatus };
-              roomRegistrationStatus[params.roomId] = v.status;
-              return v.status;
-            }
-            default:
-              throw new Error(`Unknown message version ${payload.tag}`);
-          }
+        (payload) => {
+          roomRegistrationStatus[params.roomId] = payload.status;
+          return payload.status;
         },
-        (err: { tag: string; value: unknown }) => {
-          throw err.value;
+        (err) => {
+          throw err;
         },
       );
     },
@@ -96,22 +81,15 @@ export const createProductChatManager = (transport: Transport = sandboxTransport
         return existingRegistration;
       }
 
-      const result = await hostApi.chatRegisterBot(enumValue('v1', params));
+      const result = await hostApi.chatRegisterBot(params);
 
       return result.match(
-        (payload: { tag: string; value: unknown }) => {
-          switch (payload.tag) {
-            case 'v1': {
-              const v = payload.value as { status: ChatBotRegistrationStatus };
-              botRegistrationStatus[params.botId] = v.status;
-              return v.status;
-            }
-            default:
-              throw new Error(`Unknown message version ${payload.tag}`);
-          }
+        (payload) => {
+          botRegistrationStatus[params.botId] = payload.status;
+          return payload.status;
         },
-        (err: { tag: string; value: unknown }) => {
-          throw err.value;
+        (err) => {
+          throw err;
         },
       );
     },
@@ -125,22 +103,15 @@ export const createProductChatManager = (transport: Transport = sandboxTransport
       payload: ChatMessageContent,
     ): Promise<{ messageId: string }> {
       const result = await hostApi.chatPostMessage(
-        enumValue('v1', { roomId, payload }),
+        { roomId, payload },
       );
 
       return result.match(
-        (payload: { tag: string; value: unknown }) => {
-          switch (payload.tag) {
-            case 'v1': {
-              const v = payload.value as { messageId: string };
-              return { messageId: v.messageId };
-            }
-            default:
-              throw new Error(`Unknown message version ${payload.tag}`);
-          }
+        (payload) => {
+          return { messageId: payload.messageId };
         },
-        (err: { tag: string; value: unknown }) => {
-          throw err.value;
+        (err) => {
+          throw err;
         },
       );
     },
@@ -150,11 +121,9 @@ export const createProductChatManager = (transport: Transport = sandboxTransport
      */
     subscribeChatList(callback: (rooms: ChatRoom[]) => void) {
       return hostApi.chatListSubscribe(
-        enumValue('v1', undefined),
-        (action: { tag: string; value: unknown }) => {
-          if (action.tag === 'v1') {
-            callback(action.value as ChatRoom[]);
-          }
+        undefined,
+        (action) => {
+          callback(action);
         },
       );
     },
@@ -164,15 +133,9 @@ export const createProductChatManager = (transport: Transport = sandboxTransport
      */
     subscribeAction(callback: (action: ReceivedChatAction) => void) {
       return hostApi.chatActionSubscribe(
-        enumValue('v1', undefined),
-        (action: { tag: string; value: unknown }) => {
-          switch (action.tag) {
-            case 'v1':
-              callback(action.value as ReceivedChatAction);
-              break;
-            default:
-              console.error(`Unknown message version ${action.tag}`);
-          }
+        undefined,
+        (action) => {
+          callback(action);
         },
       );
     },
@@ -216,19 +179,16 @@ export const createProductChatManager = (transport: Transport = sandboxTransport
                 ) => void,
               ) {
                 const actionsSubscription = hostApi.chatActionSubscribe(
-                  enumValue('v1', undefined),
-                  (action: { tag: string; value: unknown }) => {
-                    if (action.tag === 'v1') {
-                      const received = action.value as ReceivedChatAction;
-                      if (
-                        received.payload.tag === 'ActionTriggered' &&
-                        received.payload.value.messageId === messageId
-                      ) {
-                        actionCallback(
-                          received.payload.value.actionId,
-                          received.payload.value.payload ?? undefined,
-                        );
-                      }
+                  undefined,
+                  (action) => {
+                    if (
+                      action.payload.tag === 'ActionTriggered' &&
+                      action.payload.value.messageId === messageId
+                    ) {
+                      actionCallback(
+                        action.payload.value.actionId,
+                        action.payload.value.payload ?? undefined,
+                      );
                     }
                   },
                 );
@@ -236,7 +196,7 @@ export const createProductChatManager = (transport: Transport = sandboxTransport
                 return actionsSubscription.unsubscribe;
               },
             },
-            (node: CustomRendererNode) => send(enumValue('v1', node)),
+            (node: CustomRendererNode) => send({ tag: 'v1' as const, value: node }),
           );
         },
       );

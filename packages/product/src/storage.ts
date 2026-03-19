@@ -10,44 +10,8 @@
  */
 
 import type { Transport } from '@polkadot/shared';
-import { ResultAsync } from '@polkadot/shared';
-
 import { createHostApi } from './hostApi.js';
 import { sandboxTransport } from './transport/sandboxTransport.js';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function enumValue<V extends string, T>(tag: V, value: T): { tag: V; value: T } {
-  return { tag, value };
-}
-
-function unwrapVersionedResult<T>(
-  version: string,
-  result: ResultAsync<{ tag: string; value: unknown }, { tag: string; value: unknown }>,
-): ResultAsync<T, unknown> {
-  return result
-    .mapErr((payload: { tag: string; value: unknown }) => {
-      if (payload.tag !== version) {
-        return new Error(`Unsupported result version ${payload.tag}`);
-      }
-      return payload.value;
-    })
-    .andThen((payload: { tag: string; value: unknown }) => {
-      if (payload.tag !== version) {
-        return ResultAsync.fromPromise(
-          Promise.reject(new Error(`Unsupported result version ${payload.tag}`)),
-          (e) => e,
-        );
-      }
-      return ResultAsync.fromSafePromise(Promise.resolve(payload.value as T));
-    });
-}
-
-function resultToPromise<T>(result: ResultAsync<T, unknown>): Promise<T> {
-  return new Promise<T>((resolve, reject) => result.match(resolve, reject));
-}
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -59,35 +23,25 @@ function resultToPromise<T>(result: ResultAsync<T, unknown>): Promise<T> {
  * @param transport - The transport to use. Defaults to the sandbox transport.
  */
 export const createLocalStorage = (transport: Transport = sandboxTransport) => {
-  const supportedVersion = 'v1';
   const hostApi = createHostApi(transport);
   const textEncoder = new TextEncoder();
   const textDecoder = new TextDecoder();
 
-  function readBytes(key: string): Promise<Uint8Array> {
-    return resultToPromise(
-      unwrapVersionedResult<Uint8Array>(
-        supportedVersion,
-        hostApi.localStorageRead(enumValue(supportedVersion, key)),
-      ),
+  function readBytes(key: string): Promise<Uint8Array | undefined> {
+    return new Promise<Uint8Array | undefined>((resolve, reject) =>
+      hostApi.localStorageRead(key).match(resolve, reject),
     );
   }
 
   function writeBytes(key: string, value: Uint8Array): Promise<void> {
-    return resultToPromise(
-      unwrapVersionedResult<void>(
-        supportedVersion,
-        hostApi.localStorageWrite(enumValue(supportedVersion, [key, value])),
-      ),
+    return new Promise<void>((resolve, reject) =>
+      hostApi.localStorageWrite([key, value]).match(resolve, reject),
     );
   }
 
   function clearKey(key: string): Promise<void> {
-    return resultToPromise(
-      unwrapVersionedResult<void>(
-        supportedVersion,
-        hostApi.localStorageClear(enumValue(supportedVersion, key)),
-      ),
+    return new Promise<void>((resolve, reject) =>
+      hostApi.localStorageClear(key).match(resolve, reject),
     );
   }
 
@@ -102,7 +56,7 @@ export const createLocalStorage = (transport: Transport = sandboxTransport) => {
     /**
      * Read raw bytes stored at `key`.
      */
-    async readBytes(key: string): Promise<Uint8Array> {
+    async readBytes(key: string): Promise<Uint8Array | undefined> {
       return readBytes(key);
     },
 

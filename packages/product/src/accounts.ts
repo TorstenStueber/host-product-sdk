@@ -10,8 +10,6 @@
  */
 
 import type { Transport } from '@polkadot/shared';
-import { ok, err } from '@polkadot/shared';
-
 import { createHostApi } from './hostApi.js';
 import { sandboxTransport } from './transport/sandboxTransport.js';
 import type {
@@ -19,35 +17,11 @@ import type {
   HexString,
   ProductAccount,
   RingLocation,
-  SigningResult,
 } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const UNSUPPORTED_VERSION_ERROR = 'Unsupported message version';
-
-function enumValue<V extends string, T>(tag: V, value: T): { tag: V; value: T } {
-  return { tag, value };
-}
-
-function isEnumVariant<V extends string>(
-  value: { tag: string; value: unknown },
-  variant: V,
-): value is { tag: V; value: unknown } {
-  return value.tag === variant;
-}
-
-function assertEnumVariant<V extends string>(
-  value: { tag: string; value: unknown },
-  variant: V,
-  errorMessage: string,
-): asserts value is { tag: V; value: unknown } {
-  if (value.tag !== variant) {
-    throw new Error(errorMessage);
-  }
-}
 
 function fromHex(hex: string): Uint8Array {
   const clean = hex.startsWith('0x') ? hex.slice(2) : hex;
@@ -76,14 +50,7 @@ export const createAccountsProvider = (transport: Transport = sandboxTransport) 
      */
     getProductAccount(dotNsIdentifier: string, derivationIndex = 0) {
       return hostApi
-        .accountGet(enumValue('v1', [dotNsIdentifier, derivationIndex]))
-        .mapErr((e: { tag: string; value: unknown }) => e.value)
-        .andThen((response: { tag: string; value: unknown }) => {
-          if (isEnumVariant(response, 'v1')) {
-            return ok(response.value as ProductAccount);
-          }
-          return err({ tag: 'Unknown' as const, value: { reason: `Unsupported response version ${response.tag}` } });
-        });
+        .accountGet([dotNsIdentifier, derivationIndex]);
     },
 
     /**
@@ -91,14 +58,7 @@ export const createAccountsProvider = (transport: Transport = sandboxTransport) 
      */
     getProductAccountAlias(dotNsIdentifier: string, derivationIndex = 0) {
       return hostApi
-        .accountGetAlias(enumValue('v1', [dotNsIdentifier, derivationIndex]))
-        .mapErr((e: { tag: string; value: unknown }) => e.value)
-        .andThen((response: { tag: string; value: unknown }) => {
-          if (isEnumVariant(response, 'v1')) {
-            return ok(response.value);
-          }
-          return err({ tag: 'Unknown' as const, value: { reason: `Unsupported response version ${response.tag}` } });
-        });
+        .accountGetAlias([dotNsIdentifier, derivationIndex]);
     },
 
     /**
@@ -106,14 +66,7 @@ export const createAccountsProvider = (transport: Transport = sandboxTransport) 
      */
     getNonProductAccounts() {
       return hostApi
-        .getNonProductAccounts(enumValue('v1', undefined))
-        .mapErr((e: { tag: string; value: unknown }) => e.value)
-        .andThen((response: { tag: string; value: unknown }) => {
-          if (isEnumVariant(response, 'v1')) {
-            return ok(response.value as Array<{ publicKey: Uint8Array; name: string | null }>);
-          }
-          return err({ tag: 'Unknown' as const, value: { reason: `Unsupported response version ${response.tag}` } });
-        });
+        .getNonProductAccounts(undefined);
     },
 
     /**
@@ -127,15 +80,8 @@ export const createAccountsProvider = (transport: Transport = sandboxTransport) 
     ) {
       return hostApi
         .accountCreateProof(
-          enumValue('v1', [[dotNsIdentifier, derivationIndex], location, message]),
-        )
-        .mapErr((e: { tag: string; value: unknown }) => e.value)
-        .andThen((response: { tag: string; value: unknown }) => {
-          if (isEnumVariant(response, 'v1')) {
-            return ok(response.value as Uint8Array);
-          }
-          return err({ tag: 'Unknown' as const, value: { reason: `Unsupported response version ${response.tag}` } });
-        });
+          [[dotNsIdentifier, derivationIndex], location, message],
+        );
     },
 
     /**
@@ -164,11 +110,9 @@ export const createAccountsProvider = (transport: Transport = sandboxTransport) 
      */
     subscribeAccountConnectionStatus(callback: (status: AccountConnectionStatus) => void) {
       return hostApi.accountConnectionStatusSubscribe(
-        enumValue('v1', undefined),
-        (status: { tag: string; value: unknown }) => {
-          if (status.tag === 'v1') {
-            callback(status.value as AccountConnectionStatus);
-          }
+        undefined,
+        (status) => {
+          callback(status);
         },
       );
     },
@@ -221,21 +165,18 @@ function createSignerForAccount(
         withSignedTransaction: payload.withSignedTransaction ?? undefined,
       };
 
-      const response = await hostApi.signPayload(enumValue('v1', codecPayload));
+      const response = await hostApi.signPayload(codecPayload);
 
       return response.match(
-        (response: { tag: string; value: unknown }) => {
-          assertEnumVariant(response, 'v1', UNSUPPORTED_VERSION_ERROR);
-          const result = response.value as SigningResult;
+        (result) => {
           return {
             id: 0,
             signature: result.signature,
             signedTransaction: result.signedTransaction ?? null,
           };
         },
-        (error: { tag: string; value: unknown }) => {
-          assertEnumVariant(error, 'v1', UNSUPPORTED_VERSION_ERROR);
-          throw error.value;
+        (error) => {
+          throw error;
         },
       );
     },
@@ -253,21 +194,18 @@ function createSignerForAccount(
             : { tag: 'Payload' as const, value: raw.data },
       };
 
-      const response = await hostApi.signRaw(enumValue('v1', payload));
+      const response = await hostApi.signRaw(payload);
 
       return response.match(
-        (response: { tag: string; value: unknown }) => {
-          assertEnumVariant(response, 'v1', UNSUPPORTED_VERSION_ERROR);
-          const result = response.value as SigningResult;
+        (result) => {
           return {
             id: 0,
             signature: result.signature,
             signedTransaction: result.signedTransaction ?? null,
           };
         },
-        (error: { tag: string; value: unknown }) => {
-          assertEnumVariant(error, 'v1', UNSUPPORTED_VERSION_ERROR);
-          throw error.value;
+        (error) => {
+          throw error;
         },
       );
     },

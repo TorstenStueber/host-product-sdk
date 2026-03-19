@@ -9,45 +9,9 @@
  */
 
 import type { Transport } from '@polkadot/shared';
-import { ResultAsync } from '@polkadot/shared';
-
 import { createHostApi } from './hostApi.js';
 import { sandboxTransport } from './transport/sandboxTransport.js';
 import type { HexString } from './types.js';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function enumValue<V extends string, T>(tag: V, value: T): { tag: V; value: T } {
-  return { tag, value };
-}
-
-function unwrapVersionedResult<T>(
-  version: string,
-  result: ResultAsync<{ tag: string; value: unknown }, { tag: string; value: unknown }>,
-): ResultAsync<T, unknown> {
-  return result
-    .mapErr((payload: { tag: string; value: unknown }) => {
-      if (payload.tag !== version) {
-        return new Error(`Unsupported result version ${payload.tag}`);
-      }
-      return payload.value;
-    })
-    .andThen((payload: { tag: string; value: unknown }) => {
-      if (payload.tag !== version) {
-        return ResultAsync.fromPromise(
-          Promise.reject(new Error(`Unsupported result version ${payload.tag}`)),
-          (e) => e,
-        );
-      }
-      return ResultAsync.fromSafePromise(Promise.resolve(payload.value as T));
-    });
-}
-
-function resultToPromise<T>(result: ResultAsync<T, unknown>): Promise<T> {
-  return new Promise<T>((resolve, reject) => result.match(resolve, reject));
-}
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -59,7 +23,6 @@ function resultToPromise<T>(result: ResultAsync<T, unknown>): Promise<T> {
  * @param transport - The transport to use. Defaults to the sandbox transport.
  */
 export const createPreimageManager = (transport: Transport = sandboxTransport) => {
-  const supportedVersion = 'v1';
   const hostApi = createHostApi(transport);
 
   return {
@@ -74,11 +37,9 @@ export const createPreimageManager = (transport: Transport = sandboxTransport) =
       callback: (preimage: Uint8Array | null) => void,
     ) {
       return hostApi.preimageLookupSubscribe(
-        enumValue(supportedVersion, key),
-        (payload: { tag: string; value: unknown }) => {
-          if (payload.tag === supportedVersion) {
-            callback(payload.value as Uint8Array | null);
-          }
+        key,
+        (payload) => {
+          callback(payload as Uint8Array | null);
         },
       );
     },
@@ -86,12 +47,11 @@ export const createPreimageManager = (transport: Transport = sandboxTransport) =
     /**
      * Submit a preimage to the host.
      */
-    submit(value: Uint8Array): Promise<void> {
-      return resultToPromise(
-        unwrapVersionedResult<void>(
-          supportedVersion,
-          hostApi.preimageSubmit(enumValue(supportedVersion, value)),
-        ),
+    async submit(value: Uint8Array): Promise<void> {
+      const result = await hostApi.preimageSubmit(value);
+      result.match(
+        () => {},
+        (err) => { throw err; },
       );
     },
   };

@@ -161,10 +161,7 @@ export function createContainer(options: CreateContainerOptions): Container {
           if (result.ok) {
             return wrapOk(version, result.value);
           }
-          // Flatten error to plain {tag, value} for wire safety (structured clone
-          // does not preserve custom Error properties).
-          const err = result.error as { tag: string; value: unknown };
-          return wrapErr(version, { tag: err.tag, value: err.value });
+          return wrapErr(version, result.error);
         } catch (e) {
           return wrapErr(version, defaultError);
         }

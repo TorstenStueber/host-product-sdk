@@ -10,21 +10,18 @@
  * abstraction from @polkadot/shared.
  */
 
-import type { Transport } from '@polkadot/shared';
+import type {
+  Transport,
+  SubscriptionPayload,
+  RuntimeType,
+  OperationStartedResult,
+} from '@polkadot/shared';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 import { getSyncProvider } from '@polkadot-api/json-rpc-provider-proxy';
 
 import { createHostApi } from './hostApi.js';
 import { sandboxTransport } from './transport/sandboxTransport.js';
 import type { HexString } from './types.js';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function enumValue<V extends string, T>(tag: V, value: T): { tag: V; value: T } {
-  return { tag, value };
-}
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -50,7 +47,6 @@ export function createPapiProvider(
   __fallback?: JsonRpcProvider,
   internal?: InternalParams,
 ): JsonRpcProvider {
-  const version = 'v1';
   const transport = internal?.transport ?? sandboxTransport;
 
   if (!transport.isCorrectEnvironment()) {
@@ -104,105 +100,61 @@ export function createPapiProvider(
 
     // -- Event conversion ---------------------------------------------------
 
-    function convertTypedEventToJsonRpc(event: { tag: string; value: unknown }): unknown {
+    type ChainHeadEvent = SubscriptionPayload<'remote_chain_head_follow', 'v1'>;
+
+    function convertTypedEventToJsonRpc(event: ChainHeadEvent): unknown {
       switch (event.tag) {
-        case 'Initialized': {
-          const v = event.value as {
-            finalizedBlockHashes: HexString[];
-            finalizedBlockRuntime: unknown;
-          };
+        case 'Initialized':
           return {
             event: 'initialized',
-            finalizedBlockHashes: v.finalizedBlockHashes,
-            finalizedBlockRuntime: convertRuntimeToJsonRpc(v.finalizedBlockRuntime),
+            finalizedBlockHashes: event.value.finalizedBlockHashes,
+            finalizedBlockRuntime: convertRuntimeToJsonRpc(event.value.finalizedBlockRuntime),
           };
-        }
-        case 'NewBlock': {
-          const v = event.value as {
-            blockHash: HexString;
-            parentBlockHash: HexString;
-            newRuntime: unknown;
-          };
+        case 'NewBlock':
           return {
             event: 'newBlock',
-            blockHash: v.blockHash,
-            parentBlockHash: v.parentBlockHash,
-            newRuntime: convertRuntimeToJsonRpc(v.newRuntime),
+            blockHash: event.value.blockHash,
+            parentBlockHash: event.value.parentBlockHash,
+            newRuntime: convertRuntimeToJsonRpc(event.value.newRuntime),
           };
-        }
-        case 'BestBlockChanged': {
-          const v = event.value as { bestBlockHash: HexString };
-          return { event: 'bestBlockChanged', bestBlockHash: v.bestBlockHash };
-        }
-        case 'Finalized': {
-          const v = event.value as {
-            finalizedBlockHashes: HexString[];
-            prunedBlockHashes: HexString[];
-          };
+        case 'BestBlockChanged':
+          return { event: 'bestBlockChanged', bestBlockHash: event.value.bestBlockHash };
+        case 'Finalized':
           return {
             event: 'finalized',
-            finalizedBlockHashes: v.finalizedBlockHashes,
-            prunedBlockHashes: v.prunedBlockHashes,
+            finalizedBlockHashes: event.value.finalizedBlockHashes,
+            prunedBlockHashes: event.value.prunedBlockHashes,
           };
-        }
-        case 'OperationBodyDone': {
-          const v = event.value as { operationId: string; value: HexString[] };
+        case 'OperationBodyDone':
           return {
             event: 'operationBodyDone',
-            operationId: v.operationId,
-            value: v.value,
+            operationId: event.value.operationId,
+            value: event.value.value,
           };
-        }
-        case 'OperationCallDone': {
-          const v = event.value as { operationId: string; output: HexString };
+        case 'OperationCallDone':
           return {
             event: 'operationCallDone',
-            operationId: v.operationId,
-            output: v.output,
+            operationId: event.value.operationId,
+            output: event.value.output,
           };
-        }
-        case 'OperationStorageItems': {
-          const v = event.value as {
-            operationId: string;
-            items: {
-              key: HexString;
-              value: HexString | null;
-              hash: HexString | null;
-              closestDescendantMerkleValue: HexString | null;
-            }[];
-          };
+        case 'OperationStorageItems':
           return {
             event: 'operationStorageItems',
-            operationId: v.operationId,
-            items: v.items,
+            operationId: event.value.operationId,
+            items: event.value.items,
           };
-        }
-        case 'OperationStorageDone': {
-          const v = event.value as { operationId: string };
-          return { event: 'operationStorageDone', operationId: v.operationId };
-        }
-        case 'OperationWaitingForContinue': {
-          const v = event.value as { operationId: string };
-          return {
-            event: 'operationWaitingForContinue',
-            operationId: v.operationId,
-          };
-        }
-        case 'OperationInaccessible': {
-          const v = event.value as { operationId: string };
-          return {
-            event: 'operationInaccessible',
-            operationId: v.operationId,
-          };
-        }
-        case 'OperationError': {
-          const v = event.value as { operationId: string; error: string };
+        case 'OperationStorageDone':
+          return { event: 'operationStorageDone', operationId: event.value.operationId };
+        case 'OperationWaitingForContinue':
+          return { event: 'operationWaitingForContinue', operationId: event.value.operationId };
+        case 'OperationInaccessible':
+          return { event: 'operationInaccessible', operationId: event.value.operationId };
+        case 'OperationError':
           return {
             event: 'operationError',
-            operationId: v.operationId,
-            error: v.error,
+            operationId: event.value.operationId,
+            error: event.value.error,
           };
-        }
         case 'Stop':
           return { event: 'stop' };
         default:
@@ -210,19 +162,11 @@ export function createPapiProvider(
       }
     }
 
-    function convertRuntimeToJsonRpc(runtime: unknown): unknown {
-      if (!runtime || typeof runtime !== 'object') return null;
+    function convertRuntimeToJsonRpc(runtime: RuntimeType | undefined): unknown {
+      if (!runtime) return null;
 
-      const rt = runtime as { tag: string; value: unknown };
-      if (rt.tag === 'Valid') {
-        const spec = rt.value as {
-          specName: string;
-          implName: string;
-          specVersion: number;
-          implVersion: number;
-          transactionVersion: number | undefined;
-          apis: [string, number][];
-        };
+      if (runtime.tag === 'Valid') {
+        const spec = runtime.value;
         const apisObj: Record<string, number> = {};
         for (const [name, ver] of spec.apis) {
           apisObj[name] = ver;
@@ -239,9 +183,8 @@ export function createPapiProvider(
           },
         };
       }
-      if (rt.tag === 'Invalid') {
-        const v = rt.value as { error: string };
-        return { type: 'invalid', error: v.error };
+      if (runtime.tag === 'Invalid') {
+        return { type: 'invalid', error: runtime.value.error };
       }
 
       return null;
@@ -269,22 +212,17 @@ export function createPapiProvider(
 
     // -- Operation result conversion ----------------------------------------
 
-    function convertOperationResultToJsonRpc(result: {
-      tag: string;
-      value: unknown;
-    }): unknown {
+    function convertOperationResultToJsonRpc(result: OperationStartedResult): unknown {
       if (result.tag === 'Started') {
-        const v = result.value as { operationId: string };
-        return { result: 'started', operationId: v.operationId };
+        return { result: 'started', operationId: result.value.operationId };
       }
       return { result: 'limitReached' };
     }
 
     // -- Error extraction helper --------------------------------------------
 
-    function extractErrorReason(error: { tag: string; value: unknown }): string {
-      const v = error.value as { payload?: { reason?: string }; reason?: string } | undefined;
-      return v?.payload?.reason ?? v?.reason ?? 'Unknown error';
+    function extractErrorReason(error: { reason: string }): string {
+      return error.reason;
     }
 
     // -- Message handler ----------------------------------------------------
@@ -306,14 +244,10 @@ export function createPapiProvider(
           const syntheticSubId = getNextSubId();
 
           const subscription = hostApi.chainHeadFollow(
-            enumValue(version, { genesisHash, withRuntime }),
-            (payload: { tag: string; value: unknown }) => {
-              if (payload.tag === version) {
-                const jsonRpcEvent = convertTypedEventToJsonRpc(
-                  payload.value as { tag: string; value: unknown },
-                );
-                sendFollowEvent(syntheticSubId, jsonRpcEvent);
-              }
+            { genesisHash, withRuntime },
+            (payload) => {
+              const jsonRpcEvent = convertTypedEventToJsonRpc(payload);
+              sendFollowEvent(syntheticSubId, jsonRpcEvent);
             },
           );
 
@@ -342,17 +276,15 @@ export function createPapiProvider(
         case 'chainHead_v1_header': {
           const [followSubId, hash] = params as [string, HexString];
           hostApi
-            .chainHeadHeader(
-              enumValue(version, {
-                genesisHash,
-                followSubscriptionId: followSubId,
-                hash,
-              }),
-            )
+            .chainHeadHeader({
+              genesisHash,
+              followSubscriptionId: followSubId,
+              hash,
+            })
             .match(
-              (result: { tag: string; value: unknown }) =>
-                sendJsonRpcResponse(id, (result as { value: unknown }).value),
-              (error: { tag: string; value: unknown }) =>
+              (result) =>
+                sendJsonRpcResponse(id, result),
+              (error) =>
                 sendJsonRpcError(id, -32603, extractErrorReason(error)),
             );
           break;
@@ -362,22 +294,18 @@ export function createPapiProvider(
         case 'chainHead_v1_body': {
           const [followSubId, hash] = params as [string, HexString];
           hostApi
-            .chainHeadBody(
-              enumValue(version, {
-                genesisHash,
-                followSubscriptionId: followSubId,
-                hash,
-              }),
-            )
+            .chainHeadBody({
+              genesisHash,
+              followSubscriptionId: followSubId,
+              hash,
+            })
             .match(
-              (result: { tag: string; value: unknown }) =>
+              (result) =>
                 sendJsonRpcResponse(
                   id,
-                  convertOperationResultToJsonRpc(
-                    result.value as { tag: string; value: unknown },
-                  ),
+                  convertOperationResultToJsonRpc(result),
                 ),
-              (error: { tag: string; value: unknown }) =>
+              (error) =>
                 sendJsonRpcError(id, -32603, extractErrorReason(error)),
             );
           break;
@@ -396,24 +324,20 @@ export function createPapiProvider(
             type: convertStorageTypeToTyped(item.type),
           }));
           hostApi
-            .chainHeadStorage(
-              enumValue(version, {
-                genesisHash,
-                followSubscriptionId: followSubId,
-                hash,
-                items: typedItems,
-                childTrie,
-              }),
-            )
+            .chainHeadStorage({
+              genesisHash,
+              followSubscriptionId: followSubId,
+              hash,
+              items: typedItems,
+              childTrie,
+            })
             .match(
-              (result: { tag: string; value: unknown }) =>
+              (result) =>
                 sendJsonRpcResponse(
                   id,
-                  convertOperationResultToJsonRpc(
-                    result.value as { tag: string; value: unknown },
-                  ),
+                  convertOperationResultToJsonRpc(result),
                 ),
-              (error: { tag: string; value: unknown }) =>
+              (error) =>
                 sendJsonRpcError(id, -32603, extractErrorReason(error)),
             );
           break;
@@ -428,24 +352,20 @@ export function createPapiProvider(
             HexString,
           ];
           hostApi
-            .chainHeadCall(
-              enumValue(version, {
-                genesisHash,
-                followSubscriptionId: followSubId,
-                hash,
-                function: fn,
-                callParameters,
-              }),
-            )
+            .chainHeadCall({
+              genesisHash,
+              followSubscriptionId: followSubId,
+              hash,
+              function: fn,
+              callParameters,
+            })
             .match(
-              (result: { tag: string; value: unknown }) =>
+              (result) =>
                 sendJsonRpcResponse(
                   id,
-                  convertOperationResultToJsonRpc(
-                    result.value as { tag: string; value: unknown },
-                  ),
+                  convertOperationResultToJsonRpc(result),
                 ),
-              (error: { tag: string; value: unknown }) =>
+              (error) =>
                 sendJsonRpcError(id, -32603, extractErrorReason(error)),
             );
           break;
@@ -461,16 +381,14 @@ export function createPapiProvider(
             ? hashOrHashes
             : [hashOrHashes];
           hostApi
-            .chainHeadUnpin(
-              enumValue(version, {
-                genesisHash,
-                followSubscriptionId: followSubId,
-                hashes,
-              }),
-            )
+            .chainHeadUnpin({
+              genesisHash,
+              followSubscriptionId: followSubId,
+              hashes,
+            })
             .match(
               () => sendJsonRpcResponse(id, null),
-              (error: { tag: string; value: unknown }) =>
+              (error) =>
                 sendJsonRpcError(id, -32603, extractErrorReason(error)),
             );
           break;
@@ -480,16 +398,14 @@ export function createPapiProvider(
         case 'chainHead_v1_continue': {
           const [followSubId, operationId] = params as [string, string];
           hostApi
-            .chainHeadContinue(
-              enumValue(version, {
-                genesisHash,
-                followSubscriptionId: followSubId,
-                operationId,
-              }),
-            )
+            .chainHeadContinue({
+              genesisHash,
+              followSubscriptionId: followSubId,
+              operationId,
+            })
             .match(
               () => sendJsonRpcResponse(id, null),
-              (error: { tag: string; value: unknown }) =>
+              (error) =>
                 sendJsonRpcError(id, -32603, extractErrorReason(error)),
             );
           break;
@@ -499,16 +415,14 @@ export function createPapiProvider(
         case 'chainHead_v1_stopOperation': {
           const [followSubId, operationId] = params as [string, string];
           hostApi
-            .chainHeadStopOperation(
-              enumValue(version, {
-                genesisHash,
-                followSubscriptionId: followSubId,
-                operationId,
-              }),
-            )
+            .chainHeadStopOperation({
+              genesisHash,
+              followSubscriptionId: followSubId,
+              operationId,
+            })
             .match(
               () => sendJsonRpcResponse(id, null),
-              (error: { tag: string; value: unknown }) =>
+              (error) =>
                 sendJsonRpcError(id, -32603, extractErrorReason(error)),
             );
           break;
@@ -516,10 +430,10 @@ export function createPapiProvider(
 
         // -- chainSpec_v1_genesisHash ---------------------------------------
         case 'chainSpec_v1_genesisHash': {
-          hostApi.chainSpecGenesisHash(enumValue(version, genesisHash)).match(
-            (result: { tag: string; value: unknown }) =>
-              sendJsonRpcResponse(id, result.value),
-            (error: { tag: string; value: unknown }) =>
+          hostApi.chainSpecGenesisHash(genesisHash).match(
+            (result) =>
+              sendJsonRpcResponse(id, result),
+            (error) =>
               sendJsonRpcError(id, -32603, extractErrorReason(error)),
           );
           break;
@@ -527,10 +441,10 @@ export function createPapiProvider(
 
         // -- chainSpec_v1_chainName -----------------------------------------
         case 'chainSpec_v1_chainName': {
-          hostApi.chainSpecChainName(enumValue(version, genesisHash)).match(
-            (result: { tag: string; value: unknown }) =>
-              sendJsonRpcResponse(id, result.value),
-            (error: { tag: string; value: unknown }) =>
+          hostApi.chainSpecChainName(genesisHash).match(
+            (result) =>
+              sendJsonRpcResponse(id, result),
+            (error) =>
               sendJsonRpcError(id, -32603, extractErrorReason(error)),
           );
           break;
@@ -538,15 +452,15 @@ export function createPapiProvider(
 
         // -- chainSpec_v1_properties ----------------------------------------
         case 'chainSpec_v1_properties': {
-          hostApi.chainSpecProperties(enumValue(version, genesisHash)).match(
-            (result: { tag: string; value: unknown }) => {
+          hostApi.chainSpecProperties(genesisHash).match(
+            (result) => {
               try {
-                sendJsonRpcResponse(id, JSON.parse(result.value as string));
+                sendJsonRpcResponse(id, JSON.parse(result));
               } catch {
-                sendJsonRpcResponse(id, result.value);
+                sendJsonRpcResponse(id, result);
               }
             },
-            (error: { tag: string; value: unknown }) =>
+            (error) =>
               sendJsonRpcError(id, -32603, extractErrorReason(error)),
           );
           break;
@@ -557,17 +471,17 @@ export function createPapiProvider(
           const [transaction] = params as [HexString];
           hostApi
             .chainTransactionBroadcast(
-              enumValue(version, { genesisHash, transaction }),
+              { genesisHash, transaction },
             )
             .match(
-              (result: { tag: string; value: unknown }) => {
-                const opId = result.value as string | null;
+              (result) => {
+                const opId = result;
                 if (opId !== null) {
                   activeBroadcasts.add(opId);
                 }
                 sendJsonRpcResponse(id, opId);
               },
-              (error: { tag: string; value: unknown }) =>
+              (error) =>
                 sendJsonRpcError(id, -32603, extractErrorReason(error)),
             );
           break;
@@ -579,11 +493,11 @@ export function createPapiProvider(
           activeBroadcasts.delete(operationId);
           hostApi
             .chainTransactionStop(
-              enumValue(version, { genesisHash, operationId }),
+              { genesisHash, operationId },
             )
             .match(
               () => sendJsonRpcResponse(id, null),
-              (error: { tag: string; value: unknown }) =>
+              (error) =>
                 sendJsonRpcError(id, -32603, extractErrorReason(error)),
             );
           break;
@@ -617,7 +531,7 @@ export function createPapiProvider(
         for (const operationId of activeBroadcasts) {
           hostApi
             .chainTransactionStop(
-              enumValue(version, { genesisHash, operationId }),
+              { genesisHash, operationId },
             )
             .match(
               () => {
@@ -641,29 +555,12 @@ export function createPapiProvider(
     return transport.isReady().then(ready => {
       if (!ready) return false;
 
-      return transport
-        .request(
-          'host_feature_supported',
-          enumValue('v1', enumValue('Chain', genesisHash)),
-        )
-        .then((payload) => {
-          const typed = payload as { tag: string; value: { success: boolean; value: unknown } };
-          switch (typed.tag) {
-            case 'v1': {
-              if (typed.value.success) {
-                return typed.value.value as boolean;
-              }
-              const err = typed.value.value as { payload?: { reason?: string } };
-              throw new Error(err?.payload?.reason ?? 'Feature check failed');
-            }
-            default:
-              throw new Error(`Unknown message version ${typed.tag}`);
-          }
-        })
-        .catch(e => {
-          transport.provider.logger.error('Error checking chain support', e);
-          return false;
-        });
+      return hostApi
+        .featureSupported({ tag: 'Chain' as const, value: genesisHash })
+        .match(
+          (supported) => supported,
+          () => false,
+        );
     });
   }
 

@@ -3,7 +3,7 @@
  *
  * Wraps the low-level transport `request()` / `subscribe()` calls into a
  * typed, ergonomic API surface.  Every request method returns a
- * `ResultAsync<Tagged<V, Ok>, Tagged<V, Err>>` from neverthrow so callers can
+ * `ResultAsync<Ok, Err>` from neverthrow so callers can
  * chain with `.map()`, `.andThen()`, `.match()`, etc.
  *
  * Handler param/ok/err types are derived from the SCALE codec definitions
@@ -28,112 +28,70 @@ import { sandboxTransport } from './transport/sandboxTransport.js';
 // Versioned envelope helper
 // ---------------------------------------------------------------------------
 
-type Tagged<V extends string, T> = { tag: V; value: T };
-
-/**
- * Construct a versioned tagged envelope.
- */
-function versioned<V extends string, T>(tag: V, value: T): Tagged<V, T> {
-  return { tag, value };
-}
-
 // ---------------------------------------------------------------------------
 // Internal: generic request / subscribe wrappers
 // ---------------------------------------------------------------------------
 
 /**
- * Wrap a transport.request call into a ResultAsync that splits the
- * versioned success/error envelope.
+ * Send a versioned request and unwrap the response.
  *
- * The wire response shape is:
- * ```
- * { tag: 'v1', value: { success: true, value: T } | { success: false, value: E } }
- * ```
+ * Wraps the payload in `{ tag: version, value: payload }` before sending.
+ * Unwraps the response by stripping the version tag and splitting the
+ * `{ success: true/false, value }` Result envelope.
+ *
+ * Returns `ResultAsync<Ok, Err>` directly — no Tagged wrapper.
  */
 function makeRequest<M extends RequestMethod, V extends string>(
   transport: Transport,
   method: M,
-  payload: Tagged<V, RequestParams<M, V>>,
-): ResultAsync<Tagged<V, ResponseOk<M, V>>, Tagged<V, ResponseErr<M, V>>> {
+  version: V,
+  payload: RequestParams<M, V>,
+): ResultAsync<ResponseOk<M, V>, ResponseErr<M, V>> {
   type Ok = ResponseOk<M, V>;
   type Err = ResponseErr<M, V>;
 
   const response = ResultAsync.fromPromise(
-    transport.request(method, payload) as Promise<{
-      tag: V;
+    transport.request(method, { tag: version, value: payload }) as Promise<{
+      tag: string;
       value: { success: boolean; value: unknown };
     }>,
-    (e: unknown) => versioned(payload.tag, { tag: 'Unknown', value: { reason: extractErrorMessage(e) } } as Err),
+    (e: unknown) => ({ tag: 'Unknown', value: { reason: extractErrorMessage(e) } } as Err),
   );
 
   return response.andThen(
-    (
-      resp: { tag: V; value: { success: boolean; value: unknown } },
-    ): ResultAsync<Tagged<V, Ok>, Tagged<V, Err>> => {
+    (resp): ResultAsync<Ok, Err> => {
       if (resp.value.success) {
         return ResultAsync.fromSafePromise(
-          Promise.resolve(versioned(resp.tag, resp.value.value as Ok)),
+          Promise.resolve(resp.value.value as Ok),
         );
       }
       return ResultAsync.fromPromise(
-        Promise.reject(versioned(resp.tag, resp.value.value as Err)),
-        (e) => e as Tagged<V, Err>,
+        Promise.reject(resp.value.value as Err),
+        (e) => e as Err,
       );
     },
   );
 }
 
 /**
- * Wrap a transport.subscribe call.
+ * Start a versioned subscription and unwrap received payloads.
+ *
+ * Wraps the start payload in `{ tag: version, value: payload }`.
+ * Unwraps received payloads by stripping the version tag.
  */
-function makeSubscription<M extends SubscriptionMethod, SV extends string, RV extends string>(
+function makeSubscription<M extends SubscriptionMethod, V extends string>(
   transport: Transport,
   method: M,
-  payload: Tagged<SV, SubscriptionParams<M, SV>>,
-  callback: (payload: Tagged<RV, SubscriptionPayload<M, RV>>) => void,
+  version: V,
+  payload: SubscriptionParams<M, V>,
+  callback: (payload: SubscriptionPayload<M, V>) => void,
 ): Subscription {
-  return transport.subscribe(method, payload, (data) => {
-    callback(data as Tagged<RV, SubscriptionPayload<M, RV>>);
+  return transport.subscribe(method, { tag: version, value: payload }, (data) => {
+    const tagged = data as { tag: string; value: unknown };
+    if (tagged.tag === version) {
+      callback(tagged.value as SubscriptionPayload<M, V>);
+    }
   });
-}
-
-// ---------------------------------------------------------------------------
-// Error class imports (for hydration in per-method wrappers)
-// ---------------------------------------------------------------------------
-
-import {
-  GenericError,
-  HandshakeErr, RequestCredentialsErr, CreateProofErr,
-  SigningErr, CreateTransactionErr, StorageErr, NavigateToErr,
-  ChatRoomRegistrationErr, ChatBotRegistrationErr, ChatMessagePostingErr,
-  StatementProofErr, PreimageSubmitErr,
-} from '@polkadot/shared';
-
-/** Hydrate a plain error and re-wrap in a versioned Tagged envelope. */
-function hydrate<V extends string, E>(
-  tagged: Tagged<V, { tag: string; value: unknown }>,
-  fromPlain: (plain: { tag: string; value: unknown }) => E,
-): Tagged<V, E> {
-  return versioned(tagged.tag, fromPlain(tagged.value as { tag: string; value: unknown }));
-}
-
-/** Hydrate a GenericError (not a tagged enum — just `{ reason: string }`). */
-function hydrateGeneric<V extends string>(
-  tagged: Tagged<V, { reason: string }>,
-): Tagged<V, GenericError> {
-  return versioned(tagged.tag, new GenericError(tagged.value as { reason: string }));
-}
-
-// ---------------------------------------------------------------------------
-// HostApi factory
-// ---------------------------------------------------------------------------
-
-/**
- * Versioned payload helper — constructs `{ tag: V, value: T }`.
- * Exported for use by consumers (accounts, chain, etc.).
- */
-export function enumValue<V extends string, T>(tag: V, value: T): Tagged<V, T> {
-  return versioned(tag, value);
 }
 
 /**
@@ -148,248 +106,224 @@ export function createHostApi(transport: Transport) {
   return {
     // -- Core / lifecycle ---------------------------------------------------
 
-    handshake(payload: Tagged<'v1', RequestParams<'host_handshake', 'v1'>>) {
-      return makeRequest(transport, 'host_handshake', payload)
-        .mapErr(e => hydrate(e, HandshakeErr.fromPlain));
+    handshake(payload: RequestParams<'host_handshake', 'v1'>) {
+      return makeRequest(transport, 'host_handshake', 'v1', payload);
     },
 
-    featureSupported(payload: Tagged<'v1', RequestParams<'host_feature_supported', 'v1'>>) {
-      return makeRequest(transport, 'host_feature_supported', payload)
-        .mapErr(hydrateGeneric);
+    featureSupported(payload: RequestParams<'host_feature_supported', 'v1'>) {
+      return makeRequest(transport, 'host_feature_supported', 'v1', payload);
     },
 
-    pushNotification(payload: Tagged<'v1', RequestParams<'host_push_notification', 'v1'>>) {
-      return makeRequest(transport, 'host_push_notification', payload)
-        .mapErr(hydrateGeneric);
+    pushNotification(payload: RequestParams<'host_push_notification', 'v1'>) {
+      return makeRequest(transport, 'host_push_notification', 'v1', payload);
     },
 
-    navigateTo(payload: Tagged<'v1', RequestParams<'host_navigate_to', 'v1'>>) {
-      return makeRequest(transport, 'host_navigate_to', payload)
-        .mapErr(e => hydrate(e, NavigateToErr.fromPlain));
+    navigateTo(payload: RequestParams<'host_navigate_to', 'v1'>) {
+      return makeRequest(transport, 'host_navigate_to', 'v1', payload);
     },
 
     // -- Permissions --------------------------------------------------------
 
-    devicePermission(payload: Tagged<'v1', RequestParams<'host_device_permission', 'v1'>>) {
-      return makeRequest(transport, 'host_device_permission', payload)
-        .mapErr(hydrateGeneric);
+    devicePermission(payload: RequestParams<'host_device_permission', 'v1'>) {
+      return makeRequest(transport, 'host_device_permission', 'v1', payload);
     },
 
-    permission(payload: Tagged<'v1', RequestParams<'remote_permission', 'v1'>>) {
-      return makeRequest(transport, 'remote_permission', payload)
-        .mapErr(hydrateGeneric);
+    permission(payload: RequestParams<'remote_permission', 'v1'>) {
+      return makeRequest(transport, 'remote_permission', 'v1', payload);
     },
 
     // -- Local storage ------------------------------------------------------
 
-    localStorageRead(payload: Tagged<'v1', RequestParams<'host_local_storage_read', 'v1'>>) {
-      return makeRequest(transport, 'host_local_storage_read', payload)
-        .mapErr(e => hydrate(e, StorageErr.fromPlain));
+    localStorageRead(payload: RequestParams<'host_local_storage_read', 'v1'>) {
+      return makeRequest(transport, 'host_local_storage_read', 'v1', payload);
     },
 
-    localStorageWrite(payload: Tagged<'v1', RequestParams<'host_local_storage_write', 'v1'>>) {
-      return makeRequest(transport, 'host_local_storage_write', payload)
-        .mapErr(e => hydrate(e, StorageErr.fromPlain));
+    localStorageWrite(payload: RequestParams<'host_local_storage_write', 'v1'>) {
+      return makeRequest(transport, 'host_local_storage_write', 'v1', payload);
     },
 
-    localStorageClear(payload: Tagged<'v1', RequestParams<'host_local_storage_clear', 'v1'>>) {
-      return makeRequest(transport, 'host_local_storage_clear', payload)
-        .mapErr(e => hydrate(e, StorageErr.fromPlain));
+    localStorageClear(payload: RequestParams<'host_local_storage_clear', 'v1'>) {
+      return makeRequest(transport, 'host_local_storage_clear', 'v1', payload);
     },
 
     // -- Accounts -----------------------------------------------------------
 
     accountConnectionStatusSubscribe(
-      args: Tagged<'v1', SubscriptionParams<'host_account_connection_status_subscribe', 'v1'>>,
-      callback: (payload: Tagged<'v1', SubscriptionPayload<'host_account_connection_status_subscribe', 'v1'>>) => void,
+      args: SubscriptionParams<'host_account_connection_status_subscribe', 'v1'>,
+      callback: (payload: SubscriptionPayload<'host_account_connection_status_subscribe', 'v1'>) => void,
     ): Subscription {
-      return makeSubscription(transport, 'host_account_connection_status_subscribe', args, callback);
+      return makeSubscription(transport, 'host_account_connection_status_subscribe', 'v1', args, callback);
     },
 
-    accountGet(payload: Tagged<'v1', RequestParams<'host_account_get', 'v1'>>) {
-      return makeRequest(transport, 'host_account_get', payload)
-        .mapErr(e => hydrate(e, RequestCredentialsErr.fromPlain));
+    accountGet(payload: RequestParams<'host_account_get', 'v1'>) {
+      return makeRequest(transport, 'host_account_get', 'v1', payload);
     },
 
-    accountGetAlias(payload: Tagged<'v1', RequestParams<'host_account_get_alias', 'v1'>>) {
-      return makeRequest(transport, 'host_account_get_alias', payload)
-        .mapErr(e => hydrate(e, RequestCredentialsErr.fromPlain));
+    accountGetAlias(payload: RequestParams<'host_account_get_alias', 'v1'>) {
+      return makeRequest(transport, 'host_account_get_alias', 'v1', payload);
     },
 
-    accountCreateProof(payload: Tagged<'v1', RequestParams<'host_account_create_proof', 'v1'>>) {
-      return makeRequest(transport, 'host_account_create_proof', payload)
-        .mapErr(e => hydrate(e, CreateProofErr.fromPlain));
+    accountCreateProof(payload: RequestParams<'host_account_create_proof', 'v1'>) {
+      return makeRequest(transport, 'host_account_create_proof', 'v1', payload);
     },
 
-    getNonProductAccounts(payload: Tagged<'v1', RequestParams<'host_get_non_product_accounts', 'v1'>>) {
-      return makeRequest(transport, 'host_get_non_product_accounts', payload)
-        .mapErr(e => hydrate(e, RequestCredentialsErr.fromPlain));
+    getNonProductAccounts(payload: RequestParams<'host_get_non_product_accounts', 'v1'>) {
+      return makeRequest(transport, 'host_get_non_product_accounts', 'v1', payload);
     },
 
     // -- Transactions -------------------------------------------------------
 
-    createTransaction(payload: Tagged<'v1', RequestParams<'host_create_transaction', 'v1'>>) {
-      return makeRequest(transport, 'host_create_transaction', payload)
-        .mapErr(e => hydrate(e, CreateTransactionErr.fromPlain));
+    createTransaction(payload: RequestParams<'host_create_transaction', 'v1'>) {
+      return makeRequest(transport, 'host_create_transaction', 'v1', payload);
     },
 
-    createTransactionWithNonProductAccount(payload: Tagged<'v1', RequestParams<'host_create_transaction_with_non_product_account', 'v1'>>) {
-      return makeRequest(transport, 'host_create_transaction_with_non_product_account', payload)
-        .mapErr(e => hydrate(e, CreateTransactionErr.fromPlain));
+    createTransactionWithNonProductAccount(payload: RequestParams<'host_create_transaction_with_non_product_account', 'v1'>) {
+      return makeRequest(transport, 'host_create_transaction_with_non_product_account', 'v1', payload);
     },
 
     // -- Signing ------------------------------------------------------------
 
-    signRaw(payload: Tagged<'v1', RequestParams<'host_sign_raw', 'v1'>>) {
-      return makeRequest(transport, 'host_sign_raw', payload)
-        .mapErr(e => hydrate(e, SigningErr.fromPlain));
+    signRaw(payload: RequestParams<'host_sign_raw', 'v1'>) {
+      return makeRequest(transport, 'host_sign_raw', 'v1', payload);
     },
 
-    signPayload(payload: Tagged<'v1', RequestParams<'host_sign_payload', 'v1'>>) {
-      return makeRequest(transport, 'host_sign_payload', payload)
-        .mapErr(e => hydrate(e, SigningErr.fromPlain));
+    signPayload(payload: RequestParams<'host_sign_payload', 'v1'>) {
+      return makeRequest(transport, 'host_sign_payload', 'v1', payload);
     },
 
     // -- Chat ---------------------------------------------------------------
 
     chatListSubscribe(
-      args: Tagged<'v1', SubscriptionParams<'host_chat_list_subscribe', 'v1'>>,
-      callback: (payload: Tagged<'v1', SubscriptionPayload<'host_chat_list_subscribe', 'v1'>>) => void,
+      args: SubscriptionParams<'host_chat_list_subscribe', 'v1'>,
+      callback: (payload: SubscriptionPayload<'host_chat_list_subscribe', 'v1'>) => void,
     ): Subscription {
-      return makeSubscription(transport, 'host_chat_list_subscribe', args, callback);
+      return makeSubscription(transport, 'host_chat_list_subscribe', 'v1', args, callback);
     },
 
-    chatCreateRoom(payload: Tagged<'v1', RequestParams<'host_chat_create_room', 'v1'>>) {
-      return makeRequest(transport, 'host_chat_create_room', payload)
-        .mapErr(e => hydrate(e, ChatRoomRegistrationErr.fromPlain));
+    chatCreateRoom(payload: RequestParams<'host_chat_create_room', 'v1'>) {
+      return makeRequest(transport, 'host_chat_create_room', 'v1', payload);
     },
 
-    chatRegisterBot(payload: Tagged<'v1', RequestParams<'host_chat_register_bot', 'v1'>>) {
-      return makeRequest(transport, 'host_chat_register_bot', payload)
-        .mapErr(e => hydrate(e, ChatBotRegistrationErr.fromPlain));
+    chatRegisterBot(payload: RequestParams<'host_chat_register_bot', 'v1'>) {
+      return makeRequest(transport, 'host_chat_register_bot', 'v1', payload);
     },
 
-    chatPostMessage(payload: Tagged<'v1', RequestParams<'host_chat_post_message', 'v1'>>) {
-      return makeRequest(transport, 'host_chat_post_message', payload)
-        .mapErr(e => hydrate(e, ChatMessagePostingErr.fromPlain));
+    chatPostMessage(payload: RequestParams<'host_chat_post_message', 'v1'>) {
+      return makeRequest(transport, 'host_chat_post_message', 'v1', payload);
     },
 
     chatActionSubscribe(
-      args: Tagged<'v1', SubscriptionParams<'host_chat_action_subscribe', 'v1'>>,
-      callback: (payload: Tagged<'v1', SubscriptionPayload<'host_chat_action_subscribe', 'v1'>>) => void,
+      args: SubscriptionParams<'host_chat_action_subscribe', 'v1'>,
+      callback: (payload: SubscriptionPayload<'host_chat_action_subscribe', 'v1'>) => void,
     ): Subscription {
-      return makeSubscription(transport, 'host_chat_action_subscribe', args, callback);
+      return makeSubscription(transport, 'host_chat_action_subscribe', 'v1', args, callback);
     },
 
     productChatCustomMessageRenderSubscribe(
-      args: Tagged<'v1', SubscriptionParams<'product_chat_custom_message_render_subscribe', 'v1'>>,
-      callback: (payload: Tagged<'v1', SubscriptionPayload<'product_chat_custom_message_render_subscribe', 'v1'>>) => void,
+      args: SubscriptionParams<'product_chat_custom_message_render_subscribe', 'v1'>,
+      callback: (payload: SubscriptionPayload<'product_chat_custom_message_render_subscribe', 'v1'>) => void,
     ): Subscription {
-      return makeSubscription(transport, 'product_chat_custom_message_render_subscribe', args, callback);
+      return makeSubscription(transport, 'product_chat_custom_message_render_subscribe', 'v1', args, callback);
     },
 
     // -- Statement store ----------------------------------------------------
 
     statementStoreSubscribe(
-      args: Tagged<'v1', SubscriptionParams<'remote_statement_store_subscribe', 'v1'>>,
-      callback: (payload: Tagged<'v1', SubscriptionPayload<'remote_statement_store_subscribe', 'v1'>>) => void,
+      args: SubscriptionParams<'remote_statement_store_subscribe', 'v1'>,
+      callback: (payload: SubscriptionPayload<'remote_statement_store_subscribe', 'v1'>) => void,
     ): Subscription {
-      return makeSubscription(transport, 'remote_statement_store_subscribe', args, callback);
+      return makeSubscription(transport, 'remote_statement_store_subscribe', 'v1', args, callback);
     },
 
-    statementStoreCreateProof(payload: Tagged<'v1', RequestParams<'remote_statement_store_create_proof', 'v1'>>) {
-      return makeRequest(transport, 'remote_statement_store_create_proof', payload)
-        .mapErr(e => hydrate(e, StatementProofErr.fromPlain));
+    statementStoreCreateProof(payload: RequestParams<'remote_statement_store_create_proof', 'v1'>) {
+      return makeRequest(transport, 'remote_statement_store_create_proof', 'v1', payload);
     },
 
-    statementStoreSubmit(payload: Tagged<'v1', RequestParams<'remote_statement_store_submit', 'v1'>>) {
-      return makeRequest(transport, 'remote_statement_store_submit', payload)
-        .mapErr(hydrateGeneric);
+    statementStoreSubmit(payload: RequestParams<'remote_statement_store_submit', 'v1'>) {
+      return makeRequest(transport, 'remote_statement_store_submit', 'v1', payload);
     },
 
     // -- Preimage -----------------------------------------------------------
 
     preimageLookupSubscribe(
-      args: Tagged<'v1', SubscriptionParams<'remote_preimage_lookup_subscribe', 'v1'>>,
-      callback: (payload: Tagged<'v1', SubscriptionPayload<'remote_preimage_lookup_subscribe', 'v1'>>) => void,
+      args: SubscriptionParams<'remote_preimage_lookup_subscribe', 'v1'>,
+      callback: (payload: SubscriptionPayload<'remote_preimage_lookup_subscribe', 'v1'>) => void,
     ): Subscription {
-      return makeSubscription(transport, 'remote_preimage_lookup_subscribe', args, callback);
+      return makeSubscription(transport, 'remote_preimage_lookup_subscribe', 'v1', args, callback);
     },
 
-    preimageSubmit(payload: Tagged<'v1', RequestParams<'remote_preimage_submit', 'v1'>>) {
-      return makeRequest(transport, 'remote_preimage_submit', payload)
-        .mapErr(e => hydrate(e, PreimageSubmitErr.fromPlain));
+    preimageSubmit(payload: RequestParams<'remote_preimage_submit', 'v1'>) {
+      return makeRequest(transport, 'remote_preimage_submit', 'v1', payload);
     },
 
     // -- JSON-RPC bridge ----------------------------------------------------
 
-    jsonrpcMessageSend(payload: Tagged<'v1', RequestParams<'host_jsonrpc_message_send', 'v1'>>) {
-      return makeRequest(transport, 'host_jsonrpc_message_send', payload)
-        .mapErr(hydrateGeneric);
+    jsonrpcMessageSend(payload: RequestParams<'host_jsonrpc_message_send', 'v1'>) {
+      return makeRequest(transport, 'host_jsonrpc_message_send', 'v1', payload);
     },
 
     jsonrpcMessageSubscribe(
-      args: Tagged<'v1', SubscriptionParams<'host_jsonrpc_message_subscribe', 'v1'>>,
-      callback: (payload: Tagged<'v1', SubscriptionPayload<'host_jsonrpc_message_subscribe', 'v1'>>) => void,
+      args: SubscriptionParams<'host_jsonrpc_message_subscribe', 'v1'>,
+      callback: (payload: SubscriptionPayload<'host_jsonrpc_message_subscribe', 'v1'>) => void,
     ): Subscription {
-      return makeSubscription(transport, 'host_jsonrpc_message_subscribe', args, callback);
+      return makeSubscription(transport, 'host_jsonrpc_message_subscribe', 'v1', args, callback);
     },
 
     // -- Remote chain (new JSON-RPC spec) -----------------------------------
 
     chainHeadFollow(
-      args: Tagged<'v1', SubscriptionParams<'remote_chain_head_follow', 'v1'>>,
-      callback: (payload: Tagged<'v1', SubscriptionPayload<'remote_chain_head_follow', 'v1'>>) => void,
+      args: SubscriptionParams<'remote_chain_head_follow', 'v1'>,
+      callback: (payload: SubscriptionPayload<'remote_chain_head_follow', 'v1'>) => void,
     ): Subscription {
-      return makeSubscription(transport, 'remote_chain_head_follow', args, callback);
+      return makeSubscription(transport, 'remote_chain_head_follow', 'v1', args, callback);
     },
 
-    chainHeadHeader(payload: Tagged<'v1', RequestParams<'remote_chain_head_header', 'v1'>>) {
-      return makeRequest(transport, 'remote_chain_head_header', payload).mapErr(hydrateGeneric);
+    chainHeadHeader(payload: RequestParams<'remote_chain_head_header', 'v1'>) {
+      return makeRequest(transport, 'remote_chain_head_header', 'v1', payload);
     },
 
-    chainHeadBody(payload: Tagged<'v1', RequestParams<'remote_chain_head_body', 'v1'>>) {
-      return makeRequest(transport, 'remote_chain_head_body', payload).mapErr(hydrateGeneric);
+    chainHeadBody(payload: RequestParams<'remote_chain_head_body', 'v1'>) {
+      return makeRequest(transport, 'remote_chain_head_body', 'v1', payload);
     },
 
-    chainHeadStorage(payload: Tagged<'v1', RequestParams<'remote_chain_head_storage', 'v1'>>) {
-      return makeRequest(transport, 'remote_chain_head_storage', payload).mapErr(hydrateGeneric);
+    chainHeadStorage(payload: RequestParams<'remote_chain_head_storage', 'v1'>) {
+      return makeRequest(transport, 'remote_chain_head_storage', 'v1', payload);
     },
 
-    chainHeadCall(payload: Tagged<'v1', RequestParams<'remote_chain_head_call', 'v1'>>) {
-      return makeRequest(transport, 'remote_chain_head_call', payload).mapErr(hydrateGeneric);
+    chainHeadCall(payload: RequestParams<'remote_chain_head_call', 'v1'>) {
+      return makeRequest(transport, 'remote_chain_head_call', 'v1', payload);
     },
 
-    chainHeadUnpin(payload: Tagged<'v1', RequestParams<'remote_chain_head_unpin', 'v1'>>) {
-      return makeRequest(transport, 'remote_chain_head_unpin', payload).mapErr(hydrateGeneric);
+    chainHeadUnpin(payload: RequestParams<'remote_chain_head_unpin', 'v1'>) {
+      return makeRequest(transport, 'remote_chain_head_unpin', 'v1', payload);
     },
 
-    chainHeadContinue(payload: Tagged<'v1', RequestParams<'remote_chain_head_continue', 'v1'>>) {
-      return makeRequest(transport, 'remote_chain_head_continue', payload).mapErr(hydrateGeneric);
+    chainHeadContinue(payload: RequestParams<'remote_chain_head_continue', 'v1'>) {
+      return makeRequest(transport, 'remote_chain_head_continue', 'v1', payload);
     },
 
-    chainHeadStopOperation(payload: Tagged<'v1', RequestParams<'remote_chain_head_stop_operation', 'v1'>>) {
-      return makeRequest(transport, 'remote_chain_head_stop_operation', payload).mapErr(hydrateGeneric);
+    chainHeadStopOperation(payload: RequestParams<'remote_chain_head_stop_operation', 'v1'>) {
+      return makeRequest(transport, 'remote_chain_head_stop_operation', 'v1', payload);
     },
 
-    chainSpecGenesisHash(payload: Tagged<'v1', RequestParams<'remote_chain_spec_genesis_hash', 'v1'>>) {
-      return makeRequest(transport, 'remote_chain_spec_genesis_hash', payload).mapErr(hydrateGeneric);
+    chainSpecGenesisHash(payload: RequestParams<'remote_chain_spec_genesis_hash', 'v1'>) {
+      return makeRequest(transport, 'remote_chain_spec_genesis_hash', 'v1', payload);
     },
 
-    chainSpecChainName(payload: Tagged<'v1', RequestParams<'remote_chain_spec_chain_name', 'v1'>>) {
-      return makeRequest(transport, 'remote_chain_spec_chain_name', payload).mapErr(hydrateGeneric);
+    chainSpecChainName(payload: RequestParams<'remote_chain_spec_chain_name', 'v1'>) {
+      return makeRequest(transport, 'remote_chain_spec_chain_name', 'v1', payload);
     },
 
-    chainSpecProperties(payload: Tagged<'v1', RequestParams<'remote_chain_spec_properties', 'v1'>>) {
-      return makeRequest(transport, 'remote_chain_spec_properties', payload).mapErr(hydrateGeneric);
+    chainSpecProperties(payload: RequestParams<'remote_chain_spec_properties', 'v1'>) {
+      return makeRequest(transport, 'remote_chain_spec_properties', 'v1', payload);
     },
 
-    chainTransactionBroadcast(payload: Tagged<'v1', RequestParams<'remote_chain_transaction_broadcast', 'v1'>>) {
-      return makeRequest(transport, 'remote_chain_transaction_broadcast', payload).mapErr(hydrateGeneric);
+    chainTransactionBroadcast(payload: RequestParams<'remote_chain_transaction_broadcast', 'v1'>) {
+      return makeRequest(transport, 'remote_chain_transaction_broadcast', 'v1', payload);
     },
 
-    chainTransactionStop(payload: Tagged<'v1', RequestParams<'remote_chain_transaction_stop', 'v1'>>) {
-      return makeRequest(transport, 'remote_chain_transaction_stop', payload).mapErr(hydrateGeneric);
+    chainTransactionStop(payload: RequestParams<'remote_chain_transaction_stop', 'v1'>) {
+      return makeRequest(transport, 'remote_chain_transaction_stop', 'v1', payload);
     },
   };
 }
