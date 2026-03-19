@@ -46,6 +46,20 @@ triangle-js-sdks defines a minimal provider (just `postMessage` and `subscribe`)
 
 triangle-js-sdks requires the handshake handler to be registered externally. This project auto-registers the handshake handler inside the transport when it detects it is on the host side, making the transport more self-contained.
 
+### Stronger end-to-end type safety
+
+In this project, the `hostApiProtocol` object (declared `as const`) is the single source from which mapped types like `RequestParams<M, V>`, `ResponseOk<M, V>`, and `ResponseErr<M, V>` are extracted. These same types are used for container handler signatures on the host side and for the facade return types on the product side. This means the types that flow through the SCALE codec are mechanically the same types that the handler receives and that the product facade returns. If a codec definition changes, TypeScript catches mismatches everywhere.
+
+triangle-js-sdks has no such mechanism. The SCALE codec definitions exist, but handler functions are not typed against them. A handler can accept one shape while the codec actually produces a different shape, and nothing catches this at compile time. The wiring between what the codec encodes/decodes and what the handler expects is based on convention, not enforced by the type system.
+
+### Version dispatch via handler map
+
+In this project, `wireRequest` and `wireSubscription` accept a version handler map: `{ v1: handlerV1, v2: handlerV2 }`. The transport extracts the version tag from the incoming message, looks up the matching handler, unwraps the versioned envelope before calling it, and re-wraps the response with the same version tag. Adding a v2 means adding an entry to the map; existing v1 handlers remain untouched. If no handler matches the version, a default error is returned.
+
+In triangle-js-sdks, version handling is hardcoded. Each handler is registered with an inline `guardVersion(message, 'v1', error)` call that checks for a specific version string literal. There is no version handler map. Adding a v2 would require duplicating the handler registration and dispatch logic for each method. The version tag is also manually re-wrapped on every response using `enumValue('v1', ...)`.
+
+On the product (receiving) side the difference is similar. In this project, the product facade strips the version envelope entirely: callers get clean unwrapped values, and for subscriptions the version tag is verified before the callback is invoked. In triangle-js-sdks, the version tag is passed through to the caller as a `{ tag, value }` wrapper. The caller has to deal with versioned envelopes themselves. Neither requests nor subscriptions verify that the response version matches what was sent.
+
 ### Simpler handler dispatch
 
 triangle-js-sdks dispatches handlers through monadic chains (`guardVersion().asyncMap().andThen().orElse().unwrapOr()`). This project uses imperative try/catch with explicit `wrapOk`/`wrapErr` helpers. Both use `neverthrow` for the product-facing API, but the host-side wiring is more straightforward here.
