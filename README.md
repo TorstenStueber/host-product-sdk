@@ -9,3 +9,43 @@ The three packages in this repo map to the three layers of the Host-Product arch
 - `packages/product`: Product SDK
 
 For a detailed walkthrough of the code in this repo, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+## Host API Differences from [triangle-js-sdks](https://github.com/paritytech/triangle-js-sdks)
+
+This project reimplements the same Host API with a different set of architectural choices. The wire format is identical and the two implementations are compatible. The main differences:
+
+### Fewer, larger packages
+
+triangle-js-sdks splits the codebase into ~11 packages (host-api, host-container, host-chat, host-papp, product-sdk, scale, statement-store, storage-adapter, etc.). This project consolidates everything into three packages that map directly to the three architectural layers. Domain-specific code (chat, statement store, chain interaction) lives as modules within the appropriate package rather than as separate packages.
+
+### Pluggable codec with runtime negotiation
+
+triangle-js-sdks hard-codes SCALE as the wire codec in the transport layer. This project introduces a `CodecAdapter` abstraction that decouples encoding from transport. Two adapters exist: SCALE (binary) and structured clone (pass-through, letting the browser's built-in `postMessage` serialization do the work instead of encoding/decoding SCALE). After the handshake, the product can request a codec upgrade; both sides negotiate the best common format and hot-swap the adapter at runtime. Old hosts that do not support negotiation simply time out and both sides stay on SCALE.
+
+### Inlined codec primitives
+
+triangle-js-sdks depends on `@novasamatech/scale` for codec helpers like `ErrEnum`, `Err`, and various utilities. This project inlines those primitives (~170 lines in `codec/scale/primitives.ts`), removing the external dependency. The inlined versions produce plain `{tag, value}` discriminated unions rather than `CodecError` class instances.
+
+### Plain error objects instead of error classes
+
+triangle-js-sdks uses `ErrEnum()` and `Err()` to create Error subclasses with `.name`, `.instance`, and `.payload` properties. Error messages are baked into the codec definition. Errors are class instances that support `instanceof` checks. This project uses plain `{tag, value}` discriminated unions for errors. They work naturally with `neverthrow`'s `.match()` and survive structured clone (which strips custom Error properties). TypeScript narrows the `value` type when the `tag` is checked, so type safety is preserved without a class hierarchy.
+
+### Explicit protocol registry
+
+triangle-js-sdks uses factory functions (`versionedRequest()`, `versionedSubscription()`) to build the protocol registry from `[request, response]` tuples. This project writes out the registry as a plain object literal with explicit `_request`/`_response` and `_start`/`_receive` keys. More verbose, but the structure is visible without jumping to helper function definitions.
+
+### Prefix-based request IDs
+
+triangle-js-sdks generates random request IDs using `nanoid`. This project uses a prefix-based counter (`createIdFactory('p:')` produces `'p:1'`, `'p:2'`, etc.). The host uses prefix `'h:'`, the product uses `'p:'`, so IDs never collide on the shared postMessage channel. This is more deterministic and easier to trace in logs.
+
+### Richer provider interface
+
+triangle-js-sdks defines a minimal provider (just `postMessage` and `subscribe`). This project adds a scoped `logger` instance and an explicit `dispose()` method for lifecycle cleanup.
+
+### Self-contained handshake
+
+triangle-js-sdks requires the handshake handler to be registered externally. This project auto-registers the handshake handler inside the transport when it detects it is on the host side, making the transport more self-contained.
+
+### Simpler handler dispatch
+
+triangle-js-sdks dispatches handlers through monadic chains (`guardVersion().asyncMap().andThen().orElse().unwrapOr()`). This project uses imperative try/catch with explicit `wrapOk`/`wrapErr` helpers. Both use `neverthrow` for the product-facing API, but the host-side wiring is more straightforward here.
