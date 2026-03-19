@@ -1,0 +1,43 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "useDaemonProcess": false,
+  "tui": {
+    "autoExit": true
+  },
+  "plugins": [
+    {
+      "plugin": "@nx/js/typescript",
+      "options": {
+        "typecheck": {
+          "targetName": "typecheck"
+        },
+        "build": {
+          "targetName": "build",
+          "configName": "tsconfig.json",
+          "buildDepsName": "build-deps",
+          "watchDepsName": "watch-deps"
+        }
+      }
+    }
+  ],
+  "namedInputs": {
+    "sharedGlobals": [
+      { "runtime": "node --version" },
+      "{workspaceRoot}/tsconfig.json",
+      "{workspaceRoot}/package.json"
+    ],
+    "project": ["{projectRoot}/**/*"],
+    "default": ["project", "sharedGlobals"]
+  },
+  "targetDefaults": {
+    "build": {
+      "cache": true,
+      "dependsOn": ["^build", "default"],
+      "inputs": ["^project", "default"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build", "^typecheck", "default"],
+      "inputs": ["default"]
+    }
+  }
+}

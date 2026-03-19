@@ -1,0 +1,98 @@
+import { Enum } from '../primitives.js';
+import { Bytes, Option, Result, Struct, Tuple, Vector, _void, u64 } from 'scale-ts';
+import { GenericErr } from './commonCodecs.js';
+import { ProductAccountId } from './accounts.js';
+
+// -- Primitives ---------------------------------------------------------------
+
+export const Topic = Bytes(32);
+export const Channel = Bytes(32);
+export const DecryptionKey = Bytes(32);
+
+// -- Statement proofs ---------------------------------------------------------
+
+export const Sr25519StatementProof = Struct({
+  signature: Bytes(64),
+  signer: Bytes(32),
+});
+
+export const Ed25519StatementProof = Struct({
+  signature: Bytes(64),
+  signer: Bytes(32),
+});
+
+export const EcdsaStatementProof = Struct({
+  signature: Bytes(65),
+  signer: Bytes(33),
+});
+
+export const OnChainStatementProof = Struct({
+  who: Bytes(32),
+  blockHash: Bytes(32),
+  event: u64,
+});
+
+export const StatementProof = Enum({
+  Sr25519: Sr25519StatementProof,
+  Ed25519: Ed25519StatementProof,
+  Ecdsa: EcdsaStatementProof,
+  OnChain: OnChainStatementProof,
+});
+
+// -- Statement ----------------------------------------------------------------
+
+export const Statement = Struct({
+  proof: Option(StatementProof),
+  decryptionKey: Option(DecryptionKey),
+  expiry: Option(u64),
+  channel: Option(Channel),
+  topics: Vector(Topic),
+  data: Option(Bytes()),
+});
+
+export const SignedStatement = Struct({
+  proof: StatementProof,
+  decryptionKey: Option(DecryptionKey),
+  expiry: Option(u64),
+  channel: Option(Channel),
+  topics: Vector(Topic),
+  data: Option(Bytes()),
+});
+
+// -- Errors -------------------------------------------------------------------
+
+export const StatementProofErr = Enum({
+  UnableToSign: _void,
+  UnknownAccount: _void,
+  Unknown: GenericErr,
+});
+
+// -- V1 request / response codecs --------------------------------------------
+
+// remote_statement_store_subscribe
+export const StatementStoreV1_start = Vector(Topic);
+export const StatementStoreV1_receive = Vector(SignedStatement);
+
+// remote_statement_store_create_proof
+export const StatementStoreCreateProofV1_request = Tuple(ProductAccountId, Statement);
+export const StatementStoreCreateProofV1_response = Result(StatementProof, StatementProofErr);
+
+// remote_statement_store_submit
+export const StatementStoreSubmitV1_request = SignedStatement;
+export const StatementStoreSubmitV1_response = Result(_void, GenericErr);
+
+// -- Derived types ------------------------------------------------------------
+
+import type { CodecType } from 'scale-ts';
+
+export type TopicType = CodecType<typeof Topic>;
+export type ChannelType = CodecType<typeof Channel>;
+export type DecryptionKeyType = CodecType<typeof DecryptionKey>;
+export type Sr25519StatementProofType = CodecType<typeof Sr25519StatementProof>;
+export type Ed25519StatementProofType = CodecType<typeof Ed25519StatementProof>;
+export type EcdsaStatementProofType = CodecType<typeof EcdsaStatementProof>;
+export type OnChainStatementProofType = CodecType<typeof OnChainStatementProof>;
+export type StatementProofType = CodecType<typeof StatementProof>;
+export type StatementType = CodecType<typeof Statement>;
+export type SignedStatementType = CodecType<typeof SignedStatement>;
+export type StatementProofErrType = CodecType<typeof StatementProofErr>;

@@ -1,0 +1,28 @@
+node_modules/
+dist/
+
+# Build artifacts
+*.tsbuildinfo
+.nx/
+
+# Test results
+test-results/
+playwright-report/
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# AI tools
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*

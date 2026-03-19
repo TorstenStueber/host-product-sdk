@@ -1,0 +1,84 @@
+/**
+ * Default handlers for account methods.
+ *
+ * - accountGet: performs HDKD derivation from session
+ * - getAlias: stub (requires ring VRF)
+ * - createProof: stub (requires ring VRF)
+ * - getNonProductAccounts: returns host accounts from config
+ * - accountConnectionStatusSubscribe: tracks auth state
+ */
+
+import type { Container } from '../container/types.js';
+import type { HandlersConfig } from './registry.js';
+import { deriveProductPublicKey } from '../auth/crypto.js';
+
+export function wireAccountHandlers(container: Container, config: HandlersConfig): VoidFunction[] {
+  const cleanups: VoidFunction[] = [];
+
+  // Account get - derives product-specific key from session
+  cleanups.push(
+    container.handleAccountGet(([dotNsIdentifier, derivationIndex], ctx) => {
+      const session = config.getSession?.();
+      if (!session) {
+        return ctx.err({ tag: 'NotConnected', value: undefined });
+      }
+
+      const publicKey = deriveProductPublicKey(
+        session.rootPublicKey,
+        dotNsIdentifier,
+        derivationIndex,
+      );
+
+      return ctx.ok({ publicKey, name: undefined });
+    }),
+  );
+
+  // Account get alias - requires ring VRF, not yet implemented
+  cleanups.push(
+    container.handleAccountGetAlias((_params, ctx) => {
+      // TODO: Implement ring VRF alias derivation
+      return ctx.err({ tag: 'Unknown', value: { reason: 'Ring VRF alias not yet implemented' } });
+    }),
+  );
+
+  // Account create proof - requires ring VRF, not yet implemented
+  cleanups.push(
+    container.handleAccountCreateProof((_params, ctx) => {
+      // TODO: Implement ring VRF proof creation
+      return ctx.err({ tag: 'Unknown', value: { reason: 'Ring VRF proof not yet implemented' } });
+    }),
+  );
+
+  // Get non-product accounts - returns root account from session
+  cleanups.push(
+    container.handleGetNonProductAccounts((_params, ctx) => {
+      const session = config.getSession?.();
+      if (!session) {
+        return ctx.ok([]);
+      }
+      return ctx.ok([
+        {
+          publicKey: session.rootPublicKey,
+          name: session.displayName ?? undefined,
+        },
+      ]);
+    }),
+  );
+
+  // Account connection status subscription
+  cleanups.push(
+    container.handleAccountConnectionStatusSubscribe((_params, send) => {
+      if (!config.subscribeAuthState) {
+        // No auth integration; report connected by default
+        send('connected');
+        return () => {};
+      }
+
+      return config.subscribeAuthState((state) => {
+        send(state === 'authenticated' ? 'connected' : 'disconnected');
+      });
+    }),
+  );
+
+  return cleanups;
+}

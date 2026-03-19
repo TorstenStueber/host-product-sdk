@@ -1,0 +1,28 @@
+{
+  "name": "@polkadot/product",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "vite build && tsc -b tsconfig.json",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@polkadot/shared": "0.1.0",
+    "@polkadot/extension-inject": "^0.62.6",
+    "@polkadot-api/json-rpc-provider": "^0.0.4",
+    "@polkadot-api/json-rpc-provider-proxy": "^0.2.7",
+    "@polkadot-api/substrate-bindings": "^0.17.0",
+    "@polkadot-api/utils": "^0.2.0",
+    "nanoevents": "9.1.0",
+    "neverthrow": "^8.2.0"
+  }
+}
