@@ -60,6 +60,10 @@ In triangle-js-sdks, version handling is hardcoded. Each handler is registered w
 
 On the product (receiving) side the difference is similar. In this project, the product facade strips the version envelope entirely: callers get clean unwrapped values, and for subscriptions the version tag is verified before the callback is invoked. In triangle-js-sdks, the version tag is passed through to the caller as a `{ tag, value }` wrapper. The caller has to deal with versioned envelopes themselves. Neither requests nor subscriptions verify that the response version matches what was sent.
 
+### Not-supported catch-all
+
+The transport tracks which actions have registered handlers. Unhandled `_request` messages receive an immediate `NOT_SUPPORTED` response (the sender's `request()` rejects with `MethodNotSupportedError`). Unhandled `_start` messages receive an immediate `_interrupt`. In triangle-js-sdks, requests or subscriptions to unhandled methods hang silently with no response, potentially blocking the caller forever.
+
 ### Simpler handler dispatch
 
-triangle-js-sdks dispatches handlers through monadic chains (`guardVersion().asyncMap().andThen().orElse().unwrapOr()`). This project uses imperative try/catch with explicit `wrapOk`/`wrapErr` helpers. Both use `neverthrow` for the product-facing API, but the host-side wiring is more straightforward here.
+triangle-js-sdks dispatches handlers through monadic chains (`guardVersion().asyncMap().andThen().orElse().unwrapOr()`). Handlers receive a context object `(params, ctx) => ctx.ok(value)` where `ctx.ok` and `ctx.err` are typed as `any`, erasing type safety at the handler boundary. This project's handlers return `ResultAsync` directly: `(params) => okAsync(value)`. The return type is fully constrained by the protocol codecs, so there is no context object and no type erasure. The container wiring uses `result.match()` with explicit `wrapOk`/`wrapErr` helpers instead of monadic chains.
