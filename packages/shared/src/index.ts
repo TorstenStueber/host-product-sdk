@@ -145,6 +145,11 @@ export type {
 
 export type { Provider } from './transport/provider.js';
 
+export { createWindowProvider } from './transport/windowProvider.js';
+export type { WindowRef } from './transport/windowProvider.js';
+
+export { createMessagePortProvider } from './transport/messagePortProvider.js';
+
 // ---------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------

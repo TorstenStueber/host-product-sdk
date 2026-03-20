@@ -189,7 +189,13 @@ type Provider = {
 };
 ```
 
-Knows nothing about protocol methods, IDs, or codecs. Four implementations exist across host and product.
+Knows nothing about protocol methods, IDs, or codecs.
+
+Two concrete provider implementations live in shared as neutral building blocks:
+
+**`transport/windowProvider.ts`** -- `createWindowProvider(target: WindowRef)`: the generic `postMessage` provider. Accepts either a direct `Window` reference or a lazy getter `() => Window | null`. Validates incoming messages (accepts both Uint8Array for SCALE and protocol message objects for structured clone), manages subscribers, handles Uint8Array buffer transfer. When the getter returns null, outgoing messages are silently dropped. Used by the host for iframes (`createWindowProvider(() => iframe.contentWindow)`) and for nested dApps, and by the product for the iframe path (`createWindowProvider(window.top)`).
+
+**`transport/messagePortProvider.ts`** -- `createMessagePortProvider(port: MessagePort | Promise<MessagePort>)`: communicates over a MessagePort. Accepts a ready port or a Promise (for async acquisition). Same message validation as `createWindowProvider`. Used by both the host webview provider (which injects a port into an Electron webview) and the product webview path (which polls for the injected port).
 
 ### 1.9 Transport (`transport/transport.ts`)
 
@@ -265,11 +271,9 @@ What runs on the host page.
 
 ### 2.1 Providers (`container/`)
 
-**`windowProvider.ts`** -- `createWindowProvider(target)`: the shared primitive for postMessage communication. Accepts either a direct `Window` reference or a lazy getter `() => Window | null`. Validates incoming messages (accepts both Uint8Array for SCALE and protocol message objects for structured clone), manages subscribers, handles Uint8Array buffer transfer. When the getter returns null, outgoing messages are silently dropped and incoming messages that can't be validated are ignored. Used directly for nested dApps and as the underlying provider for iframes.
+**`webviewProvider.ts`** -- `createHostWebviewProvider({ webview })`: the only host-specific provider. Acquires a MessagePort by creating a `MessageChannel`, injecting one end into an Electron `<webview>` via `executeJavaScript` on `dom-ready`, and passing the other end to `createMessagePortProvider` from shared. The port acquisition logic (listening for `dom-ready`, `did-fail-load`, injecting JS) is inherently host-side; once the port is obtained, all communication is handled by the neutral `createMessagePortProvider`.
 
-**`iframeProvider.ts`** -- `createIframeProvider({ iframe, url })`: thin wrapper around `createWindowProvider`. Sets `iframe.src` and passes `() => iframe.contentWindow` as a lazy window reference. No buffering or readiness checks -- before the iframe loads, `contentWindow` is null so messages are dropped; the transport's handshake retry (every 50ms for up to 10s) handles reconnection once the iframe is ready. Overrides `dispose()` to also clear `iframe.src`.
-
-**`webviewProvider.ts`** -- `createWebviewProvider({ webview })`: for Electron `<webview>`, uses MessageChannel/MessagePort.
+For iframes, the host uses `createWindowProvider(() => iframe.contentWindow)` from shared directly -- no host-specific wrapper needed. The `sdk.ts` `embed()` method sets `iframe.src` itself and creates the provider inline.
 
 ### 2.2 Container (`container/container.ts`)
 
@@ -389,7 +393,7 @@ product.dispose();
 sdk.dispose();
 ```
 
-Creates AuthManager, then `embed()` creates iframeProvider -> Container -> wireAllHandlers(). Also exposes `setSession()` / `clearSession()` for external auth management.
+Creates AuthManager, then `embed()` sets `iframe.src`, creates `createWindowProvider(() => iframe.contentWindow)` -> Container -> wireAllHandlers(). On dispose, clears `iframe.src`. Also exposes `setSession()` / `clearSession()` for external auth management.
 
 **`types.ts`** -- `HostSdkConfig` with all options: `appId`, `chainProvider`, signing callbacks, permission callbacks, UI callbacks.
 
@@ -401,9 +405,10 @@ What runs inside the iframe.
 
 ### 3.1 Transport (`transport/sandboxTransport.ts`)
 
-Detects the environment:
-- `isIframe()` -> listens on `window`, posts to `window.top`
-- `isWebview()` -> uses injected `MessagePort`
+`createDefaultProductProvider()` detects the environment and dispatches to the appropriate shared provider:
+- `isIframe()` -> `createWindowProvider(window.top)` from shared
+- `isWebview()` -> `createMessagePortProvider(getWebviewPort())` from shared, where `getWebviewPort()` polls `window.__HOST_API_PORT__` for the port injected by the host's webview provider
+- otherwise -> no-op provider with `isCorrectEnvironment() = false`
 
 Creates transport with `idPrefix: 'p:'`. The `sandboxTransport` singleton wraps `isReady()` so that after the handshake succeeds, it automatically attempts a codec upgrade to structured clone (see 1.10 Codec Negotiation). This happens transparently before any real protocol traffic. Exports singletons `sandboxProvider` and `sandboxTransport`.
 
@@ -536,7 +541,7 @@ Product: accounts.getProductAccount('myApp', 0)
 
        -- crosses iframe boundary --
 
-Host: iframeProvider receives MessageEvent
+Host: windowProvider receives MessageEvent
   -> validates source === iframe.contentWindow
   -> decodeIncoming(data)  // auto-detects: Uint8Array → SCALE, object → structured clone
   -> transport dispatches: tag matches "host_account_get_request", requestId "p:1"

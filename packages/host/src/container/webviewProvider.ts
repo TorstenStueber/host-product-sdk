@@ -1,34 +1,19 @@
 /**
- * Electron webview-based provider.
+ * Electron webview-based provider (host side).
  *
- * Creates a Provider from an Electron `<webview>` tag, using MessageChannel
- * for bidirectional communication.
+ * Creates a MessageChannel, injects one end into the webview via
+ * `executeJavaScript`, and wraps the other end with the shared
+ * `createMessagePortProvider`.
  *
  * Ported from triangle-js-sdks host-container/createWebviewProvider.ts.
  */
 
 import type { Provider, Logger } from '@polkadot/shared';
-import { createDefaultLogger, createIdFactory } from '@polkadot/shared';
+import { createMessagePortProvider, createIdFactory } from '@polkadot/shared';
 
 const nextPortId = createIdFactory('port:');
 
 const WEBVIEW_HOST_PORT_NAME = '__polkadot_host_port__';
-
-function hasWindow(): boolean {
-  try {
-    return typeof window !== 'undefined';
-  } catch {
-    return false;
-  }
-}
-
-function isValidMessage(event: MessageEvent): boolean {
-  return (
-    event.data != null &&
-    (event.data instanceof Uint8Array ||
-      (typeof event.data === 'object' && event.data.constructor?.name === 'Uint8Array'))
-  );
-}
 
 /**
  * Electron's WebviewTag type. We define a minimal interface here to avoid
@@ -42,18 +27,22 @@ export type WebviewTag = HTMLElement & {
   contentWindow: Window;
 };
 
-export type CreateWebviewProviderParams = {
+export type CreateHostWebviewProviderParams = {
   webview: WebviewTag;
   logger?: Logger;
   openDevTools?: boolean;
 };
 
-export function createWebviewProvider({ webview, logger, openDevTools }: CreateWebviewProviderParams): Provider {
-  let disposed = false;
-  let port: MessagePort | null = null;
-  const subscribers = new Set<(message: Uint8Array | unknown) => void>();
-
-  const webviewPromise = new Promise<MessagePort>((resolve, reject) => {
+/**
+ * Acquire a MessagePort by injecting the other end into an Electron
+ * `<webview>` tag.  Resolves once the webview's DOM is ready and the
+ * port has been transferred.
+ */
+function acquireWebviewPort(
+  webview: WebviewTag,
+  openDevTools?: boolean,
+): Promise<MessagePort> {
+  return new Promise<MessagePort>((resolve, reject) => {
     webview.addEventListener('did-fail-load', ((e: { errorDescription: string }) => {
       reject(new Error(e.errorDescription));
     }) as (...args: unknown[]) => void);
@@ -77,71 +66,25 @@ export function createWebviewProvider({ webview, logger, openDevTools }: CreateW
         )
         .catch(reject);
 
-      (webview as unknown as { contentWindow: Window }).contentWindow.postMessage(portInitMessage, '*', [port2]);
+      (webview as unknown as { contentWindow: Window }).contentWindow.postMessage(
+        portInitMessage,
+        '*',
+        [port2],
+      );
 
       if (openDevTools) {
         webview.openDevTools();
       }
 
-      port = port1;
-      port.start();
-      port.addEventListener('message', messageHandler);
-      resolve(port);
+      resolve(port1);
     }) as (...args: unknown[]) => void);
   });
+}
 
-  function waitForWebview(callback: (port: MessagePort) => void): void {
-    if (port) {
-      return callback(port);
-    }
-    webviewPromise.then(callback);
-  }
-
-  const messageHandler = (event: MessageEvent): void => {
-    if (disposed) return;
-    if (!isValidMessage(event)) return;
-
-    for (const subscriber of subscribers) {
-      subscriber(event.data);
-    }
-  };
-
-  return {
-    logger: logger ?? createDefaultLogger(),
-
-    isCorrectEnvironment() {
-      return hasWindow();
-    },
-
-    postMessage(message) {
-      if (disposed) return;
-
-      waitForWebview((p) => {
-        if (disposed) return;
-
-        if (message instanceof Uint8Array) {
-          p.postMessage(message, [message.buffer]);
-        } else {
-          p.postMessage(message);
-        }
-      });
-    },
-
-    subscribe(callback) {
-      subscribers.add(callback);
-      return () => {
-        subscribers.delete(callback);
-      };
-    },
-
-    dispose() {
-      disposed = true;
-      subscribers.clear();
-
-      if (port) {
-        port.removeEventListener('message', messageHandler);
-      }
-      port = null;
-    },
-  };
+export function createHostWebviewProvider({
+  webview,
+  logger,
+  openDevTools,
+}: CreateHostWebviewProviderParams): Provider {
+  return createMessagePortProvider(acquireWebviewPort(webview, openDevTools), logger);
 }

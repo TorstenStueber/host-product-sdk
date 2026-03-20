@@ -13,7 +13,7 @@
 
 import { createContainer } from '../container/container.js';
 import { wireAllHandlers, type HandlersConfig } from '../handlers/registry.js';
-import { createWindowProvider } from '../container/windowProvider.js';
+import { createWindowProvider } from '@polkadot/shared';
 
 function isUint8ArrayLike(data: unknown): data is Uint8Array {
   if (data instanceof Uint8Array) return true;

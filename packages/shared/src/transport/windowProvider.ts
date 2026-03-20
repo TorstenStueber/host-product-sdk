@@ -11,8 +11,9 @@
  * retry handles reconnection.
  */
 
-import type { Provider, Logger } from '@polkadot/shared';
-import { createDefaultLogger } from '@polkadot/shared';
+import type { Provider } from './provider.js';
+import type { Logger } from '../util/logger.js';
+import { createDefaultLogger } from '../util/logger.js';
 
 function isProtocolMessage(data: unknown): boolean {
   return (

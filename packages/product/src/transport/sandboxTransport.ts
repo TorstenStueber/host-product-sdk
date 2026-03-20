@@ -4,8 +4,12 @@
  * Detects whether the current window is running inside an iframe or a
  * native webview and creates the appropriate Provider + Transport pair.
  *
- * Ported from product-sdk/sandboxTransport.ts, adapted to use the new
- * Transport / CodecAdapter abstractions from @polkadot/shared.
+ * - **iframe**: delegates to the shared `createWindowProvider(window.top)`.
+ * - **webview**: delegates to `createMessagePortProvider(getWebviewPort())`.
+ *
+ * After the handshake, the transport automatically attempts a codec
+ * upgrade to structured clone.  If the host supports it both sides swap;
+ * otherwise the connection stays on SCALE.
  */
 
 import type { Provider, Transport } from '@polkadot/shared';
@@ -15,10 +19,11 @@ import {
   requestCodecUpgrade,
   createDefaultLogger,
   createTransport,
+  createWindowProvider,
+  createMessagePortProvider,
 } from '@polkadot/shared';
-
 // ---------------------------------------------------------------------------
-// Global augmentation for webview ports
+// Global augmentation for webview
 // ---------------------------------------------------------------------------
 
 declare global {
@@ -63,20 +68,17 @@ export function isWebview(): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Internal helpers
+// Webview port acquisition
 // ---------------------------------------------------------------------------
 
-function delay(ttl: number): Promise<void> {
-  return new Promise<void>(resolve => setTimeout(resolve, ttl));
+function delay(ms: number): Promise<void> {
+  return new Promise<void>(resolve => setTimeout(resolve, ms));
 }
 
-function getParentWindow(): Window {
-  if (typeof window !== 'undefined' && window.top) {
-    return window.top;
-  }
-  throw new Error('No parent window found');
-}
-
+/**
+ * Poll for the MessagePort injected by the host webview provider.
+ * Retries up to ~20 seconds (200 iterations x 100ms).
+ */
 async function getWebviewPort(iteration = 200): Promise<MessagePort> {
   if (iteration === 0) {
     throw new Error('No webview port found');
@@ -88,121 +90,41 @@ async function getWebviewPort(iteration = 200): Promise<MessagePort> {
   return getWebviewPort(iteration - 1);
 }
 
-function isProtocolMessage(data: unknown): boolean {
-  return (
-    typeof data === 'object' &&
-    data !== null &&
-    'requestId' in (data as Record<string, unknown>) &&
-    'payload' in (data as Record<string, unknown>)
-  );
-}
-
-function isValidIframeMessage(
-  event: MessageEvent,
-  sourceEnv: MessageEventSource,
-  currentEnv: MessageEventSource,
-): boolean {
-  return (
-    event.source !== currentEnv &&
-    event.source === sourceEnv &&
-    event.data != null &&
-    (event.data instanceof Uint8Array ||
-      (typeof event.data === 'object' && event.data.constructor?.name === 'Uint8Array') ||
-      isProtocolMessage(event.data))
-  );
-}
-
-function isValidWebviewMessage(event: MessageEvent): boolean {
-  return (
-    event.data != null &&
-    (event.data instanceof Uint8Array ||
-      (typeof event.data === 'object' && event.data.constructor?.name === 'Uint8Array') ||
-      isProtocolMessage(event.data))
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Provider factory
 // ---------------------------------------------------------------------------
 
+function getParentWindow(): Window {
+  if (typeof window !== 'undefined' && window.top) {
+    return window.top;
+  }
+  throw new Error('No parent window found');
+}
+
 /**
  * Create the default product-side provider.
  *
- * Supports two environments:
- * - **iframe**: messages are sent to / received from the parent window.
- * - **webview**: messages travel through a `MessagePort` injected by the
- *   native host as `window.__HOST_API_PORT__`.
+ * - **iframe**: reuses the shared `createWindowProvider` targeting `window.top`.
+ * - **webview**: uses `createProductWebviewProvider` (polls for a MessagePort).
+ * - **other**: returns a no-op provider (`isCorrectEnvironment` = false).
  */
-export function createDefaultSdkProvider(): Provider {
-  const subscribers = new Set<(message: Uint8Array | unknown) => void>();
-  const logger = createDefaultLogger('ProductProvider');
-
-  const handleIframeMessage = (event: MessageEvent): void => {
-    if (!isValidIframeMessage(event, getParentWindow(), window)) return;
-    for (const subscriber of subscribers) {
-      subscriber(event.data);
-    }
-  };
-
-  const handleWebviewMessage = (event: MessageEvent): void => {
-    if (!isValidWebviewMessage(event)) return;
-    for (const subscriber of subscribers) {
-      subscriber(event.data);
-    }
-  };
-
-  // Wire up listeners immediately based on the detected environment
+export function createDefaultProductProvider(): Provider {
   if (isIframe()) {
-    window.addEventListener('message', handleIframeMessage);
-  } else if (isWebview()) {
-    getWebviewPort().then(port => {
-      port.onmessage = handleWebviewMessage;
-    });
+    return createWindowProvider(getParentWindow());
   }
 
+  if (isWebview()) {
+    return createMessagePortProvider(getWebviewPort());
+  }
+
+  // Not in a supported environment — return a no-op provider.
+  const logger = createDefaultLogger('ProductProvider');
   return {
     logger,
-
-    isCorrectEnvironment(): boolean {
-      return isIframe() || isWebview();
-    },
-
-    postMessage(message: Uint8Array | unknown): void {
-      if (isIframe()) {
-        if (message instanceof Uint8Array) {
-          getParentWindow().postMessage(message, '*', [message.buffer]);
-        } else {
-          getParentWindow().postMessage(message, '*');
-        }
-      } else if (isWebview()) {
-        getWebviewPort().then(port => {
-          if (message instanceof Uint8Array) {
-            port.postMessage(message, [message.buffer]);
-          } else {
-            port.postMessage(message);
-          }
-        });
-      }
-    },
-
-    subscribe(callback: (message: Uint8Array | unknown) => void): () => void {
-      subscribers.add(callback);
-      return () => {
-        subscribers.delete(callback);
-      };
-    },
-
-    dispose(): void {
-      subscribers.clear();
-      if (isIframe()) {
-        window.removeEventListener('message', handleIframeMessage);
-      }
-      if (isWebview()) {
-        getWebviewPort().then(port => {
-          port.onmessage = null;
-        });
-      }
-    },
+    isCorrectEnvironment: () => false,
+    postMessage: () => {},
+    subscribe: () => () => {},
+    dispose: () => {},
   };
 }
 
@@ -213,7 +135,7 @@ export function createDefaultSdkProvider(): Provider {
 /**
  * Default product-side provider singleton.
  */
-export const sandboxProvider: Provider = createDefaultSdkProvider();
+export const sandboxProvider: Provider = createDefaultProductProvider();
 
 /**
  * Default product-side transport singleton.

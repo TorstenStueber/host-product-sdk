@@ -39,11 +39,8 @@ export type { CreateContainerOptions } from './container/container.js';
 // Providers
 // ---------------------------------------------------------------------------
 
-export { createIframeProvider } from './container/iframeProvider.js';
-export type { CreateIframeProviderParams } from './container/iframeProvider.js';
-
-export { createWebviewProvider } from './container/webviewProvider.js';
-export type { CreateWebviewProviderParams, WebviewTag } from './container/webviewProvider.js';
+export { createHostWebviewProvider } from './container/webviewProvider.js';
+export type { CreateHostWebviewProviderParams, WebviewTag } from './container/webviewProvider.js';
 
 // ---------------------------------------------------------------------------
 // Handlers
@@ -97,4 +94,4 @@ export type {
 export { setupNestedBridgeDetector } from './nested/detector.js';
 export type { NestedBridgeDetectorOptions } from './nested/detector.js';
 
-export { createWindowProvider } from './container/windowProvider.js';
+export { createWindowProvider } from '@polkadot/shared';

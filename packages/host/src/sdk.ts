@@ -9,7 +9,7 @@
 import { createAuthManager } from './auth/authManager.js';
 import type { UserSession, Identity } from './auth/authManager.js';
 import { createContainer } from './container/container.js';
-import { createIframeProvider } from './container/iframeProvider.js';
+import { createWindowProvider } from '@polkadot/shared';
 import { wireAllHandlers } from './handlers/registry.js';
 import type { HandlersConfig } from './handlers/registry.js';
 import type { HostSdkConfig, HostSdk, EmbeddedProduct } from './types.js';
@@ -83,8 +83,9 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
     auth,
 
     embed(iframe: HTMLIFrameElement, url: string): EmbeddedProduct {
+      iframe.src = url;
       const storagePrefix = config.storagePrefix ?? `${config.appId}:`;
-      const provider = createIframeProvider({ iframe, url });
+      const provider = createWindowProvider(() => iframe.contentWindow);
       const container = createContainer({
         provider,
       });
@@ -98,6 +99,7 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
         dispose() {
           cleanupHandlers();
           container.dispose();
+          iframe.src = '';
           embeddedProducts.delete(product);
         },
       };
