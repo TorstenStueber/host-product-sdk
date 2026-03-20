@@ -6,19 +6,20 @@
  */
 
 import type { Container } from '../container/types.js';
+import { errAsync } from '@polkadot/shared';
 
 export function wireChatHandlers(container: Container): VoidFunction[] {
   const cleanups: VoidFunction[] = [];
 
   cleanups.push(
-    container.handleChatCreateRoom((_params, ctx) => {
-      return ctx.err({ tag: 'PermissionDenied', value: undefined });
+    container.handleChatCreateRoom((_params) => {
+      return errAsync({ tag: 'PermissionDenied', value: undefined });
     }),
   );
 
   cleanups.push(
-    container.handleChatRegisterBot((_params, ctx) => {
-      return ctx.err({ tag: 'PermissionDenied', value: undefined });
+    container.handleChatRegisterBot((_params) => {
+      return errAsync({ tag: 'PermissionDenied', value: undefined });
     }),
   );
 
@@ -30,8 +31,8 @@ export function wireChatHandlers(container: Container): VoidFunction[] {
   );
 
   cleanups.push(
-    container.handleChatPostMessage((_params, ctx) => {
-      return ctx.err({ tag: 'Unknown', value: { reason: 'Chat not supported' } });
+    container.handleChatPostMessage((_params) => {
+      return errAsync({ tag: 'Unknown', value: { reason: 'Chat not supported' } });
     }),
   );
 
@@ -42,12 +43,9 @@ export function wireChatHandlers(container: Container): VoidFunction[] {
     }),
   );
 
-  cleanups.push(
-    container.handleChatCustomMessageRenderSubscribe((_params, _send, interrupt) => {
-      interrupt();
-      return () => {};
-    }),
-  );
+  // Note: product_chat_custom_message_render_subscribe is host-initiated
+  // (via container.renderChatCustomMessage), not product-initiated, so
+  // there is no handler to register here.
 
   return cleanups;
 }

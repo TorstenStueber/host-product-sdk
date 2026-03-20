@@ -6,29 +6,30 @@
 
 import type { Container } from '../container/types.js';
 import type { HandlersConfig } from './registry.js';
+import { okAsync, ResultAsync } from '@polkadot/shared';
 
 export function wirePermissionHandlers(container: Container, config: HandlersConfig): VoidFunction[] {
   const cleanups: VoidFunction[] = [];
 
   cleanups.push(
-    container.handleDevicePermission((permission, ctx) => {
+    container.handleDevicePermission((permission) => {
       if (config.onDevicePermission) {
-        return Promise.resolve(config.onDevicePermission(permission)).then(
-          (result) => ctx.ok(result),
+        return ResultAsync.fromSafePromise(
+          Promise.resolve(config.onDevicePermission(permission)),
         );
       }
-      return ctx.ok(false);
+      return okAsync(false);
     }),
   );
 
   cleanups.push(
-    container.handlePermission((request, ctx) => {
+    container.handlePermission((request) => {
       if (config.onPermission) {
-        return Promise.resolve(config.onPermission(request)).then(
-          (result) => ctx.ok(result),
+        return ResultAsync.fromSafePromise(
+          Promise.resolve(config.onPermission(request)),
         );
       }
-      return ctx.ok(false);
+      return okAsync(false);
     }),
   );
 

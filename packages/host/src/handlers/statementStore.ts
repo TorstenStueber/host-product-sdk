@@ -6,6 +6,7 @@
  */
 
 import type { Container } from '../container/types.js';
+import { errAsync } from '@polkadot/shared';
 
 export function wireStatementStoreHandlers(container: Container): VoidFunction[] {
   const cleanups: VoidFunction[] = [];
@@ -18,14 +19,14 @@ export function wireStatementStoreHandlers(container: Container): VoidFunction[]
   );
 
   cleanups.push(
-    container.handleStatementStoreCreateProof((_params, ctx) => {
-      return ctx.err({ tag: 'Unknown', value: { reason: 'Statement store not supported' } });
+    container.handleStatementStoreCreateProof((_params) => {
+      return errAsync({ tag: 'Unknown', value: { reason: 'Statement store not supported' } });
     }),
   );
 
   cleanups.push(
-    container.handleStatementStoreSubmit((_params, ctx) => {
-      return ctx.err({ reason: 'Statement store not supported' });
+    container.handleStatementStoreSubmit((_params) => {
+      return errAsync({ reason: 'Statement store not supported' });
     }),
   );
 

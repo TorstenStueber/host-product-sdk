@@ -11,16 +11,17 @@
 import type { Container } from '../container/types.js';
 import type { HandlersConfig } from './registry.js';
 import { deriveProductPublicKey } from '../auth/crypto.js';
+import { okAsync, errAsync } from '@polkadot/shared';
 
 export function wireAccountHandlers(container: Container, config: HandlersConfig): VoidFunction[] {
   const cleanups: VoidFunction[] = [];
 
   // Account get - derives product-specific key from session
   cleanups.push(
-    container.handleAccountGet(([dotNsIdentifier, derivationIndex], ctx) => {
+    container.handleAccountGet(([dotNsIdentifier, derivationIndex]) => {
       const session = config.getSession?.();
       if (!session) {
-        return ctx.err({ tag: 'NotConnected', value: undefined });
+        return errAsync({ tag: 'NotConnected', value: undefined });
       }
 
       const publicKey = deriveProductPublicKey(
@@ -29,34 +30,34 @@ export function wireAccountHandlers(container: Container, config: HandlersConfig
         derivationIndex,
       );
 
-      return ctx.ok({ publicKey, name: undefined });
+      return okAsync({ publicKey, name: undefined });
     }),
   );
 
   // Account get alias - requires ring VRF, not yet implemented
   cleanups.push(
-    container.handleAccountGetAlias((_params, ctx) => {
+    container.handleAccountGetAlias((_params) => {
       // TODO: Implement ring VRF alias derivation
-      return ctx.err({ tag: 'Unknown', value: { reason: 'Ring VRF alias not yet implemented' } });
+      return errAsync({ tag: 'Unknown', value: { reason: 'Ring VRF alias not yet implemented' } });
     }),
   );
 
   // Account create proof - requires ring VRF, not yet implemented
   cleanups.push(
-    container.handleAccountCreateProof((_params, ctx) => {
+    container.handleAccountCreateProof((_params) => {
       // TODO: Implement ring VRF proof creation
-      return ctx.err({ tag: 'Unknown', value: { reason: 'Ring VRF proof not yet implemented' } });
+      return errAsync({ tag: 'Unknown', value: { reason: 'Ring VRF proof not yet implemented' } });
     }),
   );
 
   // Get non-product accounts - returns root account from session
   cleanups.push(
-    container.handleGetNonProductAccounts((_params, ctx) => {
+    container.handleGetNonProductAccounts((_params) => {
       const session = config.getSession?.();
       if (!session) {
-        return ctx.ok([]);
+        return okAsync([]);
       }
-      return ctx.ok([
+      return okAsync([
         {
           publicKey: session.rootPublicKey,
           name: session.displayName ?? undefined,

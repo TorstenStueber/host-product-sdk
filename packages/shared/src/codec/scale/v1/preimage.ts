@@ -1,5 +1,5 @@
-import { Enum, Hex, Nullable } from '../primitives.js';
-import { Bytes, Result } from 'scale-ts';
+import { Enum, Hex } from '../primitives.js';
+import { Bytes } from 'scale-ts';
 import { GenericErr } from './commonCodecs.js';
 
 // -- Types --------------------------------------------------------------------
@@ -12,16 +12,6 @@ export const PreimageValue = Bytes();
 export const PreimageSubmitErr = Enum({
   Unknown: GenericErr,
 });
-
-// -- V1 request / response codecs --------------------------------------------
-
-// remote_preimage_lookup_subscribe
-export const PreimageLookupV1_start = PreimageKey;
-export const PreimageLookupV1_receive = Nullable(PreimageValue);
-
-// remote_preimage_submit
-export const PreimageSubmitV1_request = PreimageValue;
-export const PreimageSubmitV1_response = Result(PreimageKey, PreimageSubmitErr);
 
 // -- Derived types ------------------------------------------------------------
 

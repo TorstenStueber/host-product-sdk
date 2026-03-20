@@ -6,7 +6,7 @@
  * all handler modules.
  */
 
-import type { HexString } from '@polkadot/shared';
+import type { HexString, RequestParams } from '@polkadot/shared';
 import type {
   Feature,
   DevicePermissionRequest,
@@ -15,8 +15,6 @@ import type {
   SigningPayloadRequest,
   SigningRawRequest,
   SigningResult,
-  CreateTransactionRequest,
-  CreateTransactionWithNonProductRequest,
   ResponseOk,
 } from '@polkadot/shared';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
@@ -88,13 +86,13 @@ export type HandlersConfig = {
   /** Handle creating a transaction. Must return the signed transaction hex. */
   onCreateTransaction?: (
     session: UserSessionInfo,
-    params: CreateTransactionRequest,
+    params: RequestParams<'host_create_transaction', 'v1'>,
   ) => ResponseOk<'host_create_transaction', 'v1'> | Promise<ResponseOk<'host_create_transaction', 'v1'>>;
 
   /** Handle creating a transaction with a non-product account. Must return the signed transaction hex. */
   onCreateTransactionWithNonProductAccount?: (
     session: UserSessionInfo,
-    payload: CreateTransactionWithNonProductRequest,
+    payload: RequestParams<'host_create_transaction_with_non_product_account', 'v1'>,
   ) => ResponseOk<'host_create_transaction_with_non_product_account', 'v1'>
     | Promise<ResponseOk<'host_create_transaction_with_non_product_account', 'v1'>>;
 

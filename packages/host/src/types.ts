@@ -2,14 +2,12 @@
  * Public types for @polkadot/host.
  */
 
-import type { HexString, CodecAdapter, ResponseOk } from '@polkadot/shared';
+import type { HexString, ResponseOk, RequestParams } from '@polkadot/shared';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 import type {
   SigningPayloadRequest,
   SigningRawRequest,
   SigningResult,
-  CreateTransactionRequest,
-  CreateTransactionWithNonProductRequest,
   Feature,
   DevicePermissionRequest,
   RemotePermissionRequest,
@@ -30,9 +28,6 @@ export type HostSdkConfig = {
   /** Storage key prefix. Defaults to `${appId}:`. */
   storagePrefix?: string;
 
-  /** Custom codec adapter. Defaults to StructuredCloneCodecAdapter. */
-  codecAdapter?: CodecAdapter;
-
   // -- Chain connection -----------------------------------------------------
   /** Factory that returns a JSON-RPC provider for a given genesis hash. */
   chainProvider?: (genesisHash: HexString) => JsonRpcProvider | null;
@@ -47,13 +42,13 @@ export type HostSdkConfig = {
   /** Handle creating a transaction. Must return the signed transaction hex. */
   onCreateTransaction?: (
     session: UserSession,
-    params: CreateTransactionRequest,
+    params: RequestParams<'host_create_transaction', 'v1'>,
   ) => ResponseOk<'host_create_transaction', 'v1'> | Promise<ResponseOk<'host_create_transaction', 'v1'>>;
 
   /** Handle creating a transaction with a non-product account. Must return the signed transaction hex. */
   onCreateTransactionWithNonProductAccount?: (
     session: UserSession,
-    payload: CreateTransactionWithNonProductRequest,
+    payload: RequestParams<'host_create_transaction_with_non_product_account', 'v1'>,
   ) => ResponseOk<'host_create_transaction_with_non_product_account', 'v1'>
     | Promise<ResponseOk<'host_create_transaction_with_non_product_account', 'v1'>>;
 

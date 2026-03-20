@@ -48,8 +48,6 @@ export type {
   TxPayloadContextType as TxPayloadContext,
   TxPayloadV1Type as TxPayloadV1,
   VersionedTxPayloadType as VersionedTxPayload,
-  CreateTransactionRequestType as CreateTransactionRequest,
-  CreateTransactionWithNonProductRequestType as CreateTransactionWithNonProductRequest,
 } from '../codec/scale/v1/createTransaction.js';
 
 // ---------------------------------------------------------------------------
@@ -105,14 +103,6 @@ export type {
   StorageResultItemType as StorageResultItem,
   OperationStartedResultType as OperationStartedResult,
   ChainHeadEventType as ChainHeadEvent,
-  ChainHeadFollowParamsType as ChainHeadFollowParams,
-  ChainHeadRequestParamsType as ChainHeadRequestParams,
-  ChainHeadStorageParamsType as ChainHeadStorageParams,
-  ChainHeadCallParamsType as ChainHeadCallParams,
-  ChainHeadUnpinParamsType as ChainHeadUnpinParams,
-  ChainHeadOperationParamsType as ChainHeadOperationParams,
-  TransactionBroadcastParamsType as TransactionBroadcastParams,
-  TransactionStopParamsType as TransactionStopParams,
 } from '../codec/scale/v1/chainInteraction.js';
 
 // ---------------------------------------------------------------------------
@@ -126,7 +116,7 @@ export type { RemotePermissionRequestType as RemotePermissionRequest } from '../
 // Navigation
 // ---------------------------------------------------------------------------
 
-export type { NavigateToRequestType as NavigateToRequest } from '../codec/scale/v1/navigation.js';
+// NavigateToRequestType was derived from a V1 request codec and has been removed.
 
 // ---------------------------------------------------------------------------
 // Notification

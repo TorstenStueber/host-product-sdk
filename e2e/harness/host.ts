@@ -13,8 +13,9 @@ import { createContainer, createIframeProvider } from '@polkadot/host';
 import type { Container } from '@polkadot/host';
 import {
   structuredCloneCodecAdapter, scaleCodecAdapter,
+  okAsync, errAsync,
 } from '@polkadot/shared';
-import type { CodecAdapter, CodecAdapterMap } from '@polkadot/shared';
+import type { CodecAdapterMap } from '@polkadot/shared';
 
 declare global {
   interface Window {
@@ -31,17 +32,12 @@ declare global {
 
 const codecParam = new URLSearchParams(location.search).get('codec') ?? 'structured_clone';
 
-let codecAdapter: CodecAdapter;
-let supportedCodecs: CodecAdapterMap | undefined;
-
-if (codecParam === 'scale' || codecParam === 'upgrade') {
-  codecAdapter = scaleCodecAdapter;
-  if (codecParam === 'upgrade') {
-    supportedCodecs = { scale: scaleCodecAdapter, structured_clone: structuredCloneCodecAdapter };
-  }
-} else {
-  codecAdapter = structuredCloneCodecAdapter;
-}
+// For the 'upgrade' and 'structured_clone' tests, register codec support
+// so the product can negotiate an upgrade from SCALE to structured clone.
+const supportedCodecs: CodecAdapterMap | undefined =
+  (codecParam === 'upgrade' || codecParam === 'structured_clone')
+    ? { scale: scaleCodecAdapter, structured_clone: structuredCloneCodecAdapter }
+    : undefined;
 
 const e2e: Window['__e2e'] = {
   ready: false,
@@ -58,78 +54,78 @@ const provider = createIframeProvider({
   iframe,
   url: `/product.html?codec=${codecParam}`,
 });
-const container = createContainer({ provider, codecAdapter, supportedCodecs });
+const container = createContainer({ provider, supportedCodecs });
 e2e.container = container;
 
 // --- Feature supported ---
-container.handleFeatureSupported((_feature, ctx) => {
+container.handleFeatureSupported((_feature) => {
   // Only support "Chain" feature with a specific genesis hash
   const f = _feature as { tag: string; value: unknown } | undefined;
   if (f && f.tag === 'Chain' && f.value === '0xabc123') {
-    return ctx.ok(true);
+    return okAsync(true);
   }
-  return ctx.ok(false);
+  return okAsync(false);
 });
 
 // --- Permissions (deny all) ---
-container.handleDevicePermission((_req, ctx) => ctx.ok(false));
-container.handlePermission((_req, ctx) => ctx.ok(false));
+container.handleDevicePermission((_req) => okAsync(false));
+container.handlePermission((_req) => okAsync(false));
 
 // --- Navigation ---
-container.handleNavigateTo((url, ctx) => {
+container.handleNavigateTo((url) => {
   if (url === 'blocked://denied') {
-    return ctx.err({ tag: 'PermissionDenied' as const, value: undefined });
+    return errAsync({ tag: 'PermissionDenied' as const, value: undefined });
   }
   // Don't actually open, just record
   (window as unknown as Record<string, unknown>).__lastNavUrl = url;
-  return ctx.ok(undefined);
+  return okAsync(undefined);
 });
 
 // --- Push notification ---
-container.handlePushNotification((_notif, ctx) => {
-  return ctx.ok(undefined);
+container.handlePushNotification((_notif) => {
+  return okAsync(undefined);
 });
 
 // --- Local storage (in-memory scoped) ---
 const storagePrefix = 'e2e:';
 const storageData: Record<string, Uint8Array> = {};
 
-container.handleLocalStorageRead((key, ctx) => {
+container.handleLocalStorageRead((key) => {
   const fullKey = storagePrefix + (key as string);
   const val = storageData[fullKey];
-  return ctx.ok(val ?? undefined);
+  return okAsync(val ?? undefined);
 });
 
-container.handleLocalStorageWrite((params, ctx) => {
+container.handleLocalStorageWrite((params) => {
   const [key, value] = params as [string, Uint8Array];
   if (key === '__FULL__') {
-    return ctx.err({ tag: 'Full' as const, value: undefined });
+    return errAsync({ tag: 'Full' as const, value: undefined });
   }
   const fullKey = storagePrefix + key;
   storageData[fullKey] = value;
   e2e.storageBacking[fullKey] = btoa(String.fromCharCode(...value));
-  return ctx.ok(undefined);
+  return okAsync(undefined);
 });
 
-container.handleLocalStorageClear((key, ctx) => {
+container.handleLocalStorageClear((key) => {
   const fullKey = storagePrefix + (key as string);
   delete storageData[fullKey];
   delete e2e.storageBacking[fullKey];
-  return ctx.ok(undefined);
+  return okAsync(undefined);
 });
 
 // --- Accounts ---
-container.handleAccountGet((params, ctx) => {
+container.handleAccountGet((params) => {
   // Return a mock account with a deterministic public key
   const pk = new Uint8Array(32);
   pk[0] = 0x42;
-  return ctx.ok({ publicKey: pk, name: 'TestAccount' });
+  return okAsync({ publicKey: pk, name: 'TestAccount' });
 });
 
-container.handleGetNonProductAccounts((_params, ctx) => {
+container.handleGetNonProductAccounts((_params) => {
   const pk = new Uint8Array(32);
   pk[0] = 0xAA;
-  return ctx.ok([{ publicKey: pk, name: 'RootAccount' }]);
+  return okAsync([{ publicKey: pk, name: 'RootAccount' }]);
 });
 
 container.handleAccountConnectionStatusSubscribe((_params, send, _interrupt) => {
@@ -139,74 +135,75 @@ container.handleAccountConnectionStatusSubscribe((_params, send, _interrupt) => 
   return () => {};
 });
 
-container.handleAccountGetAlias((_params, ctx) => {
-  return ctx.err({ tag: 'Unknown' as const, value: { reason: 'Not supported' } });
+container.handleAccountGetAlias((_params) => {
+  return errAsync({ tag: 'Unknown' as const, value: { reason: 'Not supported' } });
 });
 
-container.handleAccountCreateProof((_params, ctx) => {
-  return ctx.err({ tag: 'Unknown' as const, value: { reason: 'Not supported' } });
+container.handleAccountCreateProof((_params) => {
+  return errAsync({ tag: 'Unknown' as const, value: { reason: 'Not supported' } });
 });
 
 // --- Signing ---
-container.handleSignPayload((params, ctx) => {
+container.handleSignPayload((params) => {
   const p = params as { address?: string };
   if (p.address === 'REJECT_ME') {
-    return ctx.err({ tag: 'Rejected' as const, value: undefined });
+    return errAsync({ tag: 'Rejected' as const, value: undefined });
   }
   e2e.signPayloadCalls.push(params);
-  return ctx.ok({
+  return okAsync({
     signature: '0x' + 'ab'.repeat(64),
     signedTransaction: undefined,
   });
 });
 
-container.handleSignRaw((params, ctx) => {
+container.handleSignRaw((params) => {
   e2e.signRawCalls.push(params);
-  return ctx.ok({
+  return okAsync({
     signature: '0x' + 'cd'.repeat(64),
     signedTransaction: undefined,
   });
 });
 
-container.handleCreateTransaction((_params, ctx) => {
-  return ctx.err({ tag: 'NotSupported' as const, value: 'Not implemented in E2E' });
+container.handleCreateTransaction((_params) => {
+  return errAsync({ tag: 'NotSupported' as const, value: 'Not implemented in E2E' });
 });
 
-container.handleCreateTransactionWithNonProductAccount((_params, ctx) => {
-  return ctx.err({ tag: 'NotSupported' as const, value: 'Not implemented in E2E' });
+container.handleCreateTransactionWithNonProductAccount((_params) => {
+  return errAsync({ tag: 'NotSupported' as const, value: 'Not implemented in E2E' });
 });
 
 // --- Chat (no-op) ---
-container.handleChatCreateRoom((_p, ctx) => ctx.err({ tag: 'PermissionDenied' as const, value: undefined }));
-container.handleChatRegisterBot((_p, ctx) => ctx.err({ tag: 'PermissionDenied' as const, value: undefined }));
-container.handleChatPostMessage((_p, ctx) => ctx.err({ tag: 'Unknown' as const, value: { reason: 'disabled' } }));
+container.handleChatCreateRoom((_p) => errAsync({ tag: 'PermissionDenied' as const, value: undefined }));
+container.handleChatRegisterBot((_p) => errAsync({ tag: 'PermissionDenied' as const, value: undefined }));
+container.handleChatPostMessage((_p) => errAsync({ tag: 'Unknown' as const, value: { reason: 'disabled' } }));
 container.handleChatListSubscribe((_p, _s, interrupt) => { interrupt(); return () => {}; });
 container.handleChatActionSubscribe((_p, _s, interrupt) => { interrupt(); return () => {}; });
-container.handleChatCustomMessageRenderSubscribe((_p, _s, interrupt) => { interrupt(); return () => {}; });
+// Note: product_chat_custom_message_render_subscribe is host-initiated
+// (via container.renderChatCustomMessage), so no handler registration needed.
 
 // --- Statement store (no-op) ---
-container.handleStatementStoreCreateProof((_p, ctx) => ctx.err({ tag: 'Unknown' as const, value: { reason: 'disabled' } }));
-container.handleStatementStoreSubmit((_p, ctx) => ctx.err({ reason: 'disabled' }));  // GenericErr — plain object
+container.handleStatementStoreCreateProof((_p) => errAsync({ tag: 'Unknown' as const, value: { reason: 'disabled' } }));
+container.handleStatementStoreSubmit((_p) => errAsync({ reason: 'disabled' }));  // GenericErr — plain object
 container.handleStatementStoreSubscribe((_p, _s, interrupt) => { interrupt(); return () => {}; });
 
 // --- Preimage (no-op) ---
-container.handlePreimageSubmit((_p, ctx) => ctx.err({ tag: 'Unknown' as const, value: { reason: 'disabled' } }));
+container.handlePreimageSubmit((_p) => errAsync({ tag: 'Unknown' as const, value: { reason: 'disabled' } }));
 container.handlePreimageLookupSubscribe((_p, _s, interrupt) => { interrupt(); return () => {}; });
 
 // --- Chain (minimal stub) ---
 container.handleChainHeadFollow((_p, _s, interrupt) => { interrupt(); return () => {}; });
-container.handleChainHeadHeader((_p, ctx) => ctx.ok(undefined));
-container.handleChainHeadBody((_p, ctx) => ctx.ok({ tag: 'LimitReached' as const, value: undefined }));
-container.handleChainHeadStorage((_p, ctx) => ctx.ok({ tag: 'LimitReached' as const, value: undefined }));
-container.handleChainHeadCall((_p, ctx) => ctx.ok({ tag: 'LimitReached' as const, value: undefined }));
-container.handleChainHeadUnpin((_p, ctx) => ctx.ok(undefined));
-container.handleChainHeadContinue((_p, ctx) => ctx.ok(undefined));
-container.handleChainHeadStopOperation((_p, ctx) => ctx.ok(undefined));
-container.handleChainSpecGenesisHash((_p, ctx) => ctx.ok('0xabc123'));
-container.handleChainSpecChainName((_p, ctx) => ctx.ok('TestChain'));
-container.handleChainSpecProperties((_p, ctx) => ctx.ok('{"tokenSymbol":"DOT"}'));
-container.handleChainTransactionBroadcast((_p, ctx) => ctx.ok(undefined));
-container.handleChainTransactionStop((_p, ctx) => ctx.ok(undefined));
+container.handleChainHeadHeader((_p) => okAsync(undefined));
+container.handleChainHeadBody((_p) => okAsync({ tag: 'LimitReached' as const, value: undefined }));
+container.handleChainHeadStorage((_p) => okAsync({ tag: 'LimitReached' as const, value: undefined }));
+container.handleChainHeadCall((_p) => okAsync({ tag: 'LimitReached' as const, value: undefined }));
+container.handleChainHeadUnpin((_p) => okAsync(undefined));
+container.handleChainHeadContinue((_p) => okAsync(undefined));
+container.handleChainHeadStopOperation((_p) => okAsync(undefined));
+container.handleChainSpecGenesisHash((_p) => okAsync('0xabc123'));
+container.handleChainSpecChainName((_p) => okAsync('TestChain'));
+container.handleChainSpecProperties((_p) => okAsync('{"tokenSymbol":"DOT"}'));
+container.handleChainTransactionBroadcast((_p) => okAsync(undefined));
+container.handleChainTransactionStop((_p) => okAsync(undefined));
 
 e2e.ready = true;
 document.getElementById('status')!.textContent = 'host-ready';

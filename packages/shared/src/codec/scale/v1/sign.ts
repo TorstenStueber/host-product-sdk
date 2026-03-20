@@ -1,5 +1,5 @@
 import { Enum, Hex } from '../primitives.js';
-import { Bytes, Option, Result, Struct, Vector, _void, bool, str, u32 } from 'scale-ts';
+import { Bytes, Option, Struct, Vector, _void, bool, str, u32 } from 'scale-ts';
 import { GenericErr, GenesisHash } from './commonCodecs.js';
 
 // -- Errors -------------------------------------------------------------------
@@ -46,14 +46,6 @@ export const SigningPayload = Struct({
   mode: Option(u32),
   withSignedTransaction: Option(bool),
 });
-
-// -- V1 request / response codecs --------------------------------------------
-
-export const SignRawV1_request = SigningRawPayload;
-export const SignRawV1_response = Result(SigningResult, SigningErr);
-
-export const SignPayloadV1_request = SigningPayload;
-export const SignPayloadV1_response = Result(SigningResult, SigningErr);
 
 // -- Derived types ------------------------------------------------------------
 

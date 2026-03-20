@@ -1,5 +1,5 @@
 import { Enum, Hex, Status } from '../primitives.js';
-import { Bytes, Option, Result, Struct, Tuple, Vector, _void, str, u32 } from 'scale-ts';
+import { Bytes, Option, Struct, Tuple, _void, str, u32 } from 'scale-ts';
 import { GenericErr } from './commonCodecs.js';
 
 // -- Primitives ---------------------------------------------------------------
@@ -54,28 +54,6 @@ export const CreateProofErr = Enum({
 // -- Status -------------------------------------------------------------------
 
 export const AccountConnectionStatus = Status('disconnected', 'connected');
-
-// -- V1 request / response codecs --------------------------------------------
-
-// host_account_connection_status_subscribe
-export const AccountConnectionStatusV1_start = _void;
-export const AccountConnectionStatusV1_receive = AccountConnectionStatus;
-
-// host_account_get
-export const AccountGetV1_request = ProductAccountId;
-export const AccountGetV1_response = Result(Account, RequestCredentialsErr);
-
-// host_account_get_alias
-export const AccountGetAliasV1_request = ProductAccountId;
-export const AccountGetAliasV1_response = Result(ContextualAlias, RequestCredentialsErr);
-
-// host_account_create_proof
-export const AccountCreateProofV1_request = Tuple(ProductAccountId, RingLocation, Bytes());
-export const AccountCreateProofV1_response = Result(RingVrfProof, CreateProofErr);
-
-// host_get_non_product_accounts
-export const GetNonProductAccountsV1_request = _void;
-export const GetNonProductAccountsV1_response = Result(Vector(Account), RequestCredentialsErr);
 
 // -- Derived types ------------------------------------------------------------
 

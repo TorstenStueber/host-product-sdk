@@ -87,7 +87,6 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
       const provider = createIframeProvider({ iframe, url });
       const container = createContainer({
         provider,
-        codecAdapter: config.codecAdapter,
       });
 
       const handlersConfig = buildHandlersConfig(storagePrefix);

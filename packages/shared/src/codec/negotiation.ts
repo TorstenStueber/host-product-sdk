@@ -88,14 +88,11 @@ export async function requestCodecUpgrade(
       'host_codec_upgrade',
       { tag: 'v1', value: request },
       controller.signal,
-    ) as { tag: string; value: CodecUpgradeResponse } | undefined;
+    );
 
     clearTimeout(timeout);
 
-    if (!response || typeof response !== 'object') return null;
-
-    const inner = (response as { tag: string; value: unknown }).value as CodecUpgradeResponse | undefined;
-    const selectedFormat = inner?.selectedFormat;
+    const selectedFormat = response.value.selectedFormat as CodecFormat | undefined;
 
     if (!selectedFormat || !adapters[selectedFormat]) return null;
 
@@ -103,7 +100,7 @@ export async function requestCodecUpgrade(
     transport.swapCodecAdapter(adapters[selectedFormat]!);
     return selectedFormat;
   } catch {
-    // Timeout, abort, or host doesn't support the method — stay on current codec.
+    // MethodNotSupportedError, timeout, or abort — stay on current codec.
     return null;
   }
 }
@@ -116,42 +113,45 @@ export async function requestCodecUpgrade(
  * Register a handler for codec upgrade requests on the host side.
  *
  * When the product sends `host_codec_upgrade`, this handler picks
- * the best format from the intersection of what both sides support,
- * responds with the selection, and swaps the transport's codec adapter.
+ * the best format from the intersection of what both sides support
+ * and responds with the selection.
  *
- * Uses low-level `listenMessages`/`postMessage` instead of
- * `handleRequest` so that the codec swap happens synchronously
- * AFTER the response is encoded and sent with the old codec.
+ * If structured clone is selected, the host swaps its outgoing codec
+ * BEFORE sending the response. This means the response itself arrives
+ * as a structured clone message, which forces the product's transport
+ * to auto-upgrade its outgoing codec via `decodeIncoming`. This
+ * eliminates the race condition: even if the product's timeout has
+ * already fired, the next message from the host (in structured clone)
+ * will trigger the product's auto-upgrade.
  *
  * @param transport - The host-side transport.
  * @param adapters - Map of format → CodecAdapter the host supports.
- * @param preference - Ordered list of formats the host prefers
- *   (first = most preferred). Defaults to `['structured_clone', 'scale']`.
  * @returns An unsubscribe function that removes the handler.
  */
 export function handleCodecUpgrade(
   transport: Transport,
   adapters: CodecAdapterMap,
-  preference: CodecFormat[] = ['structured_clone', 'scale'],
 ): VoidFunction {
+  const preference: CodecFormat[] = ['structured_clone', 'scale'];
+  const fallbackResponse = { tag: 'v1', value: { selectedFormat: 'scale' } };
+
   return transport.listenMessages(
     'host_codec_upgrade_request',
-    (requestId, requestPayload) => {
-      const wrapped = requestPayload.value as { tag: string; value: CodecUpgradeRequest } | undefined;
-      const request = wrapped?.value;
+    (requestId, value) => {
+      const envelope = value as { tag: string; value: CodecUpgradeRequest };
+      const request = envelope?.value;
 
       if (!request?.supportedFormats) {
-        // Malformed request — respond with fallback, no swap.
         transport.postMessage(requestId, {
           tag: 'host_codec_upgrade_response',
-          value: { tag: 'v1', value: { selectedFormat: 'scale' as CodecFormat } },
+          value: fallbackResponse,
         });
         return;
       }
 
       const productFormats = new Set(request.supportedFormats);
 
-      // Pick the host's most preferred format that the product also supports.
+      // Pick the best format from the intersection (structured_clone preferred).
       let selected: CodecFormat | undefined;
       for (const format of preference) {
         if (productFormats.has(format) && adapters[format]) {
@@ -161,24 +161,22 @@ export function handleCodecUpgrade(
       }
 
       if (!selected) {
-        // No common format — respond with fallback, no swap.
         transport.postMessage(requestId, {
           tag: 'host_codec_upgrade_response',
-          value: { tag: 'v1', value: { selectedFormat: 'scale' as CodecFormat } },
+          value: fallbackResponse,
         });
         return;
       }
 
-      const response: CodecUpgradeResponse = { selectedFormat: selected };
+      // Swap BEFORE sending the response so the response itself is
+      // encoded with the new codec. The product's decodeIncoming will
+      // detect the format and auto-upgrade its outgoing codec too.
+      transport.swapCodecAdapter(adapters[selected]!);
 
-      // Send the response — this encodes with the CURRENT codec adapter.
       transport.postMessage(requestId, {
         tag: 'host_codec_upgrade_response',
-        value: { tag: 'v1', value: response },
+        value: { tag: 'v1', value: { selectedFormat: selected } },
       });
-
-      // Swap AFTER postMessage — the response was already encoded above.
-      transport.swapCodecAdapter(adapters[selected]!);
     },
   );
 }

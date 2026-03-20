@@ -1,10 +1,6 @@
 import { Enum, Status } from '../primitives.js';
-import type { Codec } from 'scale-ts';
-import { Bytes, Option, Result, Struct, Vector, _void, str, u64 } from 'scale-ts';
+import { Bytes, Option, Struct, Vector, _void, str, u64 } from 'scale-ts';
 import { GenericErr } from './commonCodecs.js';
-
-import type { CustomRendererNodeType } from './customRenderer.js';
-import { CustomRendererNode } from './customRenderer.js';
 
 // -- Errors -------------------------------------------------------------------
 
@@ -134,35 +130,6 @@ export const ReceivedChatAction = Struct({
   peer: str,
   payload: ChatActionPayload,
 });
-
-// -- V1 request / response codecs --------------------------------------------
-
-// host_chat_create_room
-export const ChatCreateRoomV1_request = ChatRoomRequest;
-export const ChatCreateRoomV1_response = Result(ChatRoomRegistrationResult, ChatRoomRegistrationErr);
-
-// host_chat_register_bot
-export const ChatRegisterBotV1_request = ChatBotRequest;
-export const ChatRegisterBotV1_response = Result(ChatBotRegistrationResult, ChatBotRegistrationErr);
-
-// host_chat_list_subscribe
-export const ChatListV1_start = _void;
-export const ChatListV1_receive = Vector(ChatRoom);
-
-// host_chat_post_message
-export const ChatPostMessageV1_request = Struct({
-  roomId: str,
-  payload: ChatMessageContent,
-});
-export const ChatPostMessageV1_response = Result(ChatPostMessageResult, ChatMessagePostingErr);
-
-// host_chat_action_subscribe
-export const ChatActionSubscribeV1_start = _void;
-export const ChatActionSubscribeV1_receive = ReceivedChatAction;
-
-// product_chat_custom_message_render_subscribe
-export const ChatCustomMessageRenderV1_start = Struct({ messageId: str, messageType: str, payload: Bytes() });
-export const ChatCustomMessageRenderV1_receive: Codec<CustomRendererNodeType> = CustomRendererNode;
 
 // -- Derived types ------------------------------------------------------------
 

@@ -8,81 +8,80 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { handlerHelpers } from '@polkadot/host';
-import type { HandlerContext } from '@polkadot/host';
+import { okAsync, errAsync } from 'neverthrow';
 
-// We test the handler logic directly using the handlerHelpers context,
+// We test the handler logic directly using okAsync/errAsync,
 // since the actual wiring requires a full container + transport setup.
-
-describe('handlerHelpers', () => {
-  it('ok wraps value as HandlerOk', () => {
-    const result = handlerHelpers.ok(42);
-    expect(result).toEqual({ ok: true, value: 42 });
-  });
-
-  it('err wraps error as HandlerErr', () => {
-    const result = handlerHelpers.err({ tag: 'Unknown', value: { reason: 'test' } });
-    expect(result).toEqual({ ok: false, error: { tag: 'Unknown', value: { reason: 'test' } } });
-  });
-});
 
 describe('Host handler logic', () => {
   describe('featureSupported', () => {
-    it('returns true when config callback returns true', () => {
+    it('returns true when config callback returns true', async () => {
       const onFeatureSupported = vi.fn(() => true);
-      const ctx = handlerHelpers;
 
       // Simulate the handler logic from host.ts
       const feature = { tag: 'SomeFeature', value: undefined };
       const result = onFeatureSupported
-        ? ctx.ok(onFeatureSupported(feature))
-        : ctx.ok(false);
+        ? okAsync(onFeatureSupported(feature))
+        : okAsync(false);
 
-      expect(result).toEqual({ ok: true, value: true });
+      const value = await result.match(
+        (v) => v,
+        () => undefined,
+      );
+      expect(value).toBe(true);
       expect(onFeatureSupported).toHaveBeenCalledWith(feature);
     });
 
-    it('returns false when no callback is provided', () => {
-      const ctx = handlerHelpers;
+    it('returns false when no callback is provided', async () => {
       const onFeatureSupported = undefined;
 
       const result = onFeatureSupported
-        ? ctx.ok(onFeatureSupported({ tag: 'Chain', value: '0x123' }))
-        : ctx.ok(false);
+        ? okAsync(onFeatureSupported({ tag: 'Chain', value: '0x123' }))
+        : okAsync(false);
 
-      expect(result).toEqual({ ok: true, value: false });
+      const value = await result.match(
+        (v) => v,
+        () => undefined,
+      );
+      expect(value).toBe(false);
     });
   });
 
   describe('navigateTo', () => {
-    it('calls onNavigateTo callback when provided', () => {
+    it('calls onNavigateTo callback when provided', async () => {
       const onNavigateTo = vi.fn();
-      const ctx = handlerHelpers;
       const url = 'https://polkadot.network';
 
       if (onNavigateTo) {
         onNavigateTo(url);
       }
-      const result = ctx.ok(undefined);
+      const result = okAsync(undefined);
 
+      const value = await result.match(
+        (v) => v,
+        () => 'error',
+      );
       expect(onNavigateTo).toHaveBeenCalledWith(url);
-      expect(result).toEqual({ ok: true, value: undefined });
+      expect(value).toBeUndefined();
     });
   });
 
   describe('pushNotification', () => {
-    it('calls onPushNotification callback when provided', () => {
+    it('calls onPushNotification callback when provided', async () => {
       const onPushNotification = vi.fn();
-      const ctx = handlerHelpers;
       const notification = { text: 'Hello!', severity: 'info' };
 
       if (onPushNotification) {
         onPushNotification(notification);
       }
-      const result = ctx.ok(undefined);
+      const result = okAsync(undefined);
 
+      const value = await result.match(
+        (v) => v,
+        () => 'error',
+      );
       expect(onPushNotification).toHaveBeenCalledWith(notification);
-      expect(result).toEqual({ ok: true, value: undefined });
+      expect(value).toBeUndefined();
     });
 
     it('logs to console.warn when no callback is provided', () => {
@@ -100,34 +99,43 @@ describe('Host handler logic', () => {
 
 describe('Permission handler logic', () => {
   describe('devicePermission', () => {
-    it('returns false by default when no callback provided', () => {
-      const ctx = handlerHelpers;
+    it('returns false by default when no callback provided', async () => {
       const onDevicePermission = undefined;
 
       const result = onDevicePermission
-        ? ctx.ok(true)
-        : ctx.ok(false);
+        ? okAsync(true)
+        : okAsync(false);
 
-      expect(result).toEqual({ ok: true, value: false });
+      const value = await result.match(
+        (v) => v,
+        () => undefined,
+      );
+      expect(value).toBe(false);
     });
 
     it('delegates to callback when provided', async () => {
       const onDevicePermission = vi.fn().mockResolvedValue(true);
-      const ctx = handlerHelpers;
 
       const granted = await Promise.resolve(onDevicePermission({ type: 'camera' }));
-      const result = ctx.ok(granted);
+      const result = okAsync(granted);
 
-      expect(result).toEqual({ ok: true, value: true });
+      const value = await result.match(
+        (v) => v,
+        () => undefined,
+      );
+      expect(value).toBe(true);
       expect(onDevicePermission).toHaveBeenCalledWith({ type: 'camera' });
     });
   });
 
   describe('permission', () => {
-    it('returns false by default', () => {
-      const ctx = handlerHelpers;
-      const result = ctx.ok(false);
-      expect(result).toEqual({ ok: true, value: false });
+    it('returns false by default', async () => {
+      const result = okAsync(false);
+      const value = await result.match(
+        (v) => v,
+        () => undefined,
+      );
+      expect(value).toBe(false);
     });
   });
 });
@@ -139,12 +147,15 @@ describe('Storage handler logic', () => {
   const prefix = 'testapp:';
 
   describe('read with scoped prefix', () => {
-    it('returns undefined for missing keys', () => {
-      const ctx = handlerHelpers;
+    it('returns undefined for missing keys', async () => {
       // Simulate: localStorage.getItem returns null
       const raw = null;
-      const result = raw === null ? ctx.ok(undefined) : ctx.ok(raw);
-      expect(result).toEqual({ ok: true, value: undefined });
+      const result = raw === null ? okAsync(undefined) : okAsync(raw);
+      const value = await result.match(
+        (v) => v,
+        () => 'error',
+      );
+      expect(value).toBeUndefined();
     });
   });
 

@@ -1,5 +1,5 @@
 import { Enum } from '../primitives.js';
-import { Result, _void, u8 } from 'scale-ts';
+import { _void } from 'scale-ts';
 import { GenericErr } from './commonCodecs.js';
 
 export const HandshakeErr = Enum({
@@ -7,9 +7,6 @@ export const HandshakeErr = Enum({
   UnsupportedProtocolVersion: _void,
   Unknown: GenericErr,
 });
-
-export const HandshakeV1_request = u8;
-export const HandshakeV1_response = Result(_void, HandshakeErr);
 
 // -- Derived types ------------------------------------------------------------
 

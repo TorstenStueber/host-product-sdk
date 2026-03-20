@@ -9,6 +9,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   createTransport,
   structuredCloneCodecAdapter,
+  scaleCodecAdapter,
+  MethodNotSupportedError,
 } from '@polkadot/shared';
 import type { Transport, CodecAdapter, ProtocolMessage } from '@polkadot/shared';
 import { createMockProviderPair, createSyncMockProviderPair } from '../helpers/mockProvider.js';
@@ -17,10 +19,6 @@ import type { MockProvider } from '../helpers/mockProvider.js';
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function createCodec(): CodecAdapter {
-  return structuredCloneCodecAdapter;
-}
 
 /** Flush microtask queue (for async provider delivery). */
 function flush(): Promise<void> {
@@ -54,7 +52,6 @@ describe('Transport', () => {
     it('returns a Transport object with all expected methods', () => {
       const transport = createTransport({
         provider: hostProvider,
-        codecAdapter: createCodec(),
       });
 
       expect(transport).toBeDefined();
@@ -78,7 +75,6 @@ describe('Transport', () => {
     it('isCorrectEnvironment delegates to provider', () => {
       const transport = createTransport({
         provider: hostProvider,
-        codecAdapter: createCodec(),
       });
       expect(transport.isCorrectEnvironment()).toBe(true);
 
@@ -86,7 +82,6 @@ describe('Transport', () => {
       // "correct" environment for sending/receiving).
       const transport2 = createTransport({
         provider: productProvider,
-        codecAdapter: createCodec(),
       });
       expect(transport2.isCorrectEnvironment()).toBe(true);
 
@@ -103,12 +98,10 @@ describe('Transport', () => {
     it('product receives handshake response from host and becomes connected', async () => {
       hostTransport = createTransport({
         provider: hostProvider,
-        codecAdapter: createCodec(),
       });
 
       productTransport = createTransport({
         provider: productProvider,
-        codecAdapter: createCodec(),
       });
 
       // The host transport auto-wires handshake handler in createTransport
@@ -120,12 +113,10 @@ describe('Transport', () => {
     it('connection status changes to connected after successful handshake', async () => {
       hostTransport = createTransport({
         provider: hostProvider,
-        codecAdapter: createCodec(),
       });
 
       productTransport = createTransport({
         provider: productProvider,
-        codecAdapter: createCodec(),
       });
 
       const statuses: string[] = [];
@@ -147,44 +138,59 @@ describe('Transport', () => {
     beforeEach(() => {
       hostTransport = createTransport({
         provider: hostProvider,
-        codecAdapter: createCodec(),
       });
 
       productTransport = createTransport({
         provider: productProvider,
-        codecAdapter: createCodec(),
       });
     });
 
     it('send request with ID, response with same ID resolves promise', async () => {
-      // Host handles "test_method" requests
-      hostTransport.handleRequest('test_method', async (msg) => {
-        return { echo: msg };
+      // Host handles "host_feature_supported" requests
+      hostTransport.handleRequest('host_feature_supported', async (msg) => {
+        // Unwrap and respond with a valid versioned response
+        return { tag: 'v1', value: { success: true, value: true } };
       });
 
       // Wait for handshake
       await productTransport.isReady();
 
-      const result = await productTransport.request('test_method', { hello: 'world' });
-      expect(result).toEqual({ echo: { hello: 'world' } });
+      const result = await productTransport.request('host_feature_supported', {
+        tag: 'v1',
+        value: { tag: 'Chain', value: '0xabc123' },
+      });
+      expect(result).toEqual({ tag: 'v1', value: { success: true, value: true } });
     });
 
     it('multiple concurrent requests resolve independently', async () => {
-      hostTransport.handleRequest('slow_method', async (msg) => {
-        const { id, delay: ms } = msg as { id: number; delay: number };
-        await new Promise((r) => setTimeout(r, ms));
-        return { id, done: true };
+      hostTransport.handleRequest('host_feature_supported', async (msg) => {
+        // Add a small delay to keep the concurrency test meaningful
+        await new Promise((r) => setTimeout(r, 5));
+        // Differentiate responses based on the genesis hash in the payload
+        const inner = (msg as { tag: string; value: { tag: string; value: string } });
+        const isFirst = inner.value.value === '0xaaa111';
+        return {
+          tag: 'v1',
+          value: { success: true, value: isFirst },
+        };
       });
 
       await productTransport.isReady();
 
       const [r1, r2] = await Promise.all([
-        productTransport.request('slow_method', { id: 1, delay: 10 }),
-        productTransport.request('slow_method', { id: 2, delay: 5 }),
+        productTransport.request('host_feature_supported', {
+          tag: 'v1',
+          value: { tag: 'Chain', value: '0xaaa111' },
+        }),
+        productTransport.request('host_feature_supported', {
+          tag: 'v1',
+          value: { tag: 'Chain', value: '0xbbb222' },
+        }),
       ]);
 
-      expect((r1 as { id: number }).id).toBe(1);
-      expect((r2 as { id: number }).id).toBe(2);
+      // Both resolve independently — first request gets true, second gets false
+      expect((r1 as { tag: string; value: { success: boolean; value: boolean } }).value.value).toBe(true);
+      expect((r2 as { tag: string; value: { success: boolean; value: boolean } }).value.value).toBe(false);
     });
   });
 
@@ -196,12 +202,10 @@ describe('Transport', () => {
     beforeEach(() => {
       hostTransport = createTransport({
         provider: hostProvider,
-        codecAdapter: createCodec(),
       });
 
       productTransport = createTransport({
         provider: productProvider,
-        codecAdapter: createCodec(),
       });
     });
 
@@ -209,11 +213,11 @@ describe('Transport', () => {
       const received: unknown[] = [];
 
       // Host handles subscription: sends 3 values then interrupts
-      hostTransport.handleSubscription('counter', (_params, send, interrupt) => {
+      hostTransport.handleSubscription('host_account_connection_status_subscribe', (_params, send, interrupt) => {
         let count = 0;
         const interval = setInterval(() => {
           count++;
-          send({ count });
+          send({ tag: 'v1', value: 'connected' });
           if (count >= 3) {
             clearInterval(interval);
             interrupt();
@@ -228,9 +232,13 @@ describe('Transport', () => {
       await productTransport.isReady();
 
       await new Promise<void>((resolve) => {
-        const sub = productTransport.subscribe('counter', { start: 0 }, (value) => {
-          received.push(value);
-        });
+        const sub = productTransport.subscribe(
+          'host_account_connection_status_subscribe',
+          { tag: 'v1', value: undefined },
+          (value) => {
+            received.push(value);
+          },
+        );
 
         sub.onInterrupt(() => {
           resolve();
@@ -238,19 +246,19 @@ describe('Transport', () => {
       });
 
       expect(received).toHaveLength(3);
-      expect(received[0]).toEqual({ count: 1 });
-      expect(received[1]).toEqual({ count: 2 });
-      expect(received[2]).toEqual({ count: 3 });
+      expect(received[0]).toEqual({ tag: 'v1', value: 'connected' });
+      expect(received[1]).toEqual({ tag: 'v1', value: 'connected' });
+      expect(received[2]).toEqual({ tag: 'v1', value: 'connected' });
     });
 
     it('unsubscribe stops receiving values', async () => {
       const received: unknown[] = [];
 
-      hostTransport.handleSubscription('ticker', (_params, send) => {
+      hostTransport.handleSubscription('host_account_connection_status_subscribe', (_params, send) => {
         let count = 0;
         const interval = setInterval(() => {
           count++;
-          send({ tick: count });
+          send({ tag: 'v1', value: 'connected' });
         }, 5);
 
         return () => {
@@ -260,9 +268,13 @@ describe('Transport', () => {
 
       await productTransport.isReady();
 
-      const sub = productTransport.subscribe('ticker', {}, (value) => {
-        received.push(value);
-      });
+      const sub = productTransport.subscribe(
+        'host_account_connection_status_subscribe',
+        { tag: 'v1', value: undefined },
+        (value) => {
+          received.push(value);
+        },
+      );
 
       // Wait for a few ticks
       await new Promise((r) => setTimeout(r, 30));
@@ -285,24 +297,22 @@ describe('Transport', () => {
     beforeEach(() => {
       hostTransport = createTransport({
         provider: hostProvider,
-        codecAdapter: createCodec(),
       });
 
       productTransport = createTransport({
         provider: productProvider,
-        codecAdapter: createCodec(),
       });
     });
 
     it('two subscribers to same method+payload share one wire subscription', async () => {
       let handlerCallCount = 0;
 
-      hostTransport.handleSubscription('shared_sub', (_params, send) => {
+      hostTransport.handleSubscription('host_account_connection_status_subscribe', (_params, send) => {
         handlerCallCount++;
         let count = 0;
         const interval = setInterval(() => {
           count++;
-          send({ n: count });
+          send({ tag: 'v1', value: 'connected' });
           if (count >= 2) clearInterval(interval);
         }, 10);
 
@@ -314,12 +324,16 @@ describe('Transport', () => {
       const received1: unknown[] = [];
       const received2: unknown[] = [];
 
-      const sub1 = productTransport.subscribe('shared_sub', { key: 'same' }, (v) => {
-        received1.push(v);
-      });
-      const sub2 = productTransport.subscribe('shared_sub', { key: 'same' }, (v) => {
-        received2.push(v);
-      });
+      const sub1 = productTransport.subscribe(
+        'host_account_connection_status_subscribe',
+        { tag: 'v1', value: undefined },
+        (v) => { received1.push(v); },
+      );
+      const sub2 = productTransport.subscribe(
+        'host_account_connection_status_subscribe',
+        { tag: 'v1', value: undefined },
+        (v) => { received2.push(v); },
+      );
 
       await new Promise((r) => setTimeout(r, 50));
 
@@ -344,7 +358,6 @@ describe('Transport', () => {
     it('onConnectionStatusChange fires with current status immediately', () => {
       const transport = createTransport({
         provider: hostProvider,
-        codecAdapter: createCodec(),
       });
 
       const statuses: string[] = [];
@@ -359,12 +372,10 @@ describe('Transport', () => {
     it('status transitions through connecting -> connected on handshake', async () => {
       hostTransport = createTransport({
         provider: hostProvider,
-        codecAdapter: createCodec(),
       });
 
       productTransport = createTransport({
         provider: productProvider,
-        codecAdapter: createCodec(),
       });
 
       const statuses: string[] = [];
@@ -385,7 +396,6 @@ describe('Transport', () => {
     it('fires onDestroy callback', () => {
       const transport = createTransport({
         provider: hostProvider,
-        codecAdapter: createCodec(),
       });
 
       const destroyed = vi.fn();
@@ -398,7 +408,6 @@ describe('Transport', () => {
     it('sets connection status to disconnected', () => {
       hostTransport = createTransport({
         provider: hostProvider,
-        codecAdapter: createCodec(),
       });
 
       const statuses: string[] = [];
@@ -412,7 +421,6 @@ describe('Transport', () => {
     it('throws on use after destroy', () => {
       const transport = createTransport({
         provider: hostProvider,
-        codecAdapter: createCodec(),
       });
       transport.destroy();
 
@@ -425,36 +433,29 @@ describe('Transport', () => {
   // -----------------------------------------------------------------------
 
   describe('swapCodecAdapter', () => {
-    it('changes encoding behavior after swap', () => {
+    it('after swapping to structuredCloneCodecAdapter, outgoing messages are plain objects instead of Uint8Array', () => {
       const [hp, pp] = createSyncMockProviderPair();
 
-      const codec1 = createCodec();
       const transport = createTransport({
         provider: hp,
-        codecAdapter: codec1,
       });
 
       const messages: unknown[] = [];
       pp.subscribe((msg) => messages.push(msg));
 
-      transport.postMessage('id1', { tag: 'test', value: 'original' });
+      // Before swap: transport starts with SCALE codec, so messages are Uint8Array
+      transport.postMessage('id1', { tag: 'host_feature_supported_request', value: { tag: 'v1', value: { tag: 'Chain', value: '0xabc123' } } });
       expect(messages.length).toBe(1);
+      expect(messages[0]).toBeInstanceOf(Uint8Array);
 
-      // Swap to a custom codec that wraps messages
-      const customCodec: CodecAdapter = {
-        encode(message: ProtocolMessage) {
-          return { ...message, _wrapped: true } as unknown as ProtocolMessage;
-        },
-        decode(data) {
-          return data as ProtocolMessage;
-        },
-      };
-
-      transport.swapCodecAdapter(customCodec);
-      transport.postMessage('id2', { tag: 'test', value: 'swapped' });
+      // Swap to structured clone
+      transport.swapCodecAdapter(structuredCloneCodecAdapter);
+      transport.postMessage('id2', { tag: 'host_feature_supported_request', value: { tag: 'v1', value: { tag: 'Chain', value: '0xdef456' } } });
 
       expect(messages.length).toBe(2);
-      expect((messages[1] as Record<string, unknown>)._wrapped).toBe(true);
+      // After swap: messages are plain objects, not Uint8Array
+      expect(messages[1]).not.toBeInstanceOf(Uint8Array);
+      expect((messages[1] as Record<string, unknown>).requestId).toBe('id2');
 
       transport.destroy();
     });
@@ -470,37 +471,231 @@ describe('Transport', () => {
 
       const transport = createTransport({
         provider: hp,
-        codecAdapter: createCodec(),
       });
 
       const received: unknown[] = [];
-      transport.listenMessages('target_action', (requestId, data) => {
+      transport.listenMessages('host_feature_supported_request', (requestId, data) => {
         received.push({ requestId, data });
       });
 
-      // Inject messages from the product side
-      const codec = createCodec();
-      pp.postMessage(codec.encode({
+      // Inject messages from the product side using structured clone format
+      // (the transport auto-detects plain objects with requestId)
+      pp.postMessage({
         requestId: 'r1',
-        payload: { tag: 'target_action', value: 'hit' },
-      }));
-      pp.postMessage(codec.encode({
+        payload: { tag: 'host_feature_supported_request', value: { tag: 'v1', value: { tag: 'Chain', value: '0xaaa' } } },
+      });
+      pp.postMessage({
         requestId: 'r2',
-        payload: { tag: 'other_action', value: 'miss' },
-      }));
-      pp.postMessage(codec.encode({
+        payload: { tag: 'host_feature_supported_response', value: { tag: 'v1', value: { success: true, value: true } } },
+      });
+      pp.postMessage({
         requestId: 'r3',
-        payload: { tag: 'target_action', value: 'hit2' },
-      }));
+        payload: { tag: 'host_feature_supported_request', value: { tag: 'v1', value: { tag: 'Chain', value: '0xbbb' } } },
+      });
 
       await flush();
 
-      // Only target_action messages should be received
+      // Only host_feature_supported_request messages should be received
       expect(received).toHaveLength(2);
       expect((received[0] as { requestId: string }).requestId).toBe('r1');
       expect((received[1] as { requestId: string }).requestId).toBe('r3');
 
       transport.destroy();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Not-supported catch-all
+  // -----------------------------------------------------------------------
+
+  describe('not-supported catch-all', () => {
+    beforeEach(() => {
+      hostTransport = createTransport({
+        provider: hostProvider,
+      });
+
+      productTransport = createTransport({
+        provider: productProvider,
+      });
+    });
+
+    it('request to method with no handler rejects with MethodNotSupportedError', async () => {
+      await productTransport.isReady();
+
+      // Swap both sides to structured clone so the NOT_SUPPORTED_MARKER
+      // can be encoded (SCALE cannot encode arbitrary marker objects).
+      hostTransport.swapCodecAdapter(structuredCloneCodecAdapter);
+      productTransport.swapCodecAdapter(structuredCloneCodecAdapter);
+
+      await expect(
+        productTransport.request('host_push_notification', {
+          tag: 'v1',
+          value: { text: 'hello', deeplink: undefined },
+        }),
+      ).rejects.toThrow(MethodNotSupportedError);
+    });
+
+    it('subscription to method with no handler gets interrupted', async () => {
+      await productTransport.isReady();
+
+      const interrupted = await new Promise<boolean>((resolve) => {
+        const sub = productTransport.subscribe(
+          'host_account_connection_status_subscribe',
+          { tag: 'v1', value: undefined },
+          () => {},
+        );
+
+        sub.onInterrupt(() => {
+          resolve(true);
+        });
+
+        // Safety timeout in case interrupt never fires
+        setTimeout(() => resolve(false), 2000);
+      });
+
+      expect(interrupted).toBe(true);
+    });
+
+    it('deregistering a handler makes subsequent requests fail with MethodNotSupportedError', async () => {
+      // Register a handler, then immediately unsubscribe it
+      const unsubscribe = hostTransport.handleRequest('host_feature_supported', async () => {
+        return { tag: 'v1', value: { success: true, value: true } };
+      });
+
+      unsubscribe();
+
+      await productTransport.isReady();
+
+      // Swap both sides to structured clone so the NOT_SUPPORTED_MARKER
+      // can be encoded (SCALE cannot encode arbitrary marker objects).
+      hostTransport.swapCodecAdapter(structuredCloneCodecAdapter);
+      productTransport.swapCodecAdapter(structuredCloneCodecAdapter);
+
+      await expect(
+        productTransport.request('host_feature_supported', {
+          tag: 'v1',
+          value: { tag: 'Chain', value: '0xabc123' },
+        }),
+      ).rejects.toThrow(MethodNotSupportedError);
+    });
+
+    it('not-supported does not fire for methods that have handlers', async () => {
+      hostTransport.handleRequest('host_feature_supported', async () => {
+        return { tag: 'v1', value: { success: true, value: true } };
+      });
+
+      await productTransport.isReady();
+
+      const result = await productTransport.request('host_feature_supported', {
+        tag: 'v1',
+        value: { tag: 'Chain', value: '0xabc123' },
+      });
+
+      expect(result).toEqual({ tag: 'v1', value: { success: true, value: true } });
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Auto-detect codec
+  // -----------------------------------------------------------------------
+
+  describe('auto-detect codec', () => {
+    it('Uint8Array messages are decoded with SCALE', async () => {
+      const [hp, pp] = createMockProviderPair();
+
+      hostTransport = createTransport({
+        provider: hp,
+      });
+
+      const received: unknown[] = [];
+      hostTransport.listenMessages('host_feature_supported_request', (requestId, data) => {
+        received.push({ requestId, data });
+      });
+
+      // Encode a message with SCALE and inject the resulting Uint8Array
+      const encoded = scaleCodecAdapter.encode({
+        requestId: 'r1',
+        payload: {
+          tag: 'host_feature_supported_request',
+          value: { tag: 'v1', value: { tag: 'Chain', value: '0xabc123' } },
+        },
+      });
+
+      expect(encoded).toBeInstanceOf(Uint8Array);
+
+      // Inject the Uint8Array into the product provider so the host receives it
+      pp.postMessage(encoded);
+
+      await flush();
+
+      expect(received).toHaveLength(1);
+      expect((received[0] as { requestId: string }).requestId).toBe('r1');
+    });
+
+    it('plain object messages are decoded as structured clone', async () => {
+      const [hp, pp] = createMockProviderPair();
+
+      hostTransport = createTransport({
+        provider: hp,
+      });
+
+      const received: unknown[] = [];
+      hostTransport.listenMessages('host_feature_supported_request', (requestId, data) => {
+        received.push({ requestId, data });
+      });
+
+      // Inject a plain object (structured clone format)
+      pp.postMessage({
+        requestId: 'r2',
+        payload: {
+          tag: 'host_feature_supported_request',
+          value: { tag: 'v1', value: { tag: 'Chain', value: '0xdef456' } },
+        },
+      });
+
+      await flush();
+
+      expect(received).toHaveLength(1);
+      expect((received[0] as { requestId: string }).requestId).toBe('r2');
+    });
+
+    it('receiving a structured clone message auto-upgrades outgoing codec', () => {
+      const [hp, pp] = createSyncMockProviderPair();
+
+      hostTransport = createTransport({
+        provider: hp,
+      });
+
+      const outgoing: unknown[] = [];
+      pp.subscribe((msg) => outgoing.push(msg));
+
+      // Initially, outgoing messages are SCALE-encoded (Uint8Array)
+      hostTransport.postMessage('id1', {
+        tag: 'host_feature_supported_request',
+        value: { tag: 'v1', value: { tag: 'Chain', value: '0xabc' } },
+      });
+      expect(outgoing.length).toBe(1);
+      expect(outgoing[0]).toBeInstanceOf(Uint8Array);
+
+      // Inject a structured clone message from the product side.
+      // Use a _response action so the not-supported catch-all ignores it
+      // (catch-all only fires for _request and _start).
+      pp.postMessage({
+        requestId: 'sc1',
+        payload: {
+          tag: 'host_feature_supported_response',
+          value: { tag: 'v1', value: { success: true, value: true } },
+        },
+      });
+
+      // After receiving structured clone, outgoing should now be plain objects
+      hostTransport.postMessage('id2', {
+        tag: 'host_feature_supported_response',
+        value: { tag: 'v1', value: { success: true, value: true } },
+      });
+      expect(outgoing.length).toBe(2);
+      expect(outgoing[1]).not.toBeInstanceOf(Uint8Array);
+      expect((outgoing[1] as Record<string, unknown>).requestId).toBe('id2');
     });
   });
 });

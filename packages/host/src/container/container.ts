@@ -10,21 +10,21 @@
  */
 
 import type {
-  CodecAdapter, CodecAdapterMap, Provider, HexString,
+  CodecAdapterMap, Provider, HexString,
   RequestMethod, SubscriptionMethod,
   RequestVersions, StartVersions,
+  RequestCodecType, ResponseCodecType, StartCodecType, ReceiveCodecType,
   RequestParams, ResponseOk, ResponseErr,
   SubscriptionParams, SubscriptionPayload,
 } from '@polkadot/shared';
 import {
   createTransport,
-  scaleCodecAdapter,
   handleCodecUpgrade,
 } from '@polkadot/shared';
+import type { ResultAsync } from 'neverthrow';
 
 import { createChainConnectionManager } from '../chain/connectionManager.js';
-import type { Container, HandlerResult } from './types.js';
-import { handlerHelpers } from './types.js';
+import type { Container } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Wire format helpers
@@ -33,29 +33,27 @@ import { handlerHelpers } from './types.js';
 const UNSUPPORTED_MESSAGE_FORMAT_ERROR = 'Unsupported message format';
 
 /** Wraps a value in a versioned envelope with Ok result. */
-function wrapOk(version: string, value: unknown): unknown {
+function wrapOk<V extends string, T>(version: V, value: T): { tag: V; value: { success: true; value: T } } {
   return { tag: version, value: { success: true, value } };
 }
 
 /** Wraps an error in a versioned envelope with Err result. */
-function wrapErr(version: string, error: unknown): unknown {
+function wrapErr<V extends string, E>(version: V, error: E): { tag: V; value: { success: false; value: E } } {
   return { tag: version, value: { success: false, value: error } };
 }
 
 /** Wraps a value in a versioned envelope (no result wrapping, for subscriptions). */
-function wrap(version: string, value: unknown): unknown {
+function wrap<V extends string, T>(version: V, value: T): { tag: V; value: T } {
   return { tag: version, value };
 }
 
-/** Extract the inner value from a versioned message for a specific version. */
-function unwrap(message: unknown, version: string): { ok: true; value: unknown } | { ok: false } {
-  if (
-    typeof message === 'object' &&
-    message !== null &&
-    'tag' in (message as Record<string, unknown>) &&
-    (message as Record<string, unknown>).tag === version
-  ) {
-    return { ok: true, value: (message as { tag: string; value: unknown }).value };
+/** Extract the inner value from a versioned envelope for a specific version tag. */
+function unwrap<M extends { tag: string; value: unknown }>(
+  message: M,
+  version: string,
+): { ok: true; value: M['value'] } | { ok: false } {
+  if (message.tag === version) {
+    return { ok: true, value: message.value };
   }
   return { ok: false };
 }
@@ -70,7 +68,6 @@ function genericError(reason: string) {
 
 export type CreateContainerOptions = {
   provider: Provider;
-  codecAdapter?: CodecAdapter;
 
   /**
    * Codec adapters the host supports for upgrade negotiation.
@@ -89,11 +86,10 @@ export type CreateContainerOptions = {
 // ---------------------------------------------------------------------------
 
 export function createContainer(options: CreateContainerOptions): Container {
-  const { provider, codecAdapter, supportedCodecs } = options;
+  const { provider, supportedCodecs } = options;
 
   const transport = createTransport({
     provider,
-    codecAdapter: codecAdapter ?? scaleCodecAdapter,
     idPrefix: 'h:',
   });
 
@@ -123,9 +119,7 @@ export function createContainer(options: CreateContainerOptions): Container {
    */
   type RequestVersionHandler<M extends RequestMethod, V extends string> = (
     params: RequestParams<M, V>,
-    ctx: typeof handlerHelpers,
-  ) => HandlerResult<ResponseOk<M, V>, ResponseErr<M, V>>
-    | Promise<HandlerResult<ResponseOk<M, V>, ResponseErr<M, V>>>;
+  ) => ResultAsync<ResponseOk<M, V>, ResponseErr<M, V>>;
 
   /**
    * Map of version tag -> handler. Each entry handles requests at that version.
@@ -142,33 +136,35 @@ export function createContainer(options: CreateContainerOptions): Container {
   ): VoidFunction {
     init();
 
-    return transport.handleRequest(method, async (message) => {
-      const tagged = message as { tag?: string; value?: unknown } | undefined;
-      const version = tagged?.tag;
+    /** Dispatch a single version — generic over V so types flow through. */
+    async function dispatchVersion<V extends RequestVersions<M>>(
+      version: V,
+      handler: RequestVersionHandler<M, V>,
+      message: RequestCodecType<M>,
+    ): Promise<ResponseCodecType<M>> {
+      const unwrapped = unwrap(message, version);
+      if (!unwrapped.ok) {
+        return wrapErr('v1', defaultError) as ResponseCodecType<M>;
+      }
 
-      if (version && version in handlers) {
-        const handler = (handlers as Record<string, (params: unknown, ctx: typeof handlerHelpers) => unknown>)[version]!;
-        const unwrapped = unwrap(message, version);
-        if (!unwrapped.ok) {
-          return wrapErr('v1', defaultError);
-        }
+      const result = await handler(unwrapped.value as RequestParams<M, V>);
+      return result.match(
+        (ok) => wrapOk(version, ok) as ResponseCodecType<M>,
+        (err) => wrapErr(version, err) as ResponseCodecType<M>,
+      );
+    }
 
-        try {
-          const result = await Promise.resolve(
-            handler(unwrapped.value, handlerHelpers),
-          ) as HandlerResult<unknown, unknown>;
+    return transport.handleRequest(method, async (message): Promise<ResponseCodecType<M>> => {
+      const version = message.tag as RequestVersions<M>;
 
-          if (result.ok) {
-            return wrapOk(version, result.value);
-          }
-          return wrapErr(version, result.error);
-        } catch (e) {
-          return wrapErr(version, defaultError);
+      if (version in handlers) {
+        const handler = handlers[version];
+        if (handler) {
+          return dispatchVersion(version, handler, message);
         }
       }
 
-      // No handler for this version — respond with v1 error
-      return wrapErr('v1', defaultError);
+      return wrapErr('v1', defaultError) as ResponseCodecType<M>;
     });
   }
 
@@ -197,28 +193,39 @@ export function createContainer(options: CreateContainerOptions): Container {
   ): VoidFunction {
     init();
 
-    return transport.handleSubscription(method, (params, send, interrupt) => {
-      const tagged = params as { tag?: string; value?: unknown } | undefined;
-      const version = tagged?.tag;
-
-      if (version && version in handlers) {
-        const handler = (handlers as Record<string, (params: unknown, send: (payload: unknown) => void, interrupt: () => void) => VoidFunction>)[version]!;
-        const unwrapped = unwrap(params, version);
-        if (!unwrapped.ok) {
-          interrupt();
-          return () => {};
-        }
-
-        return handler(
-          unwrapped.value,
-          (payload) => send(wrap(version, payload)),
-          interrupt,
-        );
+    /** Dispatch a single version — generic over V so types flow through. */
+    function dispatchVersion<V extends StartVersions<M>>(
+      version: V,
+      handler: SubscriptionVersionHandler<M, V>,
+      params: StartCodecType<M>,
+      send: (value: ReceiveCodecType<M>) => void,
+      interrupt: () => void,
+    ): VoidFunction {
+      const unwrapped = unwrap(params, version);
+      if (!unwrapped.ok) {
+        interrupt();
+        return () => { };
       }
 
-      // No handler for this version
+      return handler(
+        unwrapped.value as SubscriptionParams<M, V>,
+        (payload) => send(wrap(version, payload) as ReceiveCodecType<M>),
+        interrupt,
+      );
+    }
+
+    return transport.handleSubscription(method, (params, send, interrupt) => {
+      const version = params.tag as StartVersions<M>;
+
+      if (version in handlers) {
+        const handler = handlers[version];
+        if (handler) {
+          return dispatchVersion(version, handler, params, send, interrupt);
+        }
+      }
+
       interrupt();
-      return () => {};
+      return () => { };
     });
   }
 
@@ -325,8 +332,18 @@ export function createContainer(options: CreateContainerOptions): Container {
       return wireSubscription('host_chat_action_subscribe', { v1: handler });
     },
 
-    handleChatCustomMessageRenderSubscribe(handler) {
-      return wireSubscription('product_chat_custom_message_render_subscribe', { v1: handler });
+    renderChatCustomMessage(params, callback) {
+      init();
+      return transport.subscribe(
+        'product_chat_custom_message_render_subscribe',
+        { tag: 'v1', value: params },
+        (data) => {
+          const tagged = data as { tag: string; value: unknown };
+          if (tagged.tag === 'v1') {
+            callback(tagged.value as Parameters<typeof callback>[0]);
+          }
+        },
+      );
     },
 
     // -- Statement store ----------------------------------------------------
@@ -423,19 +440,19 @@ export function createContainer(options: CreateContainerOptions): Container {
           const unwrapped = unwrap(params, version);
           if (!unwrapped.ok) {
             interrupt();
-            return () => {};
+            return () => { };
           }
           const { genesisHash, withRuntime } = unwrapped.value as { genesisHash: HexString; withRuntime: boolean };
 
           const entry = manager.getOrCreateChain(genesisHash);
           if (!entry) {
             interrupt();
-            return () => {};
+            return () => { };
           }
 
           const { followId } = manager.startFollow(genesisHash, withRuntime, (event: unknown) => {
             const typedEvent = manager.convertJsonRpcEventToTyped(event as Record<string, unknown>);
-            send(wrap(version, typedEvent));
+            send(wrap(version, typedEvent) as ReceiveCodecType<'remote_chain_head_follow'>);
           });
 
           return () => {
@@ -445,21 +462,29 @@ export function createContainer(options: CreateContainerOptions): Container {
         }),
       );
 
-      // Helper for chain requests
-      function wireChainRequest(
-        method: RequestMethod,
+      /**
+       * Wire a chain request handler. The handler receives the unwrapped v1
+       * params and returns a versioned response built with wrapOk/wrapErr.
+       *
+       * Chain handlers interface with the JSON-RPC connection manager which
+       * returns dynamically-typed results, so a single `as ResponseCodecType<M>`
+       * cast at the boundary bridges the untyped JSON-RPC world to the
+       * typed protocol world.
+       */
+      function wireChainRequest<M extends RequestMethod>(
+        method: M,
         handler: (value: unknown) => Promise<unknown>,
       ): void {
         cleanups.push(
-          transport.handleRequest(method, async (message) => {
+          transport.handleRequest(method, async (message): Promise<ResponseCodecType<M>> => {
             const unwrapped = unwrap(message, version);
             if (!unwrapped.ok) {
-              return errorResult(UNSUPPORTED_MESSAGE_FORMAT_ERROR);
+              return errorResult(UNSUPPORTED_MESSAGE_FORMAT_ERROR) as ResponseCodecType<M>;
             }
             try {
-              return await handler(unwrapped.value);
+              return await handler(unwrapped.value) as ResponseCodecType<M>;
             } catch (e) {
-              return errorResult(String(e));
+              return errorResult(String(e)) as ResponseCodecType<M>;
             }
           }),
         );
@@ -471,7 +496,7 @@ export function createContainer(options: CreateContainerOptions): Container {
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
         const result = await manager.sendRequest(genesisHash, 'chainHead_v1_header', [realSubId, hash]);
-        return wrapOk(version,result);
+        return wrapOk(version, result);
       });
 
       // Body
@@ -480,7 +505,7 @@ export function createContainer(options: CreateContainerOptions): Container {
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
         const result = await manager.sendRequest(genesisHash, 'chainHead_v1_body', [realSubId, hash]);
-        return wrapOk(version,manager.convertOperationStartedResult(result));
+        return wrapOk(version, manager.convertOperationStartedResult(result));
       });
 
       // Storage
@@ -501,7 +526,7 @@ export function createContainer(options: CreateContainerOptions): Container {
         const result = await manager.sendRequest(genesisHash, 'chainHead_v1_storage', [
           realSubId, hash, jsonRpcItems, childTrie,
         ]);
-        return wrapOk(version,manager.convertOperationStartedResult(result));
+        return wrapOk(version, manager.convertOperationStartedResult(result));
       });
 
       // Call
@@ -515,7 +540,7 @@ export function createContainer(options: CreateContainerOptions): Container {
         const result = await manager.sendRequest(params.genesisHash, 'chainHead_v1_call', [
           realSubId, params.hash, params.function, params.callParameters,
         ]);
-        return wrapOk(version,manager.convertOperationStartedResult(result));
+        return wrapOk(version, manager.convertOperationStartedResult(result));
       });
 
       // Unpin
@@ -524,7 +549,7 @@ export function createContainer(options: CreateContainerOptions): Container {
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
         await manager.sendRequest(genesisHash, 'chainHead_v1_unpin', [realSubId, hashes]);
-        return wrapOk(version,undefined);
+        return wrapOk(version, undefined);
       });
 
       // Continue
@@ -533,7 +558,7 @@ export function createContainer(options: CreateContainerOptions): Container {
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
         await manager.sendRequest(genesisHash, 'chainHead_v1_continue', [realSubId, operationId]);
-        return wrapOk(version,undefined);
+        return wrapOk(version, undefined);
       });
 
       // StopOperation
@@ -542,7 +567,7 @@ export function createContainer(options: CreateContainerOptions): Container {
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
         await manager.sendRequest(genesisHash, 'chainHead_v1_stopOperation', [realSubId, operationId]);
-        return wrapOk(version,undefined);
+        return wrapOk(version, undefined);
       });
 
       // ChainSpec: genesis hash
@@ -553,7 +578,7 @@ export function createContainer(options: CreateContainerOptions): Container {
         try {
           const result = await manager.sendRequest(genesisHash, 'chainSpec_v1_genesisHash', []);
           manager.releaseChain(genesisHash);
-          return wrapOk(version,result);
+          return wrapOk(version, result);
         } catch (e) {
           manager.releaseChain(genesisHash);
           throw e;
@@ -568,7 +593,7 @@ export function createContainer(options: CreateContainerOptions): Container {
         try {
           const result = await manager.sendRequest(genesisHash, 'chainSpec_v1_chainName', []);
           manager.releaseChain(genesisHash);
-          return wrapOk(version,result);
+          return wrapOk(version, result);
         } catch (e) {
           manager.releaseChain(genesisHash);
           throw e;
@@ -583,7 +608,7 @@ export function createContainer(options: CreateContainerOptions): Container {
         try {
           const result = await manager.sendRequest(genesisHash, 'chainSpec_v1_properties', []);
           manager.releaseChain(genesisHash);
-          return wrapOk(version,typeof result === 'string' ? result : JSON.stringify(result));
+          return wrapOk(version, typeof result === 'string' ? result : JSON.stringify(result));
         } catch (e) {
           manager.releaseChain(genesisHash);
           throw e;
@@ -598,7 +623,7 @@ export function createContainer(options: CreateContainerOptions): Container {
         try {
           const result = await manager.sendRequest(genesisHash, 'transaction_v1_broadcast', [transaction]);
           manager.releaseChain(genesisHash);
-          return wrapOk(version,(result as string) ?? null);
+          return wrapOk(version, (result as string) ?? null);
         } catch (e) {
           manager.releaseChain(genesisHash);
           throw e;
@@ -613,7 +638,7 @@ export function createContainer(options: CreateContainerOptions): Container {
         try {
           await manager.sendRequest(genesisHash, 'transaction_v1_stop', [operationId]);
           manager.releaseChain(genesisHash);
-          return wrapOk(version,undefined);
+          return wrapOk(version, undefined);
         } catch (e) {
           manager.releaseChain(genesisHash);
           throw e;

@@ -6,6 +6,7 @@
  */
 
 import type { Container } from '../container/types.js';
+import { errAsync } from '@polkadot/shared';
 
 export function wirePreimageHandlers(container: Container): VoidFunction[] {
   const cleanups: VoidFunction[] = [];
@@ -18,8 +19,8 @@ export function wirePreimageHandlers(container: Container): VoidFunction[] {
   );
 
   cleanups.push(
-    container.handlePreimageSubmit((_params, ctx) => {
-      return ctx.err({ tag: 'Unknown', value: { reason: 'Preimage not supported' } });
+    container.handlePreimageSubmit((_params) => {
+      return errAsync({ tag: 'Unknown', value: { reason: 'Preimage not supported' } });
     }),
   );
 

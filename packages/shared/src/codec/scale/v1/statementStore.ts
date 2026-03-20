@@ -1,7 +1,6 @@
 import { Enum } from '../primitives.js';
-import { Bytes, Option, Result, Struct, Tuple, Vector, _void, u64 } from 'scale-ts';
+import { Bytes, Option, Struct, Vector, _void, u64 } from 'scale-ts';
 import { GenericErr } from './commonCodecs.js';
-import { ProductAccountId } from './accounts.js';
 
 // -- Primitives ---------------------------------------------------------------
 
@@ -66,20 +65,6 @@ export const StatementProofErr = Enum({
   UnknownAccount: _void,
   Unknown: GenericErr,
 });
-
-// -- V1 request / response codecs --------------------------------------------
-
-// remote_statement_store_subscribe
-export const StatementStoreV1_start = Vector(Topic);
-export const StatementStoreV1_receive = Vector(SignedStatement);
-
-// remote_statement_store_create_proof
-export const StatementStoreCreateProofV1_request = Tuple(ProductAccountId, Statement);
-export const StatementStoreCreateProofV1_response = Result(StatementProof, StatementProofErr);
-
-// remote_statement_store_submit
-export const StatementStoreSubmitV1_request = SignedStatement;
-export const StatementStoreSubmitV1_response = Result(_void, GenericErr);
 
 // -- Derived types ------------------------------------------------------------
 

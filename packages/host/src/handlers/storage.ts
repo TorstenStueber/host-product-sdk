@@ -7,45 +7,46 @@
 
 import type { Container } from '../container/types.js';
 import type { HandlersConfig } from './registry.js';
+import { okAsync, errAsync } from '@polkadot/shared';
 
 export function wireStorageHandlers(container: Container, config: HandlersConfig): VoidFunction[] {
   const cleanups: VoidFunction[] = [];
   const prefix = config.storagePrefix ?? `${config.appId ?? 'host'}:`;
 
   cleanups.push(
-    container.handleLocalStorageRead((key, ctx) => {
+    container.handleLocalStorageRead((key) => {
       try {
         const raw = localStorage.getItem(prefix + key);
         if (raw === null) {
-          return ctx.ok(undefined);
+          return okAsync(undefined);
         }
         const bytes = Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
-        return ctx.ok(bytes);
+        return okAsync(bytes);
       } catch {
-        return ctx.err({ tag: 'Unknown', value: { reason: 'Failed to read from storage' } });
+        return errAsync({ tag: 'Unknown', value: { reason: 'Failed to read from storage' } });
       }
     }),
   );
 
   cleanups.push(
-    container.handleLocalStorageWrite(([key, value], ctx) => {
+    container.handleLocalStorageWrite(([key, value]) => {
       try {
         const b64 = btoa(String.fromCharCode(...value));
         localStorage.setItem(prefix + key, b64);
-        return ctx.ok(undefined);
+        return okAsync(undefined);
       } catch {
-        return ctx.err({ tag: 'Unknown', value: { reason: 'Failed to write to storage' } });
+        return errAsync({ tag: 'Unknown', value: { reason: 'Failed to write to storage' } });
       }
     }),
   );
 
   cleanups.push(
-    container.handleLocalStorageClear((key, ctx) => {
+    container.handleLocalStorageClear((key) => {
       try {
         localStorage.removeItem(prefix + key);
-        return ctx.ok(undefined);
+        return okAsync(undefined);
       } catch {
-        return ctx.err({ tag: 'Unknown', value: { reason: 'Failed to clear storage' } });
+        return errAsync({ tag: 'Unknown', value: { reason: 'Failed to clear storage' } });
       }
     }),
   );

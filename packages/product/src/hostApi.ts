@@ -14,6 +14,7 @@
 import type {
   Subscription, Transport,
   RequestMethod, SubscriptionMethod,
+  RequestCodecType, StartCodecType,
   RequestParams, ResponseOk, ResponseErr,
   SubscriptionParams, SubscriptionPayload,
 } from '@polkadot/shared';
@@ -51,7 +52,7 @@ function makeRequest<M extends RequestMethod, V extends string>(
   type Err = ResponseErr<M, V>;
 
   const response = ResultAsync.fromPromise(
-    transport.request(method, { tag: version, value: payload }) as Promise<{
+    transport.request(method, { tag: version, value: payload } as RequestCodecType<M>) as Promise<{
       tag: string;
       value: { success: boolean; value: unknown };
     }>,
@@ -86,7 +87,7 @@ function makeSubscription<M extends SubscriptionMethod, V extends string>(
   payload: SubscriptionParams<M, V>,
   callback: (payload: SubscriptionPayload<M, V>) => void,
 ): Subscription {
-  return transport.subscribe(method, { tag: version, value: payload }, (data) => {
+  return transport.subscribe(method, { tag: version, value: payload } as StartCodecType<M>, (data) => {
     const tagged = data as { tag: string; value: unknown };
     if (tagged.tag === version) {
       callback(tagged.value as SubscriptionPayload<M, V>);
@@ -219,12 +220,9 @@ export function createHostApi(transport: Transport) {
       return makeSubscription(transport, 'host_chat_action_subscribe', 'v1', args, callback);
     },
 
-    productChatCustomMessageRenderSubscribe(
-      args: SubscriptionParams<'product_chat_custom_message_render_subscribe', 'v1'>,
-      callback: (payload: SubscriptionPayload<'product_chat_custom_message_render_subscribe', 'v1'>) => void,
-    ): Subscription {
-      return makeSubscription(transport, 'product_chat_custom_message_render_subscribe', 'v1', args, callback);
-    },
+    // Note: product_chat_custom_message_render_subscribe is host-initiated.
+    // The product handles it via transport.handleSubscription() in chat.ts,
+    // not via the hostApi facade.
 
     // -- Statement store ----------------------------------------------------
 

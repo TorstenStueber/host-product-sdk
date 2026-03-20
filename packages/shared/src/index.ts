@@ -32,8 +32,6 @@ export type {
   TxPayloadContext,
   TxPayloadV1,
   VersionedTxPayload,
-  CreateTransactionRequest,
-  CreateTransactionWithNonProductRequest,
 
   // Storage
   StorageKey,
@@ -74,21 +72,10 @@ export type {
   StorageResultItem,
   OperationStartedResult,
   ChainHeadEvent,
-  ChainHeadFollowParams,
-  ChainHeadRequestParams,
-  ChainHeadStorageParams,
-  ChainHeadCallParams,
-  ChainHeadUnpinParams,
-  ChainHeadOperationParams,
-  TransactionBroadcastParams,
-  TransactionStopParams,
 
   // Permissions
   DevicePermissionRequest,
   RemotePermissionRequest,
-
-  // Navigation
-  NavigateToRequest,
 
   // Notification
   PushNotification,
@@ -125,6 +112,7 @@ export { createScaleCodecAdapter, scaleCodecAdapter, Message, MessagePayload, ho
 export type {
   RequestMethod, SubscriptionMethod, ActionString,
   RequestVersions, ResponseVersions, StartVersions, ReceiveVersions,
+  RequestCodecType, ResponseCodecType, StartCodecType, ReceiveCodecType,
   RequestParams, ResponseOk, ResponseErr,
   SubscriptionParams, SubscriptionPayload,
 } from './codec/scale/protocol.js';
@@ -145,14 +133,13 @@ export {
   createTransport,
   HANDSHAKE_INTERVAL,
   HANDSHAKE_TIMEOUT,
+  MethodNotSupportedError,
 } from './transport/transport.js';
 
 export type {
   ConnectionStatus,
   CreateTransportOptions,
-  RequestHandler,
   Subscription,
-  SubscriptionHandler,
   Transport,
 } from './transport/transport.js';
 
@@ -180,5 +167,5 @@ export {
 export type { HexString } from './codec/scale/primitives.js';
 export { toHexString } from './codec/scale/primitives.js';
 
-export { ok, err, Result, ResultAsync } from 'neverthrow';
+export { ok, err, okAsync, errAsync, Result, ResultAsync } from 'neverthrow';
 export type { Ok, Err } from 'neverthrow';

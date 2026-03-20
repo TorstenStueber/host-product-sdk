@@ -9,39 +9,22 @@ import { describe, it, expect } from 'vitest';
 import {
   createTransport,
   structuredCloneCodecAdapter,
+  scaleCodecAdapter,
   requestCodecUpgrade,
   handleCodecUpgrade,
-  scaleCodecAdapter,
 } from '@polkadot/shared';
-import type { CodecAdapter, CodecAdapterMap, ProtocolMessage, PostMessageData } from '@polkadot/shared';
 import { createMockProviderPair } from '../helpers/mockProvider.js';
-
-// A test adapter that marks messages so we can detect which codec is active.
-class MarkerCodecAdapter implements CodecAdapter {
-  constructor(public readonly marker: string) {}
-
-  encode(message: ProtocolMessage): PostMessageData {
-    // Tag the message so we can verify the adapter was swapped.
-    return { ...message, __codec: this.marker } as unknown as ProtocolMessage;
-  }
-
-  decode(data: PostMessageData): ProtocolMessage {
-    return data as ProtocolMessage;
-  }
-}
 
 function setupTransports() {
   const [hostProvider, productProvider] = createMockProviderPair();
 
   const hostTransport = createTransport({
     provider: hostProvider,
-    codecAdapter: structuredCloneCodecAdapter,
     idPrefix: 'h:',
   });
 
   const productTransport = createTransport({
     provider: productProvider,
-    codecAdapter: structuredCloneCodecAdapter,
     idPrefix: 'p:',
   });
 
@@ -105,21 +88,17 @@ describe('Codec negotiation', () => {
   it('host picks the best format from the intersection', async () => {
     const { hostTransport, productTransport } = setupTransports();
 
-    const structuredAdapter = structuredCloneCodecAdapter;
-    const markerAdapter = new MarkerCodecAdapter('scale');
-
-    // Host supports both, prefers structured_clone.
+    // Host supports both (structured_clone always preferred).
     const cleanup = handleCodecUpgrade(
       hostTransport,
-      { structured_clone: structuredAdapter, scale: markerAdapter },
-      ['structured_clone', 'scale'],
+      { structured_clone: structuredCloneCodecAdapter, scale: scaleCodecAdapter },
     );
 
     await connectTransports(hostTransport, productTransport);
 
     // Product only supports scale.
     const result = await requestCodecUpgrade(productTransport, {
-      scale: markerAdapter,
+      scale: scaleCodecAdapter,
     });
 
     // Should pick scale (the only common one).
@@ -164,6 +143,37 @@ describe('Codec negotiation', () => {
     expect(response).toEqual({ tag: 'v1', value: { success: true, value: true } });
 
     cleanup();
+    hostTransport.destroy();
+    productTransport.destroy();
+  });
+
+  it('product gets null immediately (not after timeout) when host has not-supported catch-all', async () => {
+    const { hostTransport, productTransport } = setupTransports();
+
+    // Do NOT register handleCodecUpgrade — the not-supported catch-all
+    // should respond immediately with MethodNotSupportedError.
+
+    await connectTransports(hostTransport, productTransport);
+
+    // Swap to structured clone so the NOT_SUPPORTED_MARKER can be
+    // encoded (SCALE cannot encode arbitrary marker objects).
+    hostTransport.swapCodecAdapter(structuredCloneCodecAdapter);
+    productTransport.swapCodecAdapter(structuredCloneCodecAdapter);
+
+    const start = performance.now();
+
+    const result = await requestCodecUpgrade(productTransport, {
+      structured_clone: structuredCloneCodecAdapter,
+    });
+
+    const elapsed = performance.now() - start;
+
+    // Should return null (upgrade failed).
+    expect(result).toBeNull();
+
+    // Should resolve near-instantly, well under the 1s UPGRADE_TIMEOUT.
+    expect(elapsed).toBeLessThan(200);
+
     hostTransport.destroy();
     productTransport.destroy();
   });

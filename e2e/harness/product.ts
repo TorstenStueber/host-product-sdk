@@ -17,7 +17,6 @@ import {
   requestCodecUpgrade,
   createDefaultLogger,
 } from '@polkadot/shared';
-import type { CodecAdapter } from '@polkadot/shared';
 
 declare global {
   interface Window {
@@ -32,12 +31,7 @@ declare global {
   }
 }
 
-// -- Codec selection ----------------------------------------------------------
-
 const codecParam = new URLSearchParams(location.search).get('codec') ?? 'structured_clone';
-const codecAdapter: CodecAdapter = (codecParam === 'scale' || codecParam === 'upgrade')
-  ? scaleCodecAdapter
-  : structuredCloneCodecAdapter;
 
 // -- Create product-side provider (iframe -> parent) -------------------------
 
@@ -97,7 +91,6 @@ function createProductProvider(): Provider {
 const provider = createProductProvider();
 const transport = createTransport({
   provider,
-  codecAdapter,
 });
 
 const e2e: Window['__e2e'] = {

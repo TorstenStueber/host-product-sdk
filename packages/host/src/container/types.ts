@@ -14,6 +14,7 @@
 import type {
   ConnectionStatus,
   Transport,
+  Subscription,
   HexString,
   RequestParams,
   ResponseOk,
@@ -23,26 +24,8 @@ import type {
   RequestMethod,
   SubscriptionMethod,
 } from '@polkadot/shared';
-
+import type { ResultAsync } from 'neverthrow';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
-
-// ---------------------------------------------------------------------------
-// Handler result helpers
-// ---------------------------------------------------------------------------
-
-export type HandlerOk<Ok> = { ok: true; value: Ok };
-export type HandlerErr<Err> = { ok: false; error: Err };
-export type HandlerResult<Ok, Err> = HandlerOk<Ok> | HandlerErr<Err>;
-
-export type HandlerContext = {
-  ok<T>(value: T): HandlerOk<T>;
-  err<E>(error: E): HandlerErr<E>;
-};
-
-export const handlerHelpers: HandlerContext = {
-  ok: <T>(value: T): HandlerOk<T> => ({ ok: true, value }),
-  err: <E>(error: E): HandlerErr<E> => ({ ok: false, error }),
-};
 
 // ---------------------------------------------------------------------------
 // Protocol-derived handler types
@@ -51,9 +34,7 @@ export const handlerHelpers: HandlerContext = {
 /** Request handler type derived from protocol codecs for method M at version V. */
 type RequestHandler<M extends RequestMethod, V extends string = 'v1'> = (
   params: RequestParams<M, V>,
-  ctx: HandlerContext,
-) => HandlerResult<ResponseOk<M, V>, ResponseErr<M, V>>
-  | Promise<HandlerResult<ResponseOk<M, V>, ResponseErr<M, V>>>;
+) => ResultAsync<ResponseOk<M, V>, ResponseErr<M, V>>;
 
 /** Subscription handler type derived from protocol codecs for method M. */
 type SubscriptionHandlerFn<M extends SubscriptionMethod, SV extends string = 'v1', RV extends string = 'v1'> = (
@@ -98,7 +79,18 @@ export type Container = {
   handleChatListSubscribe(handler: SubscriptionHandlerFn<'host_chat_list_subscribe'>): VoidFunction;
   handleChatPostMessage(handler: RequestHandler<'host_chat_post_message'>): VoidFunction;
   handleChatActionSubscribe(handler: SubscriptionHandlerFn<'host_chat_action_subscribe'>): VoidFunction;
-  handleChatCustomMessageRenderSubscribe(handler: SubscriptionHandlerFn<'product_chat_custom_message_render_subscribe'>): VoidFunction;
+
+  /**
+   * Initiate a custom message rendering subscription to the product.
+   *
+   * Unlike other container methods (which handle incoming requests from the
+   * product), this method is host-initiated: the host subscribes to the
+   * product and receives rendered UI nodes back.
+   */
+  renderChatCustomMessage(
+    params: SubscriptionParams<'product_chat_custom_message_render_subscribe', 'v1'>,
+    callback: (payload: SubscriptionPayload<'product_chat_custom_message_render_subscribe', 'v1'>) => void,
+  ): Subscription;
 
   // -- Statement store ------------------------------------------------------
   handleStatementStoreSubscribe(handler: SubscriptionHandlerFn<'remote_statement_store_subscribe'>): VoidFunction;

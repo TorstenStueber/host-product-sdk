@@ -9,7 +9,7 @@
  * abstraction from @polkadot/shared.
  */
 
-import type { Transport } from '@polkadot/shared';
+import type { Transport, ReceiveCodecType } from '@polkadot/shared';
 
 import { createHostApi } from './hostApi.js';
 import { sandboxTransport } from './transport/sandboxTransport.js';
@@ -196,7 +196,7 @@ export const createProductChatManager = (transport: Transport = sandboxTransport
                 return actionsSubscription.unsubscribe;
               },
             },
-            (node: CustomRendererNode) => send({ tag: 'v1' as const, value: node }),
+            (node: CustomRendererNode) => send({ tag: 'v1', value: node } as ReceiveCodecType<'product_chat_custom_message_render_subscribe'>),
           );
         },
       );

@@ -8,9 +8,11 @@
  * Transport / CodecAdapter abstractions from @polkadot/shared.
  */
 
-import type { Provider } from '@polkadot/shared';
+import type { Provider, Transport } from '@polkadot/shared';
 import {
   scaleCodecAdapter,
+  structuredCloneCodecAdapter,
+  requestCodecUpgrade,
   createDefaultLogger,
   createTransport,
 } from '@polkadot/shared';
@@ -216,12 +218,42 @@ export const sandboxProvider: Provider = createDefaultSdkProvider();
 /**
  * Default product-side transport singleton.
  *
- * Uses the SCALE codec adapter by default, matching the original
- * triangle-js-sdks wire format. The host may negotiate a codec
- * upgrade to structured clone after handshake.
+ * Starts with the SCALE codec adapter for backwards compatibility.
+ * After handshake, automatically attempts a codec upgrade to
+ * structured clone. If the host supports it, both sides swap;
+ * otherwise the connection stays on SCALE.
  */
-export const sandboxTransport = createTransport({
-  provider: sandboxProvider,
-  codecAdapter: scaleCodecAdapter,
-  idPrefix: 'p:',
-});
+export const sandboxTransport: Transport = wrapWithAutoCodecUpgrade(
+  createTransport({
+    provider: sandboxProvider,
+    idPrefix: 'p:',
+  }),
+);
+
+/**
+ * Wraps a transport so that the first successful `isReady()` call
+ * automatically triggers a codec upgrade attempt before resolving.
+ */
+function wrapWithAutoCodecUpgrade(transport: Transport): Transport {
+  let upgradePromise: Promise<boolean> | null = null;
+
+  return {
+    ...transport,
+    isReady(): Promise<boolean> {
+      if (upgradePromise) return upgradePromise;
+
+      upgradePromise = transport.isReady().then(async (ready) => {
+        if (!ready) return false;
+
+        await requestCodecUpgrade(transport, {
+          scale: scaleCodecAdapter,
+          structured_clone: structuredCloneCodecAdapter,
+        });
+
+        return true;
+      });
+
+      return upgradePromise;
+    },
+  };
+}

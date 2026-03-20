@@ -14,73 +14,39 @@
  * `_void` in the MessagePayload enum.
  */
 
-import { Enum } from './primitives.js';
+import { Enum, Hex, Nullable } from './primitives.js';
 import type { Codec, StringRecord } from 'scale-ts';
-import { Struct, _void, str } from 'scale-ts';
+import { Bytes, Option, Result, Struct, Tuple, Vector, bool, str, u8, _void } from 'scale-ts';
 
-// -- v1 codec imports ---------------------------------------------------------
+// -- v1 building-block codec imports ------------------------------------------
 
-import { HandshakeV1_request, HandshakeV1_response } from './v1/handshake.js';
-import { FeatureV1_request, FeatureV1_response } from './v1/feature.js';
-import { PushNotificationV1_request, PushNotificationV1_response } from './v1/notification.js';
-import { NavigateToV1_request, NavigateToV1_response } from './v1/navigation.js';
-import { DevicePermissionV1_request, DevicePermissionV1_response } from './v1/devicePermission.js';
-import { RemotePermissionV1_request, RemotePermissionV1_response } from './v1/remotePermission.js';
+import { GenesisHash, GenericErr } from './v1/commonCodecs.js';
+import { HandshakeErr } from './v1/handshake.js';
+import { Feature } from './v1/feature.js';
+import { PushNotification } from './v1/notification.js';
+import { NavigateToErr } from './v1/navigation.js';
+import { DevicePermissionRequest } from './v1/devicePermission.js';
+import { RemotePermissionRequest } from './v1/remotePermission.js';
+import { StorageKey, StorageValue, StorageErr } from './v1/localStorage.js';
 import {
-  StorageReadV1_request, StorageReadV1_response,
-  StorageWriteV1_request, StorageWriteV1_response,
-  StorageClearV1_request, StorageClearV1_response,
-} from './v1/localStorage.js';
-import {
-  AccountGetV1_request, AccountGetV1_response,
-  AccountGetAliasV1_request, AccountGetAliasV1_response,
-  AccountCreateProofV1_request, AccountCreateProofV1_response,
-  GetNonProductAccountsV1_request, GetNonProductAccountsV1_response,
-  AccountConnectionStatusV1_start, AccountConnectionStatusV1_receive,
+  ProductAccountId, Account, ContextualAlias, RingLocation, RingVrfProof,
+  RequestCredentialsErr, CreateProofErr, AccountConnectionStatus,
 } from './v1/accounts.js';
+import { CreateTransactionErr, VersionedTxPayload } from './v1/createTransaction.js';
+import { SigningRawPayload, SigningPayload, SigningResult, SigningErr } from './v1/sign.js';
 import {
-  CreateTransactionV1_request, CreateTransactionV1_response,
-  CreateTransactionWithNonProductV1_request, CreateTransactionWithNonProductV1_response,
-} from './v1/createTransaction.js';
-import {
-  SignRawV1_request, SignRawV1_response,
-  SignPayloadV1_request, SignPayloadV1_response,
-} from './v1/sign.js';
-import {
-  ChatCreateRoomV1_request, ChatCreateRoomV1_response,
-  ChatRegisterBotV1_request, ChatRegisterBotV1_response,
-  ChatListV1_start, ChatListV1_receive,
-  ChatPostMessageV1_request, ChatPostMessageV1_response,
-  ChatActionSubscribeV1_start, ChatActionSubscribeV1_receive,
-  ChatCustomMessageRenderV1_start, ChatCustomMessageRenderV1_receive,
+  ChatRoomRequest, ChatRoomRegistrationResult, ChatRoomRegistrationErr,
+  ChatBotRequest, ChatBotRegistrationResult, ChatBotRegistrationErr,
+  ChatRoom, ChatMessageContent, ChatPostMessageResult, ChatMessagePostingErr,
+  ReceivedChatAction,
 } from './v1/chat.js';
+import { CustomRendererNode } from './v1/customRenderer.js';
 import {
-  StatementStoreV1_start, StatementStoreV1_receive,
-  StatementStoreCreateProofV1_request, StatementStoreCreateProofV1_response,
-  StatementStoreSubmitV1_request, StatementStoreSubmitV1_response,
+  Topic, SignedStatement, Statement, StatementProof, StatementProofErr,
 } from './v1/statementStore.js';
+import { PreimageKey, PreimageValue, PreimageSubmitErr } from './v1/preimage.js';
 import {
-  PreimageLookupV1_start, PreimageLookupV1_receive,
-  PreimageSubmitV1_request, PreimageSubmitV1_response,
-} from './v1/preimage.js';
-import {
-  JsonRpcMessageSendV1_request, JsonRpcMessageSendV1_response,
-  JsonRpcMessageSubscribeV1_start, JsonRpcMessageSubscribeV1_receive,
-} from './v1/jsonRpc.js';
-import {
-  ChainHeadFollowV1_start, ChainHeadFollowV1_receive,
-  ChainHeadHeaderV1_request, ChainHeadHeaderV1_response,
-  ChainHeadBodyV1_request, ChainHeadBodyV1_response,
-  ChainHeadStorageV1_request, ChainHeadStorageV1_response,
-  ChainHeadCallV1_request, ChainHeadCallV1_response,
-  ChainHeadUnpinV1_request, ChainHeadUnpinV1_response,
-  ChainHeadContinueV1_request, ChainHeadContinueV1_response,
-  ChainHeadStopOperationV1_request, ChainHeadStopOperationV1_response,
-  ChainSpecGenesisHashV1_request, ChainSpecGenesisHashV1_response,
-  ChainSpecChainNameV1_request, ChainSpecChainNameV1_response,
-  ChainSpecPropertiesV1_request, ChainSpecPropertiesV1_response,
-  TransactionBroadcastV1_request, TransactionBroadcastV1_response,
-  TransactionStopV1_request, TransactionStopV1_response,
+  BlockHash, OperationId, StorageQueryItem, OperationStartedResult, ChainHeadEvent,
 } from './v1/chainInteraction.js';
 
 // -- Protocol registry --------------------------------------------------------
@@ -98,206 +64,206 @@ import {
 export const hostApiProtocol = {
   // Core / lifecycle
   host_handshake: {
-    _request: Enum({ v1: HandshakeV1_request }),
-    _response: Enum({ v1: HandshakeV1_response }),
+    _request: Enum({ v1: u8 }),
+    _response: Enum({ v1: Result(_void, HandshakeErr) }),
   },
   host_feature_supported: {
-    _request: Enum({ v1: FeatureV1_request }),
-    _response: Enum({ v1: FeatureV1_response }),
+    _request: Enum({ v1: Feature }),
+    _response: Enum({ v1: Result(bool, GenericErr) }),
   },
   host_push_notification: {
-    _request: Enum({ v1: PushNotificationV1_request }),
-    _response: Enum({ v1: PushNotificationV1_response }),
+    _request: Enum({ v1: PushNotification }),
+    _response: Enum({ v1: Result(_void, GenericErr) }),
   },
   host_navigate_to: {
-    _request: Enum({ v1: NavigateToV1_request }),
-    _response: Enum({ v1: NavigateToV1_response }),
+    _request: Enum({ v1: str }),
+    _response: Enum({ v1: Result(_void, NavigateToErr) }),
   },
 
   // Permissions
   host_device_permission: {
-    _request: Enum({ v1: DevicePermissionV1_request }),
-    _response: Enum({ v1: DevicePermissionV1_response }),
+    _request: Enum({ v1: DevicePermissionRequest }),
+    _response: Enum({ v1: Result(bool, GenericErr) }),
   },
   remote_permission: {
-    _request: Enum({ v1: RemotePermissionV1_request }),
-    _response: Enum({ v1: RemotePermissionV1_response }),
+    _request: Enum({ v1: RemotePermissionRequest }),
+    _response: Enum({ v1: Result(bool, GenericErr) }),
   },
 
   // Local storage
   host_local_storage_read: {
-    _request: Enum({ v1: StorageReadV1_request }),
-    _response: Enum({ v1: StorageReadV1_response }),
+    _request: Enum({ v1: StorageKey }),
+    _response: Enum({ v1: Result(Option(StorageValue), StorageErr) }),
   },
   host_local_storage_write: {
-    _request: Enum({ v1: StorageWriteV1_request }),
-    _response: Enum({ v1: StorageWriteV1_response }),
+    _request: Enum({ v1: Tuple(StorageKey, StorageValue) }),
+    _response: Enum({ v1: Result(_void, StorageErr) }),
   },
   host_local_storage_clear: {
-    _request: Enum({ v1: StorageClearV1_request }),
-    _response: Enum({ v1: StorageClearV1_response }),
+    _request: Enum({ v1: StorageKey }),
+    _response: Enum({ v1: Result(_void, StorageErr) }),
   },
 
   // Accounts
   host_account_connection_status_subscribe: {
-    _start: Enum({ v1: AccountConnectionStatusV1_start }),
-    _receive: Enum({ v1: AccountConnectionStatusV1_receive }),
+    _start: Enum({ v1: _void }),
+    _receive: Enum({ v1: AccountConnectionStatus }),
   },
   host_account_get: {
-    _request: Enum({ v1: AccountGetV1_request }),
-    _response: Enum({ v1: AccountGetV1_response }),
+    _request: Enum({ v1: ProductAccountId }),
+    _response: Enum({ v1: Result(Account, RequestCredentialsErr) }),
   },
   host_account_get_alias: {
-    _request: Enum({ v1: AccountGetAliasV1_request }),
-    _response: Enum({ v1: AccountGetAliasV1_response }),
+    _request: Enum({ v1: ProductAccountId }),
+    _response: Enum({ v1: Result(ContextualAlias, RequestCredentialsErr) }),
   },
   host_account_create_proof: {
-    _request: Enum({ v1: AccountCreateProofV1_request }),
-    _response: Enum({ v1: AccountCreateProofV1_response }),
+    _request: Enum({ v1: Tuple(ProductAccountId, RingLocation, Bytes()) }),
+    _response: Enum({ v1: Result(RingVrfProof, CreateProofErr) }),
   },
   host_get_non_product_accounts: {
-    _request: Enum({ v1: GetNonProductAccountsV1_request }),
-    _response: Enum({ v1: GetNonProductAccountsV1_response }),
+    _request: Enum({ v1: _void }),
+    _response: Enum({ v1: Result(Vector(Account), RequestCredentialsErr) }),
   },
 
   // Transactions
   host_create_transaction: {
-    _request: Enum({ v1: CreateTransactionV1_request }),
-    _response: Enum({ v1: CreateTransactionV1_response }),
+    _request: Enum({ v1: Tuple(ProductAccountId, VersionedTxPayload) }),
+    _response: Enum({ v1: Result(Hex(), CreateTransactionErr) }),
   },
   host_create_transaction_with_non_product_account: {
-    _request: Enum({ v1: CreateTransactionWithNonProductV1_request }),
-    _response: Enum({ v1: CreateTransactionWithNonProductV1_response }),
+    _request: Enum({ v1: VersionedTxPayload }),
+    _response: Enum({ v1: Result(Hex(), CreateTransactionErr) }),
   },
 
   // Signing
   host_sign_raw: {
-    _request: Enum({ v1: SignRawV1_request }),
-    _response: Enum({ v1: SignRawV1_response }),
+    _request: Enum({ v1: SigningRawPayload }),
+    _response: Enum({ v1: Result(SigningResult, SigningErr) }),
   },
   host_sign_payload: {
-    _request: Enum({ v1: SignPayloadV1_request }),
-    _response: Enum({ v1: SignPayloadV1_response }),
+    _request: Enum({ v1: SigningPayload }),
+    _response: Enum({ v1: Result(SigningResult, SigningErr) }),
   },
 
   // Chat
   host_chat_create_room: {
-    _request: Enum({ v1: ChatCreateRoomV1_request }),
-    _response: Enum({ v1: ChatCreateRoomV1_response }),
+    _request: Enum({ v1: ChatRoomRequest }),
+    _response: Enum({ v1: Result(ChatRoomRegistrationResult, ChatRoomRegistrationErr) }),
   },
   host_chat_register_bot: {
-    _request: Enum({ v1: ChatRegisterBotV1_request }),
-    _response: Enum({ v1: ChatRegisterBotV1_response }),
+    _request: Enum({ v1: ChatBotRequest }),
+    _response: Enum({ v1: Result(ChatBotRegistrationResult, ChatBotRegistrationErr) }),
   },
   host_chat_list_subscribe: {
-    _start: Enum({ v1: ChatListV1_start }),
-    _receive: Enum({ v1: ChatListV1_receive }),
+    _start: Enum({ v1: _void }),
+    _receive: Enum({ v1: Vector(ChatRoom) }),
   },
   host_chat_post_message: {
-    _request: Enum({ v1: ChatPostMessageV1_request }),
-    _response: Enum({ v1: ChatPostMessageV1_response }),
+    _request: Enum({ v1: Struct({ roomId: str, payload: ChatMessageContent }) }),
+    _response: Enum({ v1: Result(ChatPostMessageResult, ChatMessagePostingErr) }),
   },
   host_chat_action_subscribe: {
-    _start: Enum({ v1: ChatActionSubscribeV1_start }),
-    _receive: Enum({ v1: ChatActionSubscribeV1_receive }),
+    _start: Enum({ v1: _void }),
+    _receive: Enum({ v1: ReceivedChatAction }),
   },
   product_chat_custom_message_render_subscribe: {
-    _start: Enum({ v1: ChatCustomMessageRenderV1_start }),
-    _receive: Enum({ v1: ChatCustomMessageRenderV1_receive }),
+    _start: Enum({ v1: Struct({ messageId: str, messageType: str, payload: Bytes() }) }),
+    _receive: Enum({ v1: CustomRendererNode }),
   },
 
   // Statement store
   remote_statement_store_subscribe: {
-    _start: Enum({ v1: StatementStoreV1_start }),
-    _receive: Enum({ v1: StatementStoreV1_receive }),
+    _start: Enum({ v1: Vector(Topic) }),
+    _receive: Enum({ v1: Vector(SignedStatement) }),
   },
   remote_statement_store_create_proof: {
-    _request: Enum({ v1: StatementStoreCreateProofV1_request }),
-    _response: Enum({ v1: StatementStoreCreateProofV1_response }),
+    _request: Enum({ v1: Tuple(ProductAccountId, Statement) }),
+    _response: Enum({ v1: Result(StatementProof, StatementProofErr) }),
   },
   remote_statement_store_submit: {
-    _request: Enum({ v1: StatementStoreSubmitV1_request }),
-    _response: Enum({ v1: StatementStoreSubmitV1_response }),
+    _request: Enum({ v1: SignedStatement }),
+    _response: Enum({ v1: Result(_void, GenericErr) }),
   },
 
   // Preimage
   remote_preimage_lookup_subscribe: {
-    _start: Enum({ v1: PreimageLookupV1_start }),
-    _receive: Enum({ v1: PreimageLookupV1_receive }),
+    _start: Enum({ v1: PreimageKey }),
+    _receive: Enum({ v1: Nullable(PreimageValue) }),
   },
   remote_preimage_submit: {
-    _request: Enum({ v1: PreimageSubmitV1_request }),
-    _response: Enum({ v1: PreimageSubmitV1_response }),
+    _request: Enum({ v1: PreimageValue }),
+    _response: Enum({ v1: Result(PreimageKey, PreimageSubmitErr) }),
   },
 
   // JSON-RPC bridge
   host_jsonrpc_message_send: {
-    _request: Enum({ v1: JsonRpcMessageSendV1_request }),
-    _response: Enum({ v1: JsonRpcMessageSendV1_response }),
+    _request: Enum({ v1: Tuple(GenesisHash, str) }),
+    _response: Enum({ v1: Result(_void, GenericErr) }),
   },
   host_jsonrpc_message_subscribe: {
-    _start: Enum({ v1: JsonRpcMessageSubscribeV1_start }),
-    _receive: Enum({ v1: JsonRpcMessageSubscribeV1_receive }),
+    _start: Enum({ v1: GenesisHash }),
+    _receive: Enum({ v1: str }),
   },
 
   // Remote chain
   remote_chain_head_follow: {
-    _start: Enum({ v1: ChainHeadFollowV1_start }),
-    _receive: Enum({ v1: ChainHeadFollowV1_receive }),
+    _start: Enum({ v1: Struct({ genesisHash: GenesisHash, withRuntime: bool }) }),
+    _receive: Enum({ v1: ChainHeadEvent }),
   },
   remote_chain_head_header: {
-    _request: Enum({ v1: ChainHeadHeaderV1_request }),
-    _response: Enum({ v1: ChainHeadHeaderV1_response }),
+    _request: Enum({ v1: Struct({ genesisHash: GenesisHash, followSubscriptionId: str, hash: BlockHash }) }),
+    _response: Enum({ v1: Result(Nullable(Hex()), GenericErr) }),
   },
   remote_chain_head_body: {
-    _request: Enum({ v1: ChainHeadBodyV1_request }),
-    _response: Enum({ v1: ChainHeadBodyV1_response }),
+    _request: Enum({ v1: Struct({ genesisHash: GenesisHash, followSubscriptionId: str, hash: BlockHash }) }),
+    _response: Enum({ v1: Result(OperationStartedResult, GenericErr) }),
   },
   remote_chain_head_storage: {
-    _request: Enum({ v1: ChainHeadStorageV1_request }),
-    _response: Enum({ v1: ChainHeadStorageV1_response }),
+    _request: Enum({ v1: Struct({ genesisHash: GenesisHash, followSubscriptionId: str, hash: BlockHash, items: Vector(StorageQueryItem), childTrie: Nullable(Hex()) }) }),
+    _response: Enum({ v1: Result(OperationStartedResult, GenericErr) }),
   },
   remote_chain_head_call: {
-    _request: Enum({ v1: ChainHeadCallV1_request }),
-    _response: Enum({ v1: ChainHeadCallV1_response }),
+    _request: Enum({ v1: Struct({ genesisHash: GenesisHash, followSubscriptionId: str, hash: BlockHash, function: str, callParameters: Hex() }) }),
+    _response: Enum({ v1: Result(OperationStartedResult, GenericErr) }),
   },
   remote_chain_head_unpin: {
-    _request: Enum({ v1: ChainHeadUnpinV1_request }),
-    _response: Enum({ v1: ChainHeadUnpinV1_response }),
+    _request: Enum({ v1: Struct({ genesisHash: GenesisHash, followSubscriptionId: str, hashes: Vector(BlockHash) }) }),
+    _response: Enum({ v1: Result(_void, GenericErr) }),
   },
   remote_chain_head_continue: {
-    _request: Enum({ v1: ChainHeadContinueV1_request }),
-    _response: Enum({ v1: ChainHeadContinueV1_response }),
+    _request: Enum({ v1: Struct({ genesisHash: GenesisHash, followSubscriptionId: str, operationId: OperationId }) }),
+    _response: Enum({ v1: Result(_void, GenericErr) }),
   },
   remote_chain_head_stop_operation: {
-    _request: Enum({ v1: ChainHeadStopOperationV1_request }),
-    _response: Enum({ v1: ChainHeadStopOperationV1_response }),
+    _request: Enum({ v1: Struct({ genesisHash: GenesisHash, followSubscriptionId: str, operationId: OperationId }) }),
+    _response: Enum({ v1: Result(_void, GenericErr) }),
   },
   remote_chain_spec_genesis_hash: {
-    _request: Enum({ v1: ChainSpecGenesisHashV1_request }),
-    _response: Enum({ v1: ChainSpecGenesisHashV1_response }),
+    _request: Enum({ v1: GenesisHash }),
+    _response: Enum({ v1: Result(Hex(), GenericErr) }),
   },
   remote_chain_spec_chain_name: {
-    _request: Enum({ v1: ChainSpecChainNameV1_request }),
-    _response: Enum({ v1: ChainSpecChainNameV1_response }),
+    _request: Enum({ v1: GenesisHash }),
+    _response: Enum({ v1: Result(str, GenericErr) }),
   },
   remote_chain_spec_properties: {
-    _request: Enum({ v1: ChainSpecPropertiesV1_request }),
-    _response: Enum({ v1: ChainSpecPropertiesV1_response }),
+    _request: Enum({ v1: GenesisHash }),
+    _response: Enum({ v1: Result(str, GenericErr) }),
   },
   remote_chain_transaction_broadcast: {
-    _request: Enum({ v1: TransactionBroadcastV1_request }),
-    _response: Enum({ v1: TransactionBroadcastV1_response }),
+    _request: Enum({ v1: Struct({ genesisHash: GenesisHash, transaction: Hex() }) }),
+    _response: Enum({ v1: Result(Nullable(str), GenericErr) }),
   },
   remote_chain_transaction_stop: {
-    _request: Enum({ v1: TransactionStopV1_request }),
-    _response: Enum({ v1: TransactionStopV1_response }),
+    _request: Enum({ v1: Struct({ genesisHash: GenesisHash, operationId: str }) }),
+    _response: Enum({ v1: Result(_void, GenericErr) }),
   },
 
   // Codec upgrade (our extension -- not in original triangle-js-sdks)
   host_codec_upgrade: {
-    _request: Enum({ v1: _void }),
-    _response: Enum({ v1: _void }),
+    _request: Enum({ v1: Struct({ supportedFormats: Vector(str) }) }),
+    _response: Enum({ v1: Struct({ selectedFormat: str }) }),
   },
 } as const;
 
@@ -334,17 +300,17 @@ export type ActionString =
 
 import type { CodecType } from 'scale-ts';
 
-/** Full decoded type of a request method's _request codec. */
-type RequestCodecType<M extends RequestMethod> = CodecType<Protocol[M]['_request']>;
+/** Full decoded type of a request method's _request codec (versioned envelope). */
+export type RequestCodecType<M extends RequestMethod> = CodecType<Protocol[M]['_request']>;
 
-/** Full decoded type of a request method's _response codec. */
-type ResponseCodecType<M extends RequestMethod> = CodecType<Protocol[M]['_response']>;
+/** Full decoded type of a request method's _response codec (versioned envelope). */
+export type ResponseCodecType<M extends RequestMethod> = CodecType<Protocol[M]['_response']>;
 
-/** Full decoded type of a subscription method's _start codec. */
-type StartCodecType<M extends SubscriptionMethod> = CodecType<Protocol[M]['_start']>;
+/** Full decoded type of a subscription method's _start codec (versioned envelope). */
+export type StartCodecType<M extends SubscriptionMethod> = CodecType<Protocol[M]['_start']>;
 
-/** Full decoded type of a subscription method's _receive codec. */
-type ReceiveCodecType<M extends SubscriptionMethod> = CodecType<Protocol[M]['_receive']>;
+/** Full decoded type of a subscription method's _receive codec (versioned envelope). */
+export type ReceiveCodecType<M extends SubscriptionMethod> = CodecType<Protocol[M]['_receive']>;
 
 /** Available version tags for a request method's _request codec. */
 export type RequestVersions<M extends RequestMethod> = RequestCodecType<M>['tag'];

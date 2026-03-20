@@ -4,10 +4,11 @@
  * Ported from triangle-js-sdks `packages/host-api/src/transport.ts`,
  * adapted for the new architecture:
  *
- * 1. Uses a pluggable {@link CodecAdapter} instead of the hard-coded
- *    `Message.enc`/`Message.dec` calls.
+ * 1. Auto-detects incoming message format (Uint8Array → SCALE,
+ *    plain object → structured clone) and auto-upgrades the
+ *    outgoing codec when structured clone is detected.
  * 2. Exposes a `swapCodecAdapter` method so codec negotiation can
- *    upgrade the wire format at runtime.
+ *    explicitly upgrade the wire format.
  * 3. Keeps the full API surface: `request`, `handleRequest`,
  *    `subscribe`, `handleSubscription`, plus low-level
  *    `postMessage` / `listenMessages`.
@@ -15,8 +16,14 @@
 
 import { createNanoEvents } from 'nanoevents';
 
-import type { CodecAdapter, PostMessageData, ProtocolMessage } from '../codec/adapter.js';
-import type { RequestMethod, SubscriptionMethod, ActionString } from '../codec/scale/protocol.js';
+import type { CodecAdapter, ProtocolMessage } from '../codec/adapter.js';
+import { structuredCloneCodecAdapter } from '../codec/structured/index.js';
+import { scaleCodecAdapter } from '../codec/scale/protocol.js';
+import type {
+  RequestMethod, SubscriptionMethod, ActionString,
+  RequestCodecType, ResponseCodecType,
+  StartCodecType, ReceiveCodecType,
+} from '../codec/scale/protocol.js';
 import { composeAction, delay, promiseWithResolvers } from '../util/helpers.js';
 import { createIdFactory } from '../util/idFactory.js';
 import type { Provider } from './provider.js';
@@ -31,6 +38,21 @@ export const HANDSHAKE_INTERVAL = 50;
 /** Maximum time (ms) to wait for a handshake response. */
 export const HANDSHAKE_TIMEOUT = 10_000;
 
+/**
+ * Marker value sent as the response when a request targets a method
+ * that has no registered handler. The sender detects this and rejects
+ * the promise with a `MethodNotSupported` error.
+ */
+export const NOT_SUPPORTED_MARKER = { _notSupported: true } as const;
+
+/** Error thrown when a request targets a method with no registered handler. */
+export class MethodNotSupportedError extends Error {
+  constructor(method: string) {
+    super(`Method not supported: ${method}`);
+    this.name = 'MethodNotSupportedError';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Public types
 // ---------------------------------------------------------------------------
@@ -41,16 +63,6 @@ export type Subscription = {
   unsubscribe: VoidFunction;
   onInterrupt(callback: VoidFunction): VoidFunction;
 };
-
-export type RequestHandler = (
-  message: unknown,
-) => PromiseLike<unknown>;
-
-export type SubscriptionHandler = (
-  params: unknown,
-  send: (value: unknown) => void,
-  interrupt: () => void,
-) => VoidFunction;
 
 export type Transport = {
   readonly provider: Provider;
@@ -64,27 +76,37 @@ export type Transport = {
   /** Swap the codec adapter (e.g. after negotiation). */
   swapCodecAdapter(adapter: CodecAdapter): void;
 
-  request(
-    method: RequestMethod,
-    payload: unknown,
+  request<M extends RequestMethod>(
+    method: M,
+    payload: RequestCodecType<M>,
     signal?: AbortSignal,
-  ): Promise<unknown>;
+  ): Promise<ResponseCodecType<M>>;
 
-  handleRequest(method: RequestMethod, handler: RequestHandler): VoidFunction;
+  handleRequest<M extends RequestMethod>(
+    method: M,
+    handler: (message: RequestCodecType<M>) => Promise<ResponseCodecType<M>>,
+  ): VoidFunction;
 
-  subscribe(
-    method: SubscriptionMethod,
-    payload: unknown,
-    callback: (payload: unknown) => void,
+  subscribe<M extends SubscriptionMethod>(
+    method: M,
+    payload: StartCodecType<M>,
+    callback: (payload: ReceiveCodecType<M>) => void,
   ): Subscription;
 
-  handleSubscription(method: SubscriptionMethod, handler: SubscriptionHandler): VoidFunction;
+  handleSubscription<M extends SubscriptionMethod>(
+    method: M,
+    handler: (
+      params: StartCodecType<M>,
+      send: (value: ReceiveCodecType<M>) => void,
+      interrupt: () => void,
+    ) => VoidFunction,
+  ): VoidFunction;
 
   // Low-level -- use at your own risk.
   postMessage(requestId: string, payload: { tag: ActionString; value: unknown }): void;
   listenMessages(
     action: ActionString,
-    callback: (requestId: string, data: { tag: string; value: unknown }) => void,
+    callback: (requestId: string, value: unknown) => void,
     onError?: (error: unknown) => void,
   ): VoidFunction;
 };
@@ -132,7 +154,6 @@ function getSubscriptionKey(method: string, payload: { tag: string; value: unkno
 
 export type CreateTransportOptions = {
   provider: Provider;
-  codecAdapter: CodecAdapter;
 
   /**
    * Protocol version id sent during handshake.
@@ -151,7 +172,34 @@ export type CreateTransportOptions = {
 
 export function createTransport(options: CreateTransportOptions): Transport {
   const { provider, protocolVersionId = 1, idPrefix = '' } = options;
-  let codecAdapter = options.codecAdapter;
+
+  /** Codec used for encoding outgoing messages. Starts as SCALE, upgrades to structured clone. */
+  let codecAdapter = scaleCodecAdapter;
+
+  /**
+   * Decode an incoming message by inspecting its shape:
+   * - Uint8Array → SCALE decode
+   * - Object with `requestId` → structured clone (identity)
+   *
+   * When a structured clone message is detected, the outgoing codec
+   * is automatically upgraded to structured clone as well (preferred).
+   */
+  function decodeIncoming(message: Uint8Array | unknown): ProtocolMessage {
+    if (message instanceof Uint8Array ||
+        (typeof message === 'object' && message !== null &&
+         (message as { constructor?: { name?: string } }).constructor?.name === 'Uint8Array')) {
+      return scaleCodecAdapter.decode(message as Uint8Array);
+    }
+
+    if (typeof message === 'object' && message !== null &&
+        'requestId' in (message as Record<string, unknown>)) {
+      // Upgrade outgoing codec to structured clone on first structured clone message.
+      codecAdapter = structuredCloneCodecAdapter;
+      return message as ProtocolMessage;
+    }
+
+    throw new Error('Unrecognized message format');
+  }
 
   const nextId = createIdFactory(idPrefix);
 
@@ -195,6 +243,11 @@ export function createTransport(options: CreateTransportOptions): Transport {
   // -- Subscription multiplexing --------------------------------------------
 
   const activeSubscriptions: Map<string, InternalSubscription> = new Map();
+
+  // -- Handler tracking (for not-supported detection) -----------------------
+
+  /** Actions that have registered handlers. */
+  const handledActions = new Set<string>();
 
   // -- Transport implementation ---------------------------------------------
 
@@ -287,11 +340,11 @@ export function createTransport(options: CreateTransportOptions): Transport {
 
     // -- Request / Response -------------------------------------------------
 
-    async request(
-      method: RequestMethod,
-      payload: unknown,
+    async request<M extends RequestMethod>(
+      method: M,
+      payload: RequestCodecType<M>,
       signal?: AbortSignal,
-    ): Promise<unknown> {
+    ): Promise<ResponseCodecType<M>> {
       checks();
 
       if (!(await transport.isReady())) {
@@ -304,7 +357,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
       const requestAction = composeAction(method, 'request');
       const responseAction = composeAction(method, 'response');
 
-      const { resolve, reject, promise } = promiseWithResolvers<unknown>();
+      const { resolve, reject, promise } = promiseWithResolvers<ResponseCodecType<M>>();
 
       const cleanup = (): void => {
         unsubscribe();
@@ -318,10 +371,15 @@ export function createTransport(options: CreateTransportOptions): Transport {
 
       const unsubscribe = transport.listenMessages(
         responseAction,
-        (receivedId, responsePayload) => {
+        (receivedId, value) => {
           if (receivedId === requestId) {
             cleanup();
-            resolve(responsePayload.value);
+            const v = value as Record<string, unknown>;
+            if (v && v._notSupported) {
+              reject(new MethodNotSupportedError(method));
+            } else {
+              resolve(value as ResponseCodecType<M>);
+            }
           }
         },
       );
@@ -335,14 +393,17 @@ export function createTransport(options: CreateTransportOptions): Transport {
 
     // -- Handle incoming requests (host side) -------------------------------
 
-    handleRequest(method: RequestMethod, handler: RequestHandler): VoidFunction {
+    handleRequest<M extends RequestMethod>(
+      method: M,
+      handler: (message: RequestCodecType<M>) => Promise<ResponseCodecType<M>>,
+    ): VoidFunction {
       checks();
 
       const requestAction = composeAction(method, 'request');
       const responseAction = composeAction(method, 'response');
 
-      return transport.listenMessages(requestAction, (requestId, requestPayload) => {
-        void Promise.resolve(handler(requestPayload.value)).then(result => {
+      return transport.listenMessages(requestAction, (requestId, value) => {
+        void Promise.resolve(handler(value as RequestCodecType<M>)).then(result => {
           transport.postMessage(requestId, { tag: responseAction, value: result });
         });
       });
@@ -350,10 +411,10 @@ export function createTransport(options: CreateTransportOptions): Transport {
 
     // -- Subscriptions (product side) ---------------------------------------
 
-    subscribe(
-      method: SubscriptionMethod,
-      payload: unknown,
-      callback: (payload: unknown) => void,
+    subscribe<M extends SubscriptionMethod>(
+      method: M,
+      payload: StartCodecType<M>,
+      callback: (payload: ReceiveCodecType<M>) => void,
     ): Subscription {
       checks();
 
@@ -399,12 +460,12 @@ export function createTransport(options: CreateTransportOptions): Transport {
 
         const unsubscribeReceive = transport.listenMessages(
           receiveAction,
-          (receivedId, data) => {
+          (receivedId, value) => {
             if (receivedId === requestId) {
               const sub = activeSubscriptions.get(subscriptionKey);
               if (sub) {
                 for (const l of sub.listeners) {
-                  l.call(data.value);
+                  l.call(value);
                 }
               }
             }
@@ -447,7 +508,14 @@ export function createTransport(options: CreateTransportOptions): Transport {
 
     // -- Handle subscriptions (host side) -----------------------------------
 
-    handleSubscription(method: SubscriptionMethod, handler: SubscriptionHandler): VoidFunction {
+    handleSubscription<M extends SubscriptionMethod>(
+      method: M,
+      handler: (
+        params: StartCodecType<M>,
+        send: (value: ReceiveCodecType<M>) => void,
+        interrupt: () => void,
+      ) => VoidFunction,
+    ): VoidFunction {
       checks();
 
       const startAction = composeAction(method, 'start');
@@ -459,15 +527,15 @@ export function createTransport(options: CreateTransportOptions): Transport {
 
       const unsubStart = transport.listenMessages(
         startAction,
-        (requestId, startPayload) => {
+        (requestId, value) => {
           if (subscriptions.has(requestId)) return;
 
           let interrupted = false;
 
           const unsubscribe = handler(
-            startPayload.value,
+            value as StartCodecType<M>,
             // send callback
-            (value: unknown) => {
+            (value) => {
               transport.postMessage(requestId, { tag: receiveAction, value });
             },
             // interrupt callback
@@ -511,20 +579,34 @@ export function createTransport(options: CreateTransportOptions): Transport {
 
     listenMessages(
       action: ActionString,
-      callback: (requestId: string, data: { tag: string; value: unknown }) => void,
+      callback: (requestId: string, value: unknown) => void,
       onError?: (error: unknown) => void,
     ): VoidFunction {
-      return provider.subscribe((message: Uint8Array | unknown) => {
+      // Track _request/_start actions so the not-supported catch-all
+      // doesn't fire for actions that have low-level listeners.
+      const isHandlerAction = action.endsWith('_request') || action.endsWith('_start');
+      if (isHandlerAction) {
+        handledActions.add(action);
+      }
+
+      const unsubscribe = provider.subscribe((message: Uint8Array | unknown) => {
         try {
-          const result = codecAdapter.decode(message as PostMessageData);
+          const result = decodeIncoming(message);
 
           if (result.payload.tag === action) {
-            callback(result.requestId, result.payload);
+            callback(result.requestId, result.payload.value);
           }
         } catch (e) {
           onError?.(e);
         }
       });
+
+      return () => {
+        unsubscribe();
+        if (isHandlerAction) {
+          handledActions.delete(action);
+        }
+      };
     },
 
     // -- Connection status --------------------------------------------------
@@ -550,6 +632,28 @@ export function createTransport(options: CreateTransportOptions): Transport {
     },
   };
 
+  // -- Not-supported catch-all -----------------------------------------------
+  //
+  // Responds immediately to any _request or _start message that has no
+  // registered handler, so the sender doesn't wait forever.
+
+  provider.subscribe((message: Uint8Array | unknown) => {
+    try {
+      const result = decodeIncoming(message);
+      const { tag } = result.payload;
+
+      if (tag.endsWith('_request') && !handledActions.has(tag)) {
+        const responseTag = tag.replace(/_request$/, '_response') as ActionString;
+        transport.postMessage(result.requestId, { tag: responseTag, value: NOT_SUPPORTED_MARKER });
+      } else if (tag.endsWith('_start') && !handledActions.has(tag)) {
+        const interruptTag = tag.replace(/_start$/, '_interrupt') as ActionString;
+        transport.postMessage(result.requestId, { tag: interruptTag, value: undefined });
+      }
+    } catch {
+      // Ignore decode errors — handled by listenMessages subscribers.
+    }
+  });
+
   // -- Auto-wire handshake handler on the host side -------------------------
   //
   // When the provider detects that it is in the correct environment (i.e.
@@ -557,25 +661,14 @@ export function createTransport(options: CreateTransportOptions): Transport {
   // handshake requests.
 
   if (provider.isCorrectEnvironment()) {
-    transport.handleRequest('host_handshake', async (version: unknown) => {
-      const v = version as { tag: string; value: number };
-
-      switch (v.tag) {
-        case 'v1': {
-          if (v.value === protocolVersionId) {
-            return { tag: 'v1', value: { success: true, value: undefined } };
-          }
-          return {
-            tag: 'v1',
-            value: { success: false, value: { tag: 'UnsupportedProtocolVersion', value: undefined } },
-          };
-        }
-        default:
-          return {
-            tag: v.tag,
-            value: { success: false, value: { tag: 'UnsupportedProtocolVersion', value: undefined } },
-          };
+    transport.handleRequest('host_handshake', async (version): Promise<ResponseCodecType<'host_handshake'>> => {
+      if (version.tag === 'v1' && version.value === protocolVersionId) {
+        return { tag: 'v1', value: { success: true, value: undefined } };
       }
+      return {
+        tag: 'v1',
+        value: { success: false, value: { tag: 'UnsupportedProtocolVersion', value: undefined } },
+      };
     });
   }
 
