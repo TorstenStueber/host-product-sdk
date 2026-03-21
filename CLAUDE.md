@@ -13,11 +13,6 @@
   (DOM methods like `localStorage.getItem()`, `contentWindow`, JSON-RPC spec, etc.). Never introduce `null` in our own
   types, return values, or state variables.
 
-## Formatting
-
-- **Run `npm run format` when you finish a task.** Before committing or reporting completion, run prettier to ensure all
-  touched files are consistently formatted.
-
 ## Git
 
 - **Never mention Claude in commit messages.** No co-authored-by lines, no references to AI assistance.
@@ -36,9 +31,14 @@
   in `packages/host-api/dist/`. Run `npm run build -w @polkadot/host-api` (or `npx nx run @polkadot/host-api:build`)
   before running `npx nx run-many -t typecheck`, otherwise downstream packages may typecheck against stale declarations.
 
-## Testing
+## After implementing a feature
 
-- **Write new tests before running existing ones.** After implementing a feature, think about new tests that cover the
-  happy path, error cases, and edge cases. Include e2e tests when the feature affects the host-product communication. Be
-  creative but write meaningful tests — don't just test the obvious. Then run both unit tests (`npm test`) and e2e tests
-  (`npm run test:e2e`).
+Do these steps in order before reporting completion:
+
+1. **Write tests.** Think about new tests that cover the happy path, error cases, and edge cases. Include e2e tests when
+   the feature affects host-product communication. Be creative but write meaningful tests — don't just test the obvious.
+2. **Run all tests.** `npm test` (unit) and `npm run test:e2e` (e2e). All must be green.
+3. **Format.** `npm run format`.
+4. **Update ARCHITECTURE.md.** If the change affects anything described there (types, file structure, counts, behavior),
+   correct it so it stays in sync with the code.
+5. **Commit.**
