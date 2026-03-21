@@ -655,7 +655,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 ### 4.1 Unit Tests (15 files, 173 tests)
 
-**Test helper** (`helpers/mockProvider.ts`): creates connected mock Provider pairs (async and sync variants).
+**Test helper** (`test/helpers/mockProvider.ts`): creates connected mock Provider pairs (async and sync variants).
 
 **Shared** (6 files):
 
