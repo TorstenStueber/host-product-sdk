@@ -30,25 +30,25 @@ Runtime dependencies of host-api: `scale-ts`, `nanoevents`, `neverthrow`, `@polk
 
 ---
 
-## Part 1: `@polkadot/host-api` -- Shared layer (`src/shared/`)
+## Part 1: `@polkadot/host-api`: Shared layer (`src/shared/`)
 
 Everything both sides depend on. Read bottom-up: utilities, then codec, then transport, then protocol types.
 
 ### 1.1 Utilities (`util/`)
 
-**`util/logger.ts`** -- A `Logger` type (info/warn/error/log + `withPrefix()`) and `createDefaultLogger(prefix?)` that
+**`util/logger.ts`**: A `Logger` type (info/warn/error/log + `withPrefix()`) and `createDefaultLogger(prefix?)` that
 wraps `console`.
 
-**`util/idFactory.ts`** -- `createIdFactory(prefix)` returns a function that generates prefixed incrementing IDs. Each
+**`util/idFactory.ts`**: `createIdFactory(prefix)` returns a function that generates prefixed incrementing IDs. Each
 factory has its own independent counter. The host uses prefix `"h:"`, the product uses `"p:"`, so IDs never collide on
 the shared postMessage channel.
 
-**`util/helpers.ts`** -- Four small utilities:
+**`util/helpers.ts`**: Four small utilities:
 
-- `delay(ms)` -- Promise that resolves after a timeout
-- `promiseWithResolvers<T>()` -- ES2024 polyfill
-- `composeAction(method, suffix)` -- builds `"host_account_get_request"` from `"host_account_get"` + `"request"`
-- `extractErrorMessage(err)` -- safely gets a string from any thrown value
+- `delay(ms)`: Promise that resolves after a timeout
+- `promiseWithResolvers<T>()`: ES2024 polyfill
+- `composeAction(method, suffix)`: builds `"host_account_get_request"` from `"host_account_get"` + `"request"`
+- `extractErrorMessage(err)`: safely gets a string from any thrown value
 
 ### 1.2 Codec Adapter (`codec/adapter.ts`)
 
@@ -109,23 +109,23 @@ Also exports `HexString` type (`` `0x${string}` ``) and `toHexString()` validato
 `CodecType<>`-derived TypeScript types. The per-method request/response/start/receive codecs are not exported separately
 -- they are composed inline in `hostApiProtocol` (see 1.6).
 
-**`commonCodecs.ts`** -- `GenesisHash = Hex()`, `GenericErr = Struct({ reason: str })`.
+**`commonCodecs.ts`**: `GenesisHash = Hex()`, `GenericErr = Struct({ reason: str })`.
 
-**`accounts.ts`** -- `AccountId = Bytes(32)`, `ProductAccountId = Tuple(str, u32)`,
+**`accounts.ts`**: `AccountId = Bytes(32)`, `ProductAccountId = Tuple(str, u32)`,
 `Account = Struct({ publicKey, name })`, error enums (`RequestCredentialsErr`, `CreateProofErr`),
 `AccountConnectionStatus`.
 
-**`sign.ts`** -- `SigningPayload` (16 fields: address, blockHash, era, method, nonce, etc.), `SigningResult`,
+**`sign.ts`**: `SigningPayload` (16 fields: address, blockHash, era, method, nonce, etc.), `SigningResult`,
 `RawPayload`, `SigningErr`.
 
-**`chainInteraction.ts`** -- The largest file. All `chainHead_v1` JSON-RPC as SCALE: `ChainHeadEvent` (12-variant enum:
+**`chainInteraction.ts`**: The largest file. All `chainHead_v1` JSON-RPC as SCALE: `ChainHeadEvent` (12-variant enum:
 Initialized, NewBlock, BestBlockChanged, Finalized, plus operation events), `BlockHash`, `OperationId`,
 `StorageQueryItem`, `OperationStartedResult`.
 
-**`chat.ts`** -- Room/bot registration, `ChatMessageContent` (7-variant enum: Text, RichText, Actions, File, Reaction,
+**`chat.ts`**: Room/bot registration, `ChatMessageContent` (7-variant enum: Text, RichText, Actions, File, Reaction,
 ReactionRemoved, Custom), actions.
 
-**`customRenderer.ts`** -- Recursive UI component tree matching the original wire format exactly. 9 node variants (Nil,
+**`customRenderer.ts`**: Recursive UI component tree matching the original wire format exactly. 9 node variants (Nil,
 String, Box, Column, Row, Spacer, Text, Button, TextField), each wrapped in a Component struct with
 `{modifiers: Vector(Modifier), props, children: Vector(Children)}`. Modifiers are a tagged enum (margin, padding,
 background, border, sizes, fill flags). Uses `lazy()` for recursive children.
@@ -161,30 +161,30 @@ its request/response types independently.
 Each entry's exact codec types are preserved by TypeScript, so `typeof hostApiProtocol.host_handshake._request` gives
 the precise codec type.
 
-**Derived method name types** -- since `hostApiProtocol` is declared `as const`, TypeScript preserves the literal key
+**Derived method name types**: since `hostApiProtocol` is declared `as const`, TypeScript preserves the literal key
 types. Mapped types split them into two union types:
 
-- `RequestMethod` -- union of all keys with `_request`/`_response` (e.g. `'host_handshake' | 'host_account_get' | ...`)
-- `SubscriptionMethod` -- union of all keys with `_start`/`_receive` (e.g.
+- `RequestMethod`: union of all keys with `_request`/`_response` (e.g. `'host_handshake' | 'host_account_get' | ...`)
+- `SubscriptionMethod`: union of all keys with `_start`/`_receive` (e.g.
   `'host_account_connection_status_subscribe' | ...`)
-- `ActionString` -- union of all valid wire action strings:
+- `ActionString`: union of all valid wire action strings:
   `` `${RequestMethod}_${'request'|'response'}` | `${SubscriptionMethod}_${'start'|'receive'|'stop'|'interrupt'}` ``
 
 These types are used throughout the transport, protocol handler, and product API to ensure method names are checked at
 compile time.
 
-**Derived per-method per-version types** -- given a method name `M` and version tag `V` (e.g. `'v1'`), the following
-types extract the inner codec types using `CodecType<>` and `Extract<>`:
+**Derived per-method per-version types**: given a method name `M` and version tag `V` (e.g. `'v1'`), the following types
+extract the inner codec types using `CodecType<>` and `Extract<>`:
 
-- `RequestCodecType<M>`, `ResponseCodecType<M>` -- full versioned envelope types (e.g. `{ tag: 'v1'; value: ... }`) used
+- `RequestCodecType<M>`, `ResponseCodecType<M>`: full versioned envelope types (e.g. `{ tag: 'v1'; value: ... }`) used
   by the transport layer
-- `StartCodecType<M>`, `ReceiveCodecType<M>` -- same for subscription methods
-- `RequestParams<M, V>` -- handler params type (inner value at a specific version, from `_request` codec)
-- `ResponseOk<M, V>` -- Ok type from the `Result` response (from `_response` codec)
-- `ResponseErr<M, V>` -- Err type from the `Result` response
-- `SubscriptionParams<M, V>` -- subscription start params (from `_start` codec)
-- `SubscriptionPayload<M, V>` -- subscription receive payload (from `_receive` codec)
-- `RequestVersions<M>`, `ResponseVersions<M>`, `StartVersions<M>`, `ReceiveVersions<M>` -- available version tags
+- `StartCodecType<M>`, `ReceiveCodecType<M>`: same for subscription methods
+- `RequestParams<M, V>`: handler params type (inner value at a specific version, from `_request` codec)
+- `ResponseOk<M, V>`: Ok type from the `Result` response (from `_response` codec)
+- `ResponseErr<M, V>`: Err type from the `Result` response
+- `SubscriptionParams<M, V>`: subscription start params (from `_start` codec)
+- `SubscriptionPayload<M, V>`: subscription receive payload (from `_receive` codec)
+- `RequestVersions<M>`, `ResponseVersions<M>`, `StartVersions<M>`, `ReceiveVersions<M>`: available version tags
 
 These types are the single source of truth for handler signatures on both the host and product sides. The transport
 methods are generic on the method name (`request<M>`, `handleRequest<M>`, etc.) so the versioned envelope types flow
@@ -194,9 +194,9 @@ protocol codecs.
 The `MessagePayload` enum is built by flattening all entries (concatenating method name + suffix into action keys like
 `host_handshake_request`). For subscriptions, `_stop` and `_interrupt` default to `_void` if omitted. Then:
 
-- `Message = Struct({ requestId: str, payload: MessagePayload })` -- the top-level wire format
-- `createScaleCodecAdapter(messageCodec)` -- wraps any scale-ts Codec into a CodecAdapter
-- `scaleCodecAdapter` -- ready-to-use instance
+- `Message = Struct({ requestId: str, payload: MessagePayload })`: the top-level wire format
+- `createScaleCodecAdapter(messageCodec)`: wraps any scale-ts Codec into a CodecAdapter
+- `scaleCodecAdapter`: ready-to-use instance
 
 ### 1.7 Protocol Types (`protocol/types.ts`)
 
@@ -231,14 +231,14 @@ Knows nothing about protocol methods, IDs, or codecs.
 
 Two concrete provider implementations live in shared as neutral building blocks:
 
-**`transport/windowProvider.ts`** -- `createWindowProvider(target: WindowRef)`: the generic `postMessage` provider.
+**`transport/windowProvider.ts`**: `createWindowProvider(target: WindowRef)`: the generic `postMessage` provider.
 Accepts either a direct `Window` reference or a lazy getter `() => Window | null`. Validates incoming messages (accepts
 both Uint8Array for SCALE and protocol message objects for structured clone), manages subscribers, handles Uint8Array
 buffer transfer. When the getter returns null, outgoing messages are silently dropped. Used by the host for iframes
 (`createWindowProvider(() => iframe.contentWindow)`) and for nested dApps, and by the product for the iframe path
 (`createWindowProvider(window.top)`).
 
-**`transport/messagePortProvider.ts`** -- `createMessagePortProvider(port: MessagePort | Promise<MessagePort>)`:
+**`transport/messagePortProvider.ts`**: `createMessagePortProvider(port: MessagePort | Promise<MessagePort>)`:
 communicates over a MessagePort. Accepts a ready port or a Promise (for async acquisition). Same message validation as
 `createWindowProvider`. Used by both the host webview provider (which injects a port into an Electron webview) and the
 product webview path (which polls for the injected port).
@@ -248,65 +248,64 @@ product webview path (which polls for the injected port).
 **The engine of the system.** Takes a Provider, returns a Transport. Always starts with SCALE encoding — no codec
 configuration needed.
 
-**Auto-detect decoding** -- incoming messages are decoded by inspecting their shape: `Uint8Array` → SCALE decode, plain
+**Auto-detect decoding**: incoming messages are decoded by inspecting their shape: `Uint8Array` → SCALE decode, plain
 object with `requestId` → structured clone (identity). When a structured clone message is detected, the outgoing codec
 is automatically upgraded to structured clone. This means the transport starts encoding with SCALE but transparently
 upgrades to structured clone as soon as the other side sends a structured clone message.
 
-**Not-supported catch-all** -- the transport tracks which `_request` and `_start` actions have registered handlers. A
+**Not-supported catch-all**: the transport tracks which `_request` and `_start` actions have registered handlers. A
 catch-all listener responds immediately to unhandled requests (with `NOT_SUPPORTED_MARKER`, detected by the sender's
 `request()` which rejects with `MethodNotSupportedError`) and unhandled subscriptions (with `_interrupt`). This prevents
 requests from hanging indefinitely when the other side doesn't support a method.
 
-**Handshake** -- `transport.isReady()` sends `host_handshake_request` every 50ms, waits up to 10s. The host side
+**Handshake**: `transport.isReady()` sends `host_handshake_request` every 50ms, waits up to 10s. The host side
 auto-registers a handler that validates the protocol version. Connection status goes `disconnected` -> `connecting` ->
 `connected`.
 
-**Request/Response** -- `transport.request<M>(method, payload)` is generic on the method name. It takes
+**Request/Response**: `transport.request<M>(method, payload)` is generic on the method name. It takes
 `RequestCodecType<M>` (the versioned envelope), generates a unique ID (e.g. `"p:1"`), posts
 `{requestId, payload: {tag: "method_request", value}}`, listens for `{tag: "method_response"}` with matching requestId,
 and resolves with `ResponseCodecType<M>`. Supports `AbortSignal`. If the other side has no handler, rejects with
 `MethodNotSupportedError`.
 
-**Handle Request** -- `transport.handleRequest<M>(method, handler)` is also generic. The handler receives
+**Handle Request**: `transport.handleRequest<M>(method, handler)` is also generic. The handler receives
 `RequestCodecType<M>` and must return `Promise<ResponseCodecType<M>>`.
 
-**Subscriptions** -- `transport.subscribe<M>(method, payload, callback)` sends `_start` with `StartCodecType<M>`,
-listens for `_receive` with `ReceiveCodecType<M>`. `unsubscribe()` sends `_stop`. The other side can `interrupt()`.
+**Subscriptions**: `transport.subscribe<M>(method, payload, callback)` sends `_start` with `StartCodecType<M>`, listens
+for `_receive` with `ReceiveCodecType<M>`. `unsubscribe()` sends `_stop`. The other side can `interrupt()`.
 
-**Multiplexing** -- Two callers subscribing to the same method+payload share one wire subscription. When the last
-listener unsubscribes, `_stop` is sent.
+**Multiplexing**: Two callers subscribing to the same method+payload share one wire subscription. When the last listener
+unsubscribes, `_stop` is sent.
 
-**Low-level** -- `postMessage` and `listenMessages` operate on `ActionString` (the composed `method_suffix` strings).
+**Low-level**: `postMessage` and `listenMessages` operate on `ActionString` (the composed `method_suffix` strings).
 `listenMessages` callback receives `(requestId, value)` -- just the payload value, not the full `{tag, value}` envelope
 (the tag is redundant since it was used for filtering). `composeAction(method, suffix)` is generic and returns
 `` `${M}_${S}` ``, so the types flow through correctly.
 
-**Codec swap** -- `transport.swapCodecAdapter(newAdapter)` hot-swaps the outgoing encoding. Used by
-`requestCodecUpgrade` on the product side and `handleCodecUpgrade` on the host side.
+**Codec swap**: `transport.swapCodecAdapter(newAdapter)` hot-swaps the outgoing encoding. Used by `requestCodecUpgrade`
+on the product side and `handleCodecUpgrade` on the host side.
 
 ### 1.10 Codec Negotiation (`codec/negotiation.ts`)
 
 Post-handshake codec upgrade flow.
 
-**Product side** -- `requestCodecUpgrade(transport, adapters)`: after handshake, sends `host_codec_upgrade` with
-supported formats, waits 1s for response, swaps its outgoing codec if host agrees. Returns selected format or
-`undefined`. The `host_codec_upgrade` method has proper SCALE codecs in the protocol registry
+**Product side**: `requestCodecUpgrade(transport, adapters)`: after handshake, sends `host_codec_upgrade` with supported
+formats, waits 1s for response, swaps its outgoing codec if host agrees. Returns selected format or `undefined`. The
+`host_codec_upgrade` method has proper SCALE codecs in the protocol registry
 (`Struct({ supportedFormats: Vector(str) })` for the request, `Struct({ selectedFormat: str })` for the response), so
 `transport.request` is called with full type safety.
 
-**Host side** -- `handleCodecUpgrade(transport, adapters)`: picks best format from intersection (always prefers
-structured clone), swaps the outgoing codec BEFORE sending the response, then sends the response. This means the
-response itself is encoded as structured clone, which forces the product's `decodeIncoming` to auto-upgrade its outgoing
-codec too. Uses low-level `listenMessages`/`postMessage` (not `handleRequest`) for explicit control of the
-swap-then-respond sequence.
+**Host side**: `handleCodecUpgrade(transport, adapters)`: picks best format from intersection (always prefers structured
+clone), swaps the outgoing codec BEFORE sending the response, then sends the response. This means the response itself is
+encoded as structured clone, which forces the product's `decodeIncoming` to auto-upgrade its outgoing codec too. Uses
+low-level `listenMessages`/`postMessage` (not `handleRequest`) for explicit control of the swap-then-respond sequence.
 
-**Race condition safety** -- because the host swaps before responding, the response arrives as structured clone. Even if
+**Race condition safety**: because the host swaps before responding, the response arrives as structured clone. Even if
 the product's 1s timeout has already fired (so `requestCodecUpgrade` returned `undefined`), the product's
 `decodeIncoming` detects the structured clone response and auto-upgrades the outgoing codec. Both sides converge on
 structured clone regardless of timing.
 
-**Automatic upgrade** -- the product-side `sandboxTransport` singleton wraps `isReady()` so that after the handshake
+**Automatic upgrade**: the product-side `sandboxTransport` singleton wraps `isReady()` so that after the handshake
 succeeds, it automatically calls `requestCodecUpgrade` with both `scale` and `structured_clone` adapters. Since every
 `transport.request()` and `transport.subscribe()` internally awaits `isReady()`, the upgrade happens transparently
 before any real protocol traffic.
@@ -355,7 +354,7 @@ flatten/hydrate layer between host and product.
 
 ---
 
-## Part 1b: `@polkadot/host-api` -- Host layer (`src/host/`)
+## Part 1b: `@polkadot/host-api`: Host layer (`src/host/`)
 
 Host-side protocol handler, providers, and chain connection manager. These live in the `host-api` package because they
 are the host's interface to the transport -- the bridge between the protocol layer and the handler implementations in
@@ -363,7 +362,7 @@ are the host's interface to the transport -- the bridge between the protocol lay
 
 ### 1b.1 Providers
 
-**`webviewProvider.ts`** -- `createHostWebviewProvider({ webview })`: the only host-specific provider. Acquires a
+**`webviewProvider.ts`**: `createHostWebviewProvider({ webview })`: the only host-specific provider. Acquires a
 MessagePort by creating a `MessageChannel`, injecting one end into an Electron `<webview>` via `executeJavaScript` on
 `dom-ready`, and passing the other end to `createMessagePortProvider` from shared. The port acquisition logic (listening
 for `dom-ready`, `did-fail-load`, injecting JS) is inherently host-side; once the port is obtained, all communication is
@@ -382,7 +381,7 @@ wrapper needed. The `sdk.ts` `embed()` method sets `iframe.src` itself and creat
    host-initiated method: `renderChatCustomMessage`)
 
 The internal helpers `wireRequest(method, handlers, defaultError)` and `wireSubscription(method, handlers)` take a
-**version handler map** -- an object keyed by version tag, each value a handler for that version:
+**version handler map**: an object keyed by version tag, each value a handler for that version:
 
 ```typescript
 wireRequest('host_account_get', { v1: handler }, defaultError);
@@ -403,13 +402,13 @@ Internal helpers:
 The handler's params, ok, and err types are derived from the protocol codecs via `RequestParams<M, V>`,
 `ResponseOk<M, V>`, `ResponseErr<M, V>`. TypeScript enforces that handler implementations match the SCALE codec shapes.
 
-**Adding a new version** -- when a method needs a v2, three changes are needed:
+**Adding a new version**: when a method needs a v2, three changes are needed:
 
-1. **`codec/scale/v1/` (or new `v2/`)** -- define the new v2 building-block codecs.
-2. **`codec/scale/protocol.ts`** -- extend the method's enum inline:
+1. **`codec/scale/v1/` (or new `v2/`)**: define the new v2 building-block codecs.
+2. **`codec/scale/protocol.ts`**: extend the method's enum inline:
    `_request: Enum({ v1: ProductAccountId, v2: NewAccountGetV2Codec })`. The `RequestVersions<M>` type automatically
    becomes `'v1' | 'v2'`, and `RequestParams<M, 'v2'>` derives the v2 types.
-3. **`protocolHandler.ts`** -- add the v2 handler to the map:
+3. **`protocolHandler.ts`**: add the v2 handler to the map:
    `wireRequest('host_account_get', { v1: handlerV1, v2: handlerV2 }, defaultError)`. TypeScript enforces that
    `handlerV2` matches the v2 codec types. Existing v1 clients continue to work unchanged.
 
@@ -442,7 +441,7 @@ interface ProtocolHandler {
 Handlers return `ResultAsync` from neverthrow. No context object -- handlers use `okAsync(value)` and `errAsync(error)`
 directly. All param/ok/err types flow from `hostApiProtocol`.
 
-**Directionality** -- almost all protocol methods are product-initiated: the product calls `transport.request()` or
+**Directionality**: almost all protocol methods are product-initiated: the product calls `transport.request()` or
 `transport.subscribe()`, and the host handles them via `transport.handleRequest()` / `transport.handleSubscription()`.
 The one exception is `product_chat_custom_message_render_subscribe`, where the host initiates a subscription to the
 product (asking it to render a custom chat message UI). The protocol handler exposes this as `renderChatCustomMessage()`
@@ -451,7 +450,7 @@ product (asking it to render a custom chat message UI). The protocol handler exp
 
 ---
 
-## Part 1c: `@polkadot/host-api` -- Product layer (`src/product/`)
+## Part 1c: `@polkadot/host-api`: Product layer (`src/product/`)
 
 Product-side transport setup and HostApi facade. These live in the `host-api` package because they are the product's
 interface to the transport -- the bridge between the protocol layer and the domain modules in `@polkadot/product`.
@@ -481,13 +480,13 @@ before sending, and unwraps the response by stripping the version tag and splitt
 Result envelope. Callers never see the versioned wire format. `makeSubscription` similarly wraps start payloads and
 unwraps received payloads.
 
-**Transport proxies** -- in addition to protocol methods, `HostApi` exposes transport lifecycle as meaningful accessors
-so domain modules never need a `Transport` reference:
+**Transport proxies**: in addition to protocol methods, `HostApi` exposes transport lifecycle as meaningful accessors so
+domain modules never need a `Transport` reference:
 
-- `logger` -- the provider's logger instance
-- `isCorrectEnvironment()` -- whether the transport is in a supported environment
-- `isReady()` -- resolves when handshake and codec negotiation are complete
-- `handleHostSubscription(method, handler)` -- registers a handler for the one host-initiated subscription (custom chat
+- `logger`: the provider's logger instance
+- `isCorrectEnvironment()`: whether the transport is in a supported environment
+- `isReady()`: resolves when handshake and codec negotiation are complete
+- `handleHostSubscription(method, handler)`: registers a handler for the one host-initiated subscription (custom chat
   message rendering)
 
 ---
@@ -499,55 +498,55 @@ What runs on the host page. Handlers, auth, storage adapters, and the SDK entry 
 
 ### 2.1 Handlers (`handlers/`)
 
-**`registry.ts`** -- `wireAllHandlers(protocolHandler, config)`: orchestrator calling each domain wiring function.
+**`registry.ts`**: `wireAllHandlers(protocolHandler, config)`: orchestrator calling each domain wiring function.
 `HandlersConfig` has `getSession()`, `subscribeAuthState()`, `chainProvider()`, plus callbacks.
 
-**`host.ts`** -- `featureSupported` (config callback or chainProvider check), `navigateTo` (callback or `window.open`),
+**`host.ts`**: `featureSupported` (config callback or chainProvider check), `navigateTo` (callback or `window.open`),
 `pushNotification` (callback or `console.warn`).
 
-**`permissions.ts`** -- `devicePermission` and `permission` return `false` by default.
+**`permissions.ts`**: `devicePermission` and `permission` return `false` by default.
 
-**`storage.ts`** -- Scoped browser localStorage. Keys prefixed with `config.storagePrefix` (default `"${appId}:"`).
-Values stored as base64 strings.
+**`storage.ts`**: Scoped browser localStorage. Keys prefixed with `config.storagePrefix` (default `"${appId}:"`). Values
+stored as base64 strings.
 
-**`accounts.ts`** -- `accountGet` derives product-specific public key via HDKD from session. `getNonProductAccounts`
+**`accounts.ts`**: `accountGet` derives product-specific public key via HDKD from session. `getNonProductAccounts`
 returns root account. `connectionStatusSubscribe` pushes connected/disconnected. `getAlias`/`createProof` are stubs.
 
-**`signing.ts`** -- `signPayload`/`signRaw` delegate to config callbacks via `ResultAsync.fromPromise`. Return
+**`signing.ts`**: `signPayload`/`signRaw` delegate to config callbacks via `ResultAsync.fromPromise`. Return
 `errAsync({tag: 'PermissionDenied', ...})` if no session. `createTransaction`/`createTransactionWithNonProductAccount`
 delegate to config callbacks, returning `errAsync({tag: 'NotSupported', ...})` when the callback is not configured.
 
-**`chain.ts`** -- Wires `protocolHandler.handleChainConnection(config.chainProvider)`.
+**`chain.ts`**: Wires `protocolHandler.handleChainConnection(config.chainProvider)`.
 
-**`chat.ts`**, **`statementStore.ts`**, **`preimage.ts`** -- Stubs returning `errAsync(...)` with plain error objects
+**`chat.ts`**, **`statementStore.ts`**, **`preimage.ts`**: Stubs returning `errAsync(...)` with plain error objects
 (e.g. `{tag: 'PermissionDenied', value: undefined}`).
 
 ### 2.2 Chain
 
-**`chain/rateLimiter.ts`** -- Token-bucket rate limiter. Two strategies: `drop` (reject immediately) and `queue` (buffer
+**`chain/rateLimiter.ts`**: Token-bucket rate limiter. Two strategies: `drop` (reject immediately) and `queue` (buffer
 up to max, process as tokens refill).
 
 ### 2.3 Storage Adapters (`storage/`)
 
 `StorageAdapter` interface: async `read(key)`, `write(key, value)`, `clear(key)` for Uint8Array values.
 
-- `createMemoryStorageAdapter()` -- Map-backed, for testing
-- `createLocalStorageAdapter(prefix)` -- browser localStorage, base64, prefix-scoped
+- `createMemoryStorageAdapter()`: Map-backed, for testing
+- `createLocalStorageAdapter(prefix)`: browser localStorage, base64, prefix-scoped
 
 ### 2.4 Auth (`auth/`)
 
-**`authManager.ts`** -- State machine: `idle -> pairing -> attesting -> authenticated -> idle` (back to idle via
+**`authManager.ts`**: State machine: `idle -> pairing -> attesting -> authenticated -> idle` (back to idle via
 `clearSession()`). Any state can go to `error`. Pub-sub via `subscribe(callback)`. `getSession()` returns session if
 authenticated.
 
-**`crypto.ts`** -- `deriveProductPublicKey(rootPublicKey, productId, derivationIndex)`: HDKD soft derivation through
+**`crypto.ts`**: `deriveProductPublicKey(rootPublicKey, productId, derivationIndex)`: HDKD soft derivation through
 junctions `['product', productId, derivationIndex]`.
 
-**`pappAdapter.ts`** -- Stub interface for QR-code pairing (to be ported from old host-papp).
+**`pappAdapter.ts`**: Stub interface for QR-code pairing (to be ported from old host-papp).
 
 ### 2.5 Nested Bridge (`nested/`)
 
-**`detector.ts`** -- `setupNestedBridgeDetector()`: listens for postMessage from windows OTHER than the primary iframe.
+**`detector.ts`**: `setupNestedBridgeDetector()`: listens for postMessage from windows OTHER than the primary iframe.
 Auto-creates `createWindowProvider` + `createProtocolHandler` + `wireAllHandlers` bridge for each nested dApp.
 
 ### 2.6 SDK Entry Point (`sdk.ts`)
@@ -568,8 +567,8 @@ Creates AuthManager, then `embed()` sets `iframe.src`, creates `createWindowProv
 `createProtocolHandler()` -> `wireAllHandlers()`. On dispose, clears `iframe.src`. Also exposes `setSession()` /
 `clearSession()` for external auth management.
 
-**`types.ts`** -- `HostSdkConfig` with all options: `appId`, `chainProvider`, signing callbacks, permission callbacks,
-UI callbacks.
+**`types.ts`**: `HostSdkConfig` with all options: `appId`, `chainProvider`, signing callbacks, permission callbacks, UI
+callbacks.
 
 ---
 
@@ -615,7 +614,7 @@ singleton.
 
 ### 3.4 Chat, Statement Store, Preimage
 
-**`chat.ts`** -- three exports:
+**`chat.ts`**: three exports:
 
 - `createProductChatManager(hostApi?)`: pure client -- `registerRoom`, `registerBot`, `sendMessage`,
   `subscribeChatList`, `subscribeAction`.
@@ -625,9 +624,9 @@ singleton.
   because handler registration is a setup-time concern, not a domain operation.
 - `matchChatCustomRenderers(map)`: utility that dispatches to a specific renderer based on the `messageType` field.
 
-**`statementStore.ts`** -- `createStatementStore(hostApi?)`: subscribe to topics, create proofs, submit statements.
+**`statementStore.ts`**: `createStatementStore(hostApi?)`: subscribe to topics, create proofs, submit statements.
 
-**`preimage.ts`** -- `createPreimageManager(hostApi?)`: lookup subscriptions, submit preimages.
+**`preimage.ts`**: `createPreimageManager(hostApi?)`: lookup subscriptions, submit preimages.
 
 All domain modules accept an optional `HostApi` parameter, defaulting to the singleton. None import `Transport`
 directly.
@@ -658,34 +657,33 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 **Shared** (6 files):
 
-- `transport.spec.ts` (23 tests) -- handshake, request/response correlation, subscriptions, multiplexing, connection
+- `transport.spec.ts` (23 tests): handshake, request/response correlation, subscriptions, multiplexing, connection
   status, destroy, codec swap, not-supported catch-all (request rejection, subscription interrupt, handler
   deregistration), auto-detect codec (SCALE decode, structured clone decode, outgoing auto-upgrade)
-- `negotiation.spec.ts` (5 tests) -- upgrade succeeds, fails gracefully, picks best intersection, requests work after
+- `negotiation.spec.ts` (5 tests): upgrade succeeds, fails gracefully, picks best intersection, requests work after
   upgrade, not-supported fast path (near-instant rejection instead of 1s timeout)
-- `messagePortProvider.spec.ts` (17 tests) -- sync/async port delivery, message validation (protocol messages,
-  Uint8Array, rejection of invalid data), postMessage with/without buffer transfer, subscribe/unsubscribe, dispose
-  lifecycle
-- `codec.spec.ts` (6 tests) -- structured clone round-trips, rejects Uint8Array, nested objects
-- `protocol.spec.ts` (18 tests) -- all methods present in hostApiProtocol, correct types, error type construction
-- `util.spec.ts` (24 tests) -- logger, createIdFactory, delay, promiseWithResolvers, composeAction, toHexString
+- `messagePortProvider.spec.ts` (17 tests): sync/async port delivery, message validation (protocol messages, Uint8Array,
+  rejection of invalid data), postMessage with/without buffer transfer, subscribe/unsubscribe, dispose lifecycle
+- `codec.spec.ts` (6 tests): structured clone round-trips, rejects Uint8Array, nested objects
+- `protocol.spec.ts` (18 tests): all methods present in hostApiProtocol, correct types, error type construction
+- `util.spec.ts` (24 tests): logger, createIdFactory, delay, promiseWithResolvers, composeAction, toHexString
 
 **Host** (5 files):
 
-- `handlers.spec.ts` (14 tests) -- featureSupported, navigateTo, pushNotification, permissions, storage
-- `authManager.spec.ts` (14 tests) -- full state machine, subscribe/unsubscribe
-- `storage.spec.ts` (11 tests) -- memory adapter CRUD, prefix isolation
-- `rateLimiter.spec.ts` (10 tests) -- drop/queue strategies
-- `sdk.spec.ts` (7 tests) -- construction, session management
+- `handlers.spec.ts` (14 tests): featureSupported, navigateTo, pushNotification, permissions, storage
+- `authManager.spec.ts` (14 tests): full state machine, subscribe/unsubscribe
+- `storage.spec.ts` (11 tests): memory adapter CRUD, prefix isolation
+- `rateLimiter.spec.ts` (10 tests): drop/queue strategies
+- `sdk.spec.ts` (7 tests): construction, session management
 
 **Product** (4 files):
 
-- `hostApi.spec.ts` (5 tests) -- HostApi transport proxy methods: logger, isCorrectEnvironment, isReady,
+- `hostApi.spec.ts` (5 tests): HostApi transport proxy methods: logger, isCorrectEnvironment, isReady,
   handleHostSubscription registration and unsubscribe
-- `chat.spec.ts` (3 tests) -- handleCustomMessageRendering: handler registration, render function delivery, unsubscribe
+- `chat.spec.ts` (3 tests): handleCustomMessageRendering: handler registration, render function delivery, unsubscribe
   deregistration
-- `constants.spec.ts` (13 tests) -- all chains present, hex format
-- `storage.spec.ts` (3 tests) -- API shape verification
+- `constants.spec.ts` (13 tests): all chains present, hex format
+- `storage.spec.ts` (3 tests): API shape verification
 
 ### 4.2 E2E Tests (1 file, 51 tests)
 
@@ -695,11 +693,11 @@ across the iframe boundary.
 
 Every test runs three times via `?codec=` query parameter:
 
-- **`structured_clone`** -- host registers codec upgrade support, product auto-upgrades after handshake, all requests
-  run over structured clone
-- **`scale`** -- host does not register codec upgrade support, product's upgrade attempt fails (not-supported
-  catch-all), both sides stay on SCALE
-- **`upgrade`** -- same as `structured_clone` but the product explicitly calls `requestCodecUpgrade` after handshake to
+- **`structured_clone`**: host registers codec upgrade support, product auto-upgrades after handshake, all requests run
+  over structured clone
+- **`scale`**: host does not register codec upgrade support, product's upgrade attempt fails (not-supported catch-all),
+  both sides stay on SCALE
+- **`upgrade`**: same as `structured_clone` but the product explicitly calls `requestCodecUpgrade` after handshake to
   trigger the negotiation flow
 
 **Happy-path tests** (12 per codec): handshake, feature check (known chain true + unknown chain false), account get,
