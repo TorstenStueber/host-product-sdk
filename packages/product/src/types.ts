@@ -208,13 +208,13 @@ export type ChatCustomMessageRendererParams<T = Uint8Array> = {
   messageId: string;
   messageType: string;
   payload: T;
-  subscribeActions(callback: (actionId: string, payload: Uint8Array | undefined) => void): VoidFunction;
+  subscribeActions(callback: (actionId: string, payload: Uint8Array | undefined) => void): () => void;
 };
 
 export type ChatCustomMessageRenderer = (
   params: ChatCustomMessageRendererParams,
   render: (node: CustomRendererNode) => void,
-) => VoidFunction;
+) => () => void;
 
 // ---------------------------------------------------------------------------
 // Statement store

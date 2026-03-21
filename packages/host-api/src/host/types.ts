@@ -39,7 +39,7 @@ type SubscriptionHandlerFn<M extends SubscriptionMethod, SV extends string = 'v1
   params: SubscriptionParams<M, SV>,
   send: (payload: SubscriptionPayload<M, RV>) => void,
   interrupt: () => void,
-) => VoidFunction;
+) => () => void;
 
 // ---------------------------------------------------------------------------
 // ProtocolHandler interface
@@ -47,40 +47,40 @@ type SubscriptionHandlerFn<M extends SubscriptionMethod, SV extends string = 'v1
 
 export type ProtocolHandler = {
   // -- Core / lifecycle -----------------------------------------------------
-  handleFeatureSupported(handler: RequestHandler<'host_feature_supported'>): VoidFunction;
-  handleDevicePermission(handler: RequestHandler<'host_device_permission'>): VoidFunction;
-  handlePermission(handler: RequestHandler<'remote_permission'>): VoidFunction;
-  handlePushNotification(handler: RequestHandler<'host_push_notification'>): VoidFunction;
-  handleNavigateTo(handler: RequestHandler<'host_navigate_to'>): VoidFunction;
+  handleFeatureSupported(handler: RequestHandler<'host_feature_supported'>): () => void;
+  handleDevicePermission(handler: RequestHandler<'host_device_permission'>): () => void;
+  handlePermission(handler: RequestHandler<'remote_permission'>): () => void;
+  handlePushNotification(handler: RequestHandler<'host_push_notification'>): () => void;
+  handleNavigateTo(handler: RequestHandler<'host_navigate_to'>): () => void;
 
   // -- Local storage --------------------------------------------------------
-  handleLocalStorageRead(handler: RequestHandler<'host_local_storage_read'>): VoidFunction;
-  handleLocalStorageWrite(handler: RequestHandler<'host_local_storage_write'>): VoidFunction;
-  handleLocalStorageClear(handler: RequestHandler<'host_local_storage_clear'>): VoidFunction;
+  handleLocalStorageRead(handler: RequestHandler<'host_local_storage_read'>): () => void;
+  handleLocalStorageWrite(handler: RequestHandler<'host_local_storage_write'>): () => void;
+  handleLocalStorageClear(handler: RequestHandler<'host_local_storage_clear'>): () => void;
 
   // -- Accounts -------------------------------------------------------------
-  handleAccountGet(handler: RequestHandler<'host_account_get'>): VoidFunction;
-  handleAccountGetAlias(handler: RequestHandler<'host_account_get_alias'>): VoidFunction;
-  handleAccountCreateProof(handler: RequestHandler<'host_account_create_proof'>): VoidFunction;
-  handleGetNonProductAccounts(handler: RequestHandler<'host_get_non_product_accounts'>): VoidFunction;
+  handleAccountGet(handler: RequestHandler<'host_account_get'>): () => void;
+  handleAccountGetAlias(handler: RequestHandler<'host_account_get_alias'>): () => void;
+  handleAccountCreateProof(handler: RequestHandler<'host_account_create_proof'>): () => void;
+  handleGetNonProductAccounts(handler: RequestHandler<'host_get_non_product_accounts'>): () => void;
   handleAccountConnectionStatusSubscribe(
     handler: SubscriptionHandlerFn<'host_account_connection_status_subscribe'>,
-  ): VoidFunction;
+  ): () => void;
 
   // -- Signing --------------------------------------------------------------
-  handleSignPayload(handler: RequestHandler<'host_sign_payload'>): VoidFunction;
-  handleSignRaw(handler: RequestHandler<'host_sign_raw'>): VoidFunction;
-  handleCreateTransaction(handler: RequestHandler<'host_create_transaction'>): VoidFunction;
+  handleSignPayload(handler: RequestHandler<'host_sign_payload'>): () => void;
+  handleSignRaw(handler: RequestHandler<'host_sign_raw'>): () => void;
+  handleCreateTransaction(handler: RequestHandler<'host_create_transaction'>): () => void;
   handleCreateTransactionWithNonProductAccount(
     handler: RequestHandler<'host_create_transaction_with_non_product_account'>,
-  ): VoidFunction;
+  ): () => void;
 
   // -- Chat -----------------------------------------------------------------
-  handleChatCreateRoom(handler: RequestHandler<'host_chat_create_room'>): VoidFunction;
-  handleChatRegisterBot(handler: RequestHandler<'host_chat_register_bot'>): VoidFunction;
-  handleChatListSubscribe(handler: SubscriptionHandlerFn<'host_chat_list_subscribe'>): VoidFunction;
-  handleChatPostMessage(handler: RequestHandler<'host_chat_post_message'>): VoidFunction;
-  handleChatActionSubscribe(handler: SubscriptionHandlerFn<'host_chat_action_subscribe'>): VoidFunction;
+  handleChatCreateRoom(handler: RequestHandler<'host_chat_create_room'>): () => void;
+  handleChatRegisterBot(handler: RequestHandler<'host_chat_register_bot'>): () => void;
+  handleChatListSubscribe(handler: SubscriptionHandlerFn<'host_chat_list_subscribe'>): () => void;
+  handleChatPostMessage(handler: RequestHandler<'host_chat_post_message'>): () => void;
+  handleChatActionSubscribe(handler: SubscriptionHandlerFn<'host_chat_action_subscribe'>): () => void;
 
   /**
    * Initiate a custom message rendering subscription to the product.
@@ -95,36 +95,36 @@ export type ProtocolHandler = {
   ): Subscription;
 
   // -- Statement store ------------------------------------------------------
-  handleStatementStoreSubscribe(handler: SubscriptionHandlerFn<'remote_statement_store_subscribe'>): VoidFunction;
-  handleStatementStoreCreateProof(handler: RequestHandler<'remote_statement_store_create_proof'>): VoidFunction;
-  handleStatementStoreSubmit(handler: RequestHandler<'remote_statement_store_submit'>): VoidFunction;
+  handleStatementStoreSubscribe(handler: SubscriptionHandlerFn<'remote_statement_store_subscribe'>): () => void;
+  handleStatementStoreCreateProof(handler: RequestHandler<'remote_statement_store_create_proof'>): () => void;
+  handleStatementStoreSubmit(handler: RequestHandler<'remote_statement_store_submit'>): () => void;
 
   // -- Preimage -------------------------------------------------------------
-  handlePreimageLookupSubscribe(handler: SubscriptionHandlerFn<'remote_preimage_lookup_subscribe'>): VoidFunction;
-  handlePreimageSubmit(handler: RequestHandler<'remote_preimage_submit'>): VoidFunction;
+  handlePreimageLookupSubscribe(handler: SubscriptionHandlerFn<'remote_preimage_lookup_subscribe'>): () => void;
+  handlePreimageSubmit(handler: RequestHandler<'remote_preimage_submit'>): () => void;
 
   // -- Chain ----------------------------------------------------------------
-  handleChainHeadFollow(handler: SubscriptionHandlerFn<'remote_chain_head_follow'>): VoidFunction;
-  handleChainHeadHeader(handler: RequestHandler<'remote_chain_head_header'>): VoidFunction;
-  handleChainHeadBody(handler: RequestHandler<'remote_chain_head_body'>): VoidFunction;
-  handleChainHeadStorage(handler: RequestHandler<'remote_chain_head_storage'>): VoidFunction;
-  handleChainHeadCall(handler: RequestHandler<'remote_chain_head_call'>): VoidFunction;
-  handleChainHeadUnpin(handler: RequestHandler<'remote_chain_head_unpin'>): VoidFunction;
-  handleChainHeadContinue(handler: RequestHandler<'remote_chain_head_continue'>): VoidFunction;
-  handleChainHeadStopOperation(handler: RequestHandler<'remote_chain_head_stop_operation'>): VoidFunction;
-  handleChainSpecGenesisHash(handler: RequestHandler<'remote_chain_spec_genesis_hash'>): VoidFunction;
-  handleChainSpecChainName(handler: RequestHandler<'remote_chain_spec_chain_name'>): VoidFunction;
-  handleChainSpecProperties(handler: RequestHandler<'remote_chain_spec_properties'>): VoidFunction;
-  handleChainTransactionBroadcast(handler: RequestHandler<'remote_chain_transaction_broadcast'>): VoidFunction;
-  handleChainTransactionStop(handler: RequestHandler<'remote_chain_transaction_stop'>): VoidFunction;
+  handleChainHeadFollow(handler: SubscriptionHandlerFn<'remote_chain_head_follow'>): () => void;
+  handleChainHeadHeader(handler: RequestHandler<'remote_chain_head_header'>): () => void;
+  handleChainHeadBody(handler: RequestHandler<'remote_chain_head_body'>): () => void;
+  handleChainHeadStorage(handler: RequestHandler<'remote_chain_head_storage'>): () => void;
+  handleChainHeadCall(handler: RequestHandler<'remote_chain_head_call'>): () => void;
+  handleChainHeadUnpin(handler: RequestHandler<'remote_chain_head_unpin'>): () => void;
+  handleChainHeadContinue(handler: RequestHandler<'remote_chain_head_continue'>): () => void;
+  handleChainHeadStopOperation(handler: RequestHandler<'remote_chain_head_stop_operation'>): () => void;
+  handleChainSpecGenesisHash(handler: RequestHandler<'remote_chain_spec_genesis_hash'>): () => void;
+  handleChainSpecChainName(handler: RequestHandler<'remote_chain_spec_chain_name'>): () => void;
+  handleChainSpecProperties(handler: RequestHandler<'remote_chain_spec_properties'>): () => void;
+  handleChainTransactionBroadcast(handler: RequestHandler<'remote_chain_transaction_broadcast'>): () => void;
+  handleChainTransactionStop(handler: RequestHandler<'remote_chain_transaction_stop'>): () => void;
 
   // -- High-level chain connection (wraps all chain_* methods) ---------------
-  handleChainConnection(factory: (genesisHash: HexString) => JsonRpcProvider | null): VoidFunction;
+  handleChainConnection(factory: (genesisHash: HexString) => JsonRpcProvider | null): () => void;
 
   // -- Transport lifecycle ---------------------------------------------------
   readonly transport: Transport;
 
   isReady(): Promise<boolean>;
-  subscribeProductConnectionStatus(callback: (status: ConnectionStatus) => void): VoidFunction;
+  subscribeProductConnectionStatus(callback: (status: ConnectionStatus) => void): () => void;
   dispose(): void;
 };

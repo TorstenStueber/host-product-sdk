@@ -133,8 +133,8 @@ export function createHostApi(transport: Transport) {
         params: StartCodecType<M>,
         send: (value: ReceiveCodecType<M>) => void,
         interrupt: () => void,
-      ) => VoidFunction,
-    ): VoidFunction {
+      ) => () => void,
+    ): () => void {
       return transport.handleSubscription(method, handler);
     },
 

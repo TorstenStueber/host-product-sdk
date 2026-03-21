@@ -8,8 +8,8 @@
 import type { ProtocolHandler } from '@polkadot/host-api';
 import { errAsync } from '@polkadot/host-api';
 
-export function wirePreimageHandlers(container: ProtocolHandler): VoidFunction[] {
-  const cleanups: VoidFunction[] = [];
+export function wirePreimageHandlers(container: ProtocolHandler): (() => void)[] {
+  const cleanups: (() => void)[] = [];
 
   cleanups.push(
     container.handlePreimageLookupSubscribe((_params, _send, interrupt) => {

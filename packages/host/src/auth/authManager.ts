@@ -43,9 +43,9 @@ type AuthListener = (state: AuthState) => void;
 export type AuthManager = {
   getState(): AuthState;
   setState(state: AuthState): void;
-  subscribe(listener: AuthListener): VoidFunction;
+  subscribe(listener: AuthListener): () => void;
   getSession(): UserSession | null;
-  subscribeAuthStatus(callback: (status: string) => void): VoidFunction;
+  subscribeAuthStatus(callback: (status: string) => void): () => void;
   dispose(): void;
 };
 
@@ -64,7 +64,7 @@ export function createAuthManager(): AuthManager {
     return currentState;
   }
 
-  function subscribe(listener: AuthListener): VoidFunction {
+  function subscribe(listener: AuthListener): () => void {
     listeners.add(listener);
     return () => listeners.delete(listener);
   }
@@ -73,7 +73,7 @@ export function createAuthManager(): AuthManager {
     return currentState.status === 'authenticated' ? currentState.session : null;
   }
 
-  function subscribeAuthStatus(callback: (status: string) => void): VoidFunction {
+  function subscribeAuthStatus(callback: (status: string) => void): () => void {
     callback(currentState.status);
     return subscribe(state => callback(state.status));
   }

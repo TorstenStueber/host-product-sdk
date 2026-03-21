@@ -7,6 +7,8 @@
   else.
 - **Prefer `Promise` over `PromiseLike`.** Use `Promise` in type signatures unless there is a specific reason to accept
   thenables.
+- **Use `() => void` instead of `VoidFunction`.** Do not use the built-in `VoidFunction` type alias anywhere — write
+  `() => void` inline instead.
 
 ## Formatting
 

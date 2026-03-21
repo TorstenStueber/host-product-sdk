@@ -106,7 +106,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
   }
 
   // Auto-register codec upgrade handler if the host supports multiple codecs.
-  let cleanupCodecUpgrade: VoidFunction | undefined;
+  let cleanupCodecUpgrade: (() => void) | undefined;
   if (supportedCodecs && Object.keys(supportedCodecs).length > 0) {
     cleanupCodecUpgrade = handleCodecUpgrade(transport, supportedCodecs);
   }
@@ -141,7 +141,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
     method: M,
     handlers: RequestVersionHandlers<M>,
     defaultError: ResponseErr<M, 'v1'>,
-  ): VoidFunction {
+  ): () => void {
     init();
 
     /** Dispatch a single version — generic over V so types flow through. */
@@ -186,7 +186,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
     params: SubscriptionParams<M, V>,
     send: (payload: SubscriptionPayload<M, V>) => void,
     interrupt: () => void,
-  ) => VoidFunction;
+  ) => () => void;
 
   /**
    * Map of version tag -> handler. Each entry handles subscriptions at that version.
@@ -198,7 +198,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
   function wireSubscription<M extends SubscriptionMethod>(
     method: M,
     handlers: SubscriptionVersionHandlers<M>,
-  ): VoidFunction {
+  ): () => void {
     init();
 
     /** Dispatch a single version — generic over V so types flow through. */
@@ -208,7 +208,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
       params: StartCodecType<M>,
       send: (value: ReceiveCodecType<M>) => void,
       interrupt: () => void,
-    ): VoidFunction {
+    ): () => void {
       const unwrapped = unwrap(params, version);
       if (!unwrapped.ok) {
         interrupt();
@@ -529,7 +529,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
     handleChainConnection(factory) {
       init();
       const manager = createChainConnectionManager(factory);
-      const cleanups: VoidFunction[] = [];
+      const cleanups: (() => void)[] = [];
 
       const version = 'v1';
       const errorResult = (reason: string) => wrapErr(version, genericError(reason));

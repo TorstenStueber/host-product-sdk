@@ -8,8 +8,8 @@
 import type { ProtocolHandler } from '@polkadot/host-api';
 import type { HandlersConfig } from './registry.js';
 
-export function wireChainHandlers(container: ProtocolHandler, config: HandlersConfig): VoidFunction[] {
-  const cleanups: VoidFunction[] = [];
+export function wireChainHandlers(container: ProtocolHandler, config: HandlersConfig): (() => void)[] {
+  const cleanups: (() => void)[] = [];
 
   if (config.chainProvider) {
     cleanups.push(container.handleChainConnection(config.chainProvider));

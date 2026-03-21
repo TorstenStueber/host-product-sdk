@@ -9,8 +9,8 @@ import type { ProtocolHandler } from '@polkadot/host-api';
 import type { HandlersConfig } from './registry.js';
 import { okAsync, errAsync } from '@polkadot/host-api';
 
-export function wireStorageHandlers(container: ProtocolHandler, config: HandlersConfig): VoidFunction[] {
-  const cleanups: VoidFunction[] = [];
+export function wireStorageHandlers(container: ProtocolHandler, config: HandlersConfig): (() => void)[] {
+  const cleanups: (() => void)[] = [];
   const prefix = config.storagePrefix ?? `${config.appId ?? 'host'}:`;
 
   cleanups.push(

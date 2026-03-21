@@ -64,8 +64,8 @@ export class MethodNotSupportedError extends Error {
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
 export type Subscription = {
-  unsubscribe: VoidFunction;
-  onInterrupt(callback: VoidFunction): VoidFunction;
+  unsubscribe: () => void;
+  onInterrupt(callback: () => void): () => void;
 };
 
 export type Transport = {
@@ -74,8 +74,8 @@ export type Transport = {
   isCorrectEnvironment(): boolean;
   isReady(): Promise<boolean>;
   destroy(): void;
-  onConnectionStatusChange(callback: (status: ConnectionStatus) => void): VoidFunction;
-  onDestroy(callback: VoidFunction): VoidFunction;
+  onConnectionStatusChange(callback: (status: ConnectionStatus) => void): () => void;
+  onDestroy(callback: () => void): () => void;
 
   /** Swap the codec adapter (e.g. after negotiation). */
   swapCodecAdapter(adapter: CodecAdapter): void;
@@ -89,7 +89,7 @@ export type Transport = {
   handleRequest<M extends RequestMethod>(
     method: M,
     handler: (message: RequestCodecType<M>) => Promise<ResponseCodecType<M>>,
-  ): VoidFunction;
+  ): () => void;
 
   subscribe<M extends SubscriptionMethod>(
     method: M,
@@ -103,8 +103,8 @@ export type Transport = {
       params: StartCodecType<M>,
       send: (value: ReceiveCodecType<M>) => void,
       interrupt: () => void,
-    ) => VoidFunction,
-  ): VoidFunction;
+    ) => () => void,
+  ): () => void;
 
   // Low-level -- use at your own risk.
   postMessage(requestId: string, payload: { tag: ActionString; value: unknown }): void;
@@ -112,7 +112,7 @@ export type Transport = {
     action: ActionString,
     callback: (requestId: string, value: unknown) => void,
     onError?: (error: unknown) => void,
-  ): VoidFunction;
+  ): () => void;
 };
 
 // ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ export type Transport = {
 // ---------------------------------------------------------------------------
 
 type InternalListener = {
-  unsubscribe: VoidFunction;
+  unsubscribe: () => void;
   call(payload: unknown): void;
 };
 
@@ -218,7 +218,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
 
   const events = createNanoEvents<{
     connectionStatus: (status: ConnectionStatus) => void;
-    destroy: VoidFunction;
+    destroy: () => void;
   }>();
 
   events.on('connectionStatus', value => {
@@ -287,7 +287,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
         const id = nextId();
         let resolved = false;
 
-        const cleanup = (interval: ReturnType<typeof setInterval>, unsubscribe: VoidFunction): void => {
+        const cleanup = (interval: ReturnType<typeof setInterval>, unsubscribe: () => void): void => {
           clearInterval(interval);
           unsubscribe();
           handshakeAbortController.signal.removeEventListener('abort', unsubscribe);
@@ -393,7 +393,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
     handleRequest<M extends RequestMethod>(
       method: M,
       handler: (message: RequestCodecType<M>) => Promise<ResponseCodecType<M>>,
-    ): VoidFunction {
+    ): () => void {
       checks();
 
       const requestAction = composeAction(method, 'request');
@@ -415,7 +415,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
     ): Subscription {
       checks();
 
-      const subEvents = createNanoEvents<{ interrupt: VoidFunction }>();
+      const subEvents = createNanoEvents<{ interrupt: () => void }>();
 
       const startAction = composeAction(method, 'start');
       const startPayload = { tag: startAction, value: payload };
@@ -505,8 +505,8 @@ export function createTransport(options: CreateTransportOptions): Transport {
         params: StartCodecType<M>,
         send: (value: ReceiveCodecType<M>) => void,
         interrupt: () => void,
-      ) => VoidFunction,
-    ): VoidFunction {
+      ) => () => void,
+    ): () => void {
       checks();
 
       const startAction = composeAction(method, 'start');
@@ -514,7 +514,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
       const interruptAction = composeAction(method, 'interrupt');
       const receiveAction = composeAction(method, 'receive');
 
-      const subscriptions: Map<string, VoidFunction> = new Map();
+      const subscriptions: Map<string, () => void> = new Map();
 
       const unsubStart = transport.listenMessages(startAction, (requestId, value) => {
         if (subscriptions.has(requestId)) return;
@@ -569,7 +569,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
       action: ActionString,
       callback: (requestId: string, value: unknown) => void,
       onError?: (error: unknown) => void,
-    ): VoidFunction {
+    ): () => void {
       // Track _request/_start actions so the not-supported catch-all
       // doesn't fire for actions that have low-level listeners.
       const isHandlerAction = action.endsWith('_request') || action.endsWith('_start');
@@ -599,12 +599,12 @@ export function createTransport(options: CreateTransportOptions): Transport {
 
     // -- Connection status --------------------------------------------------
 
-    onConnectionStatusChange(callback: (status: ConnectionStatus) => void): VoidFunction {
+    onConnectionStatusChange(callback: (status: ConnectionStatus) => void): () => void {
       callback(connectionStatus);
       return events.on('connectionStatus', callback);
     },
 
-    onDestroy(callback: VoidFunction): VoidFunction {
+    onDestroy(callback: () => void): () => void {
       return events.on('destroy', callback);
     },
 

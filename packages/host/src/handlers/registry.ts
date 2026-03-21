@@ -55,7 +55,7 @@ export type HandlersConfig = {
   getSession?: () => UserSessionInfo | null;
 
   /** Subscribe to auth state changes. Callback receives the auth status string. */
-  subscribeAuthState?: (callback: (state: string) => void) => VoidFunction;
+  subscribeAuthState?: (callback: (state: string) => void) => () => void;
 
   // -- Feature support ------------------------------------------------------
   /** Custom feature support check. */
@@ -106,8 +106,8 @@ export type HandlersConfig = {
 // Wire everything
 // ---------------------------------------------------------------------------
 
-export function wireAllHandlers(container: ProtocolHandler, config: HandlersConfig): VoidFunction {
-  const allCleanups: VoidFunction[] = [];
+export function wireAllHandlers(container: ProtocolHandler, config: HandlersConfig): () => void {
+  const allCleanups: (() => void)[] = [];
 
   allCleanups.push(...wireHostHandlers(container, config));
   allCleanups.push(...wirePermissionHandlers(container, config));

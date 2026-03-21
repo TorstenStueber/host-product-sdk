@@ -8,8 +8,8 @@
 import type { ProtocolHandler } from '@polkadot/host-api';
 import { errAsync } from '@polkadot/host-api';
 
-export function wireChatHandlers(container: ProtocolHandler): VoidFunction[] {
-  const cleanups: VoidFunction[] = [];
+export function wireChatHandlers(container: ProtocolHandler): (() => void)[] {
+  const cleanups: (() => void)[] = [];
 
   cleanups.push(
     container.handleChatCreateRoom(_params => {

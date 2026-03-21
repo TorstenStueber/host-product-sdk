@@ -36,10 +36,10 @@ export type NestedBridgeDetectorOptions = {
  * @returns A dispose function that tears down all nested bridges and
  *          stops listening for new ones.
  */
-export function setupNestedBridgeDetector(options: NestedBridgeDetectorOptions): VoidFunction {
+export function setupNestedBridgeDetector(options: NestedBridgeDetectorOptions): () => void {
   const { primaryIframe, label, createConfig } = options;
   const knownWindows = new Set<MessageEventSource>();
-  const disposers: VoidFunction[] = [];
+  const disposers: (() => void)[] = [];
 
   function messageHandler(event: MessageEvent): void {
     // Only handle protocol messages (Uint8Array)

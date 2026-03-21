@@ -38,8 +38,8 @@ export type PappAdapter = {
   disconnect(session: UserSession): Promise<void>;
   getStoredSessions(): UserSession[];
   resolveIdentity(publicKey: Uint8Array): Promise<Identity | null>;
-  subscribePairingStatus(callback: (status: PairingStatus) => void): VoidFunction;
-  subscribeAttestationStatus(callback: (status: AttestationStatus) => void): VoidFunction;
+  subscribePairingStatus(callback: (status: PairingStatus) => void): () => void;
+  subscribeAttestationStatus(callback: (status: AttestationStatus) => void): () => void;
   dispose(): void;
 };
 

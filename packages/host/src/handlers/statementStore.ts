@@ -8,8 +8,8 @@
 import type { ProtocolHandler } from '@polkadot/host-api';
 import { errAsync } from '@polkadot/host-api';
 
-export function wireStatementStoreHandlers(container: ProtocolHandler): VoidFunction[] {
-  const cleanups: VoidFunction[] = [];
+export function wireStatementStoreHandlers(container: ProtocolHandler): (() => void)[] {
+  const cleanups: (() => void)[] = [];
 
   cleanups.push(
     container.handleStatementStoreSubscribe((_params, _send, interrupt) => {

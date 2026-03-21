@@ -9,8 +9,8 @@ import type { ProtocolHandler } from '@polkadot/host-api';
 import type { HandlersConfig } from './registry.js';
 import { okAsync } from '@polkadot/host-api';
 
-export function wireHostHandlers(container: ProtocolHandler, config: HandlersConfig): VoidFunction[] {
-  const cleanups: VoidFunction[] = [];
+export function wireHostHandlers(container: ProtocolHandler, config: HandlersConfig): (() => void)[] {
+  const cleanups: (() => void)[] = [];
 
   // Feature supported - delegates to config callback or returns false
   cleanups.push(

@@ -13,8 +13,8 @@ import type { HandlersConfig } from './registry.js';
 import { deriveProductPublicKey } from '../auth/crypto.js';
 import { okAsync, errAsync } from '@polkadot/host-api';
 
-export function wireAccountHandlers(container: ProtocolHandler, config: HandlersConfig): VoidFunction[] {
-  const cleanups: VoidFunction[] = [];
+export function wireAccountHandlers(container: ProtocolHandler, config: HandlersConfig): (() => void)[] {
+  const cleanups: (() => void)[] = [];
 
   // Account get - derives product-specific key from session
   cleanups.push(

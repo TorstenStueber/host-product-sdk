@@ -148,7 +148,7 @@ export const createProductChatManager = (hostApi: HostApi = defaultHostApi) => {
 export function handleCustomMessageRendering(
   callback: ChatCustomMessageRenderer,
   hostApi: HostApi = defaultHostApi,
-): VoidFunction {
+): () => void {
   return hostApi.handleHostSubscription('product_chat_custom_message_render_subscribe', (params, send, interrupt) => {
     const typed = params as { tag: string; value: unknown };
     if (typed.tag !== 'v1') {

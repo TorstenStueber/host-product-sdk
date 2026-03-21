@@ -8,8 +8,8 @@ import type { ProtocolHandler } from '@polkadot/host-api';
 import type { HandlersConfig } from './registry.js';
 import { okAsync, ResultAsync } from '@polkadot/host-api';
 
-export function wirePermissionHandlers(container: ProtocolHandler, config: HandlersConfig): VoidFunction[] {
-  const cleanups: VoidFunction[] = [];
+export function wirePermissionHandlers(container: ProtocolHandler, config: HandlersConfig): (() => void)[] {
+  const cleanups: (() => void)[] = [];
 
   cleanups.push(
     container.handleDevicePermission(permission => {

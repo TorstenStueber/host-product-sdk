@@ -9,8 +9,8 @@ import type { ProtocolHandler } from '@polkadot/host-api';
 import type { HandlersConfig } from './registry.js';
 import { errAsync, ResultAsync } from '@polkadot/host-api';
 
-export function wireSigningHandlers(container: ProtocolHandler, config: HandlersConfig): VoidFunction[] {
-  const cleanups: VoidFunction[] = [];
+export function wireSigningHandlers(container: ProtocolHandler, config: HandlersConfig): (() => void)[] {
+  const cleanups: (() => void)[] = [];
 
   cleanups.push(
     container.handleSignPayload(payload => {

@@ -124,7 +124,7 @@ export async function requestCodecUpgrade(
  * @param adapters - Map of format → CodecAdapter the host supports.
  * @returns An unsubscribe function that removes the handler.
  */
-export function handleCodecUpgrade(transport: Transport, adapters: CodecAdapterMap): VoidFunction {
+export function handleCodecUpgrade(transport: Transport, adapters: CodecAdapterMap): () => void {
   const preference: CodecFormat[] = ['structured_clone', 'scale'];
   const fallbackResponse = { tag: 'v1', value: { selectedFormat: 'scale' } };
 
