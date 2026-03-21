@@ -248,5 +248,4 @@ describe('common type helpers', () => {
       expect(() => toHexString('abcdef')).toThrow('Expected hex string starting with 0x');
     });
   });
-
 });

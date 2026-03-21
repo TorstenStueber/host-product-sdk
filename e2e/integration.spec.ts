@@ -69,19 +69,19 @@ for (const codec of codecs) {
 
     test('feature supported: known chain returns true', async ({ page }) => {
       const frame = await getProductFrame(page);
-      const result = await runProductTest(frame, 'featureSupported_abc123') as Record<string, unknown>;
+      const result = (await runProductTest(frame, 'featureSupported_abc123')) as Record<string, unknown>;
       expect(result).toMatchObject({ tag: 'v1', value: { success: true, value: true } });
     });
 
     test('feature supported: unknown chain returns false', async ({ page }) => {
       const frame = await getProductFrame(page);
-      const result = await runProductTest(frame, 'featureSupported_unknown') as Record<string, unknown>;
+      const result = (await runProductTest(frame, 'featureSupported_unknown')) as Record<string, unknown>;
       expect(result).toMatchObject({ tag: 'v1', value: { success: true, value: false } });
     });
 
     test('account get returns mock account', async ({ page }) => {
       const frame = await getProductFrame(page);
-      const result = await runProductTest(frame, 'accountGet') as Record<string, unknown>;
+      const result = (await runProductTest(frame, 'accountGet')) as Record<string, unknown>;
       // Should be success with an account object
       const envelope = result as { tag: string; value: { tag: string; value: unknown } };
       expect(envelope.tag).toBe('v1');
@@ -94,7 +94,7 @@ for (const codec of codecs) {
 
     test('get non-product accounts returns array', async ({ page }) => {
       const frame = await getProductFrame(page);
-      const result = await runProductTest(frame, 'getNonProductAccounts') as Record<string, unknown>;
+      const result = (await runProductTest(frame, 'getNonProductAccounts')) as Record<string, unknown>;
 
       const envelope = result as { tag: string; value: { tag: string; value: unknown } };
       expect(envelope.tag).toBe('v1');
@@ -108,7 +108,7 @@ for (const codec of codecs) {
 
     test('sign payload: product sends request, host receives and returns signature', async ({ page }) => {
       const frame = await getProductFrame(page);
-      const result = await runProductTest(frame, 'signPayload') as Record<string, unknown>;
+      const result = (await runProductTest(frame, 'signPayload')) as Record<string, unknown>;
 
       const envelope = result as { tag: string; value: { tag: string; value: unknown } };
       expect(envelope.tag).toBe('v1');
@@ -125,7 +125,7 @@ for (const codec of codecs) {
 
     test('sign raw: returns signature', async ({ page }) => {
       const frame = await getProductFrame(page);
-      const result = await runProductTest(frame, 'signRaw') as Record<string, unknown>;
+      const result = (await runProductTest(frame, 'signRaw')) as Record<string, unknown>;
 
       const envelope = result as { tag: string; value: { tag: string; value: unknown } };
       expect(envelope.tag).toBe('v1');
@@ -140,7 +140,7 @@ for (const codec of codecs) {
 
     test('local storage: write, read, clear cycle', async ({ page }) => {
       const frame = await getProductFrame(page);
-      const result = await runProductTest(frame, 'localStorage') as Record<string, unknown>;
+      const result = (await runProductTest(frame, 'localStorage')) as Record<string, unknown>;
 
       const { readResult, readAfterClear } = result as {
         readResult: { tag: string; value: { tag: string; value: unknown } };
@@ -160,21 +160,19 @@ for (const codec of codecs) {
 
     test('connection status subscription receives connected', async ({ page }) => {
       const frame = await getProductFrame(page);
-      const result = await runProductTest(frame, 'connectionStatus') as unknown[];
+      const result = (await runProductTest(frame, 'connectionStatus')) as unknown[];
 
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBeGreaterThanOrEqual(1);
       // First status should be 'connected' (wrapped in v1 envelope by subscription)
       const first = result[0] as { tag?: string; value?: unknown } | string;
-      const statusValue = typeof first === 'object' && first !== null && 'value' in first
-        ? first.value
-        : first;
+      const statusValue = typeof first === 'object' && first !== null && 'value' in first ? first.value : first;
       expect(statusValue).toBe('connected');
     });
 
     test('navigate to sends URL to host', async ({ page }) => {
       const frame = await getProductFrame(page);
-      const result = await runProductTest(frame, 'navigateTo') as Record<string, unknown>;
+      const result = (await runProductTest(frame, 'navigateTo')) as Record<string, unknown>;
 
       const envelope = result as { tag: string; value: { tag: string; value: unknown } };
       expect(envelope.tag).toBe('v1');
@@ -183,7 +181,7 @@ for (const codec of codecs) {
 
     test('device permission returns false (denied)', async ({ page }) => {
       const frame = await getProductFrame(page);
-      const result = await runProductTest(frame, 'devicePermission') as Record<string, unknown>;
+      const result = (await runProductTest(frame, 'devicePermission')) as Record<string, unknown>;
 
       const envelope = result as { tag: string; value: { tag: string; value: unknown } };
       expect(envelope.tag).toBe('v1');
@@ -195,7 +193,7 @@ for (const codec of codecs) {
 
     test('sign payload: rejected error is transmitted correctly', async ({ page }) => {
       const frame = await getProductFrame(page);
-      const result = await runProductTest(frame, 'signPayloadRejected') as Record<string, unknown>;
+      const result = (await runProductTest(frame, 'signPayloadRejected')) as Record<string, unknown>;
 
       const envelope = result as { tag: string; value: { success: boolean; value: unknown } };
       expect(envelope.tag).toBe('v1');
@@ -207,7 +205,7 @@ for (const codec of codecs) {
 
     test('create transaction: NotSupported error is transmitted correctly', async ({ page }) => {
       const frame = await getProductFrame(page);
-      const result = await runProductTest(frame, 'createTransactionError') as Record<string, unknown>;
+      const result = (await runProductTest(frame, 'createTransactionError')) as Record<string, unknown>;
 
       const envelope = result as { tag: string; value: { success: boolean; value: unknown } };
       expect(envelope.tag).toBe('v1');
@@ -220,7 +218,7 @@ for (const codec of codecs) {
 
     test('account get alias: Unknown error with reason is transmitted correctly', async ({ page }) => {
       const frame = await getProductFrame(page);
-      const result = await runProductTest(frame, 'accountGetAliasError') as Record<string, unknown>;
+      const result = (await runProductTest(frame, 'accountGetAliasError')) as Record<string, unknown>;
 
       const envelope = result as { tag: string; value: { success: boolean; value: unknown } };
       expect(envelope.tag).toBe('v1');
@@ -233,7 +231,7 @@ for (const codec of codecs) {
 
     test('navigate to: PermissionDenied error is transmitted correctly', async ({ page }) => {
       const frame = await getProductFrame(page);
-      const result = await runProductTest(frame, 'navigateToBlocked') as Record<string, unknown>;
+      const result = (await runProductTest(frame, 'navigateToBlocked')) as Record<string, unknown>;
 
       const envelope = result as { tag: string; value: { success: boolean; value: unknown } };
       expect(envelope.tag).toBe('v1');
@@ -245,7 +243,7 @@ for (const codec of codecs) {
 
     test('storage write: Full error is transmitted correctly', async ({ page }) => {
       const frame = await getProductFrame(page);
-      const result = await runProductTest(frame, 'storageWriteFull') as Record<string, unknown>;
+      const result = (await runProductTest(frame, 'storageWriteFull')) as Record<string, unknown>;
 
       const envelope = result as { tag: string; value: { success: boolean; value: unknown } };
       expect(envelope.tag).toBe('v1');

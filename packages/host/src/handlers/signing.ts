@@ -5,15 +5,15 @@
  * Returns PermissionDenied when no session is available.
  */
 
-import type { Container } from '@polkadot/host-api';
+import type { ProtocolHandler } from '@polkadot/host-api';
 import type { HandlersConfig } from './registry.js';
 import { errAsync, ResultAsync } from '@polkadot/host-api';
 
-export function wireSigningHandlers(container: Container, config: HandlersConfig): VoidFunction[] {
+export function wireSigningHandlers(container: ProtocolHandler, config: HandlersConfig): VoidFunction[] {
   const cleanups: VoidFunction[] = [];
 
   cleanups.push(
-    container.handleSignPayload((payload) => {
+    container.handleSignPayload(payload => {
       const session = config.getSession?.();
       if (!session) {
         return errAsync({ tag: 'PermissionDenied', value: undefined });
@@ -23,15 +23,15 @@ export function wireSigningHandlers(container: Container, config: HandlersConfig
         return errAsync({ tag: 'Unknown', value: { reason: 'Signing not configured' } });
       }
 
-      return ResultAsync.fromPromise(
-        Promise.resolve(config.onSignPayload(session, payload)),
-        () => ({ tag: 'Rejected' as const, value: undefined }),
-      );
+      return ResultAsync.fromPromise(Promise.resolve(config.onSignPayload(session, payload)), () => ({
+        tag: 'Rejected' as const,
+        value: undefined,
+      }));
     }),
   );
 
   cleanups.push(
-    container.handleSignRaw((payload) => {
+    container.handleSignRaw(payload => {
       const session = config.getSession?.();
       if (!session) {
         return errAsync({ tag: 'PermissionDenied', value: undefined });
@@ -41,15 +41,15 @@ export function wireSigningHandlers(container: Container, config: HandlersConfig
         return errAsync({ tag: 'Unknown', value: { reason: 'Raw signing not configured' } });
       }
 
-      return ResultAsync.fromPromise(
-        Promise.resolve(config.onSignRaw(session, payload)),
-        () => ({ tag: 'Rejected' as const, value: undefined }),
-      );
+      return ResultAsync.fromPromise(Promise.resolve(config.onSignRaw(session, payload)), () => ({
+        tag: 'Rejected' as const,
+        value: undefined,
+      }));
     }),
   );
 
   cleanups.push(
-    container.handleCreateTransaction((params) => {
+    container.handleCreateTransaction(params => {
       const session = config.getSession?.();
       if (!session) {
         return errAsync({ tag: 'PermissionDenied', value: undefined });
@@ -59,15 +59,15 @@ export function wireSigningHandlers(container: Container, config: HandlersConfig
         return errAsync({ tag: 'NotSupported', value: 'Transaction creation not configured' });
       }
 
-      return ResultAsync.fromPromise(
-        Promise.resolve(config.onCreateTransaction(session, params)),
-        () => ({ tag: 'Rejected' as const, value: undefined }),
-      );
+      return ResultAsync.fromPromise(Promise.resolve(config.onCreateTransaction(session, params)), () => ({
+        tag: 'Rejected' as const,
+        value: undefined,
+      }));
     }),
   );
 
   cleanups.push(
-    container.handleCreateTransactionWithNonProductAccount((payload) => {
+    container.handleCreateTransactionWithNonProductAccount(payload => {
       const session = config.getSession?.();
       if (!session) {
         return errAsync({ tag: 'PermissionDenied', value: undefined });

@@ -7,11 +7,7 @@
  */
 
 import type { HexString } from '../shared/codec/scale/primitives.js';
-import type {
-  ChainHeadEvent,
-  OperationStartedResult,
-  RuntimeType,
-} from '../shared/protocol/types.js';
+import type { ChainHeadEvent, OperationStartedResult, RuntimeType } from '../shared/protocol/types.js';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 
 // ---------------------------------------------------------------------------
@@ -44,9 +40,7 @@ export type ChainConnectionManager = ReturnType<typeof createChainConnectionMana
 
 let instanceCounter = 0;
 
-export function createChainConnectionManager(
-  factory: (genesisHash: HexString) => JsonRpcProvider | null,
-) {
+export function createChainConnectionManager(factory: (genesisHash: HexString) => JsonRpcProvider | null) {
   const chains = new Map<HexString, ChainEntry>();
   const instanceId = instanceCounter++;
   let nextId = 0;
@@ -143,7 +137,7 @@ export function createChainConnectionManager(
     entry.followSubscriptions.set(followId, follow);
 
     entry.pendingRequests.set(requestId, {
-      resolve: (result) => {
+      resolve: result => {
         follow.chainSubId = result as string;
         follow.pendingRequestId = undefined;
       },
@@ -175,7 +169,7 @@ export function createChainConnectionManager(
       );
     } else if (follow.pendingRequestId) {
       entry.pendingRequests.set(follow.pendingRequestId, {
-        resolve: (result) => {
+        resolve: result => {
           const chainSubId = result as string;
           if (chainSubId) {
             const unfollowId = getNextId();
@@ -184,7 +178,9 @@ export function createChainConnectionManager(
             );
           }
         },
-        reject: () => { /* follow already cleaned up */ },
+        reject: () => {
+          /* follow already cleaned up */
+        },
       });
     }
   }
@@ -292,7 +288,7 @@ export function createChainConnectionManager(
           tag: 'OperationStorageItems',
           value: {
             operationId: event.operationId as string,
-            items: (event.items as Record<string, unknown>[]).map((item) => ({
+            items: (event.items as Record<string, unknown>[]).map(item => ({
               key: item.key as HexString,
               value: (item.value as HexString) ?? null,
               hash: (item.hash as HexString) ?? null,

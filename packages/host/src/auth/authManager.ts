@@ -75,7 +75,7 @@ export function createAuthManager(): AuthManager {
 
   function subscribeAuthStatus(callback: (status: string) => void): VoidFunction {
     callback(currentState.status);
-    return subscribe((state) => callback(state.status));
+    return subscribe(state => callback(state.status));
   }
 
   function dispose(): void {

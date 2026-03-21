@@ -163,7 +163,7 @@ function wrapWithAutoCodecUpgrade(transport: Transport): Transport {
     isReady(): Promise<boolean> {
       if (upgradePromise) return upgradePromise;
 
-      upgradePromise = transport.isReady().then(async (ready) => {
+      upgradePromise = transport.isReady().then(async ready => {
         if (!ready) return false;
 
         await requestCodecUpgrade(transport, {

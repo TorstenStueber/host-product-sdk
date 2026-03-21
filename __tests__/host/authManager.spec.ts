@@ -125,7 +125,7 @@ describe('createAuthManager', () => {
 
   it('subscribe receives all state changes', () => {
     const states: string[] = [];
-    auth.subscribe((state) => states.push(state.status));
+    auth.subscribe(state => states.push(state.status));
 
     auth.setState({ status: 'pairing', payload: 'data' });
     auth.setState({ status: 'attesting' });
@@ -140,7 +140,7 @@ describe('createAuthManager', () => {
 
   it('unsubscribe stops notifications', () => {
     const states: string[] = [];
-    const unsub = auth.subscribe((state) => states.push(state.status));
+    const unsub = auth.subscribe(state => states.push(state.status));
 
     auth.setState({ status: 'pairing', payload: 'x' });
     expect(states).toHaveLength(1);
@@ -180,7 +180,7 @@ describe('createAuthManager', () => {
   it('subscribeAuthStatus fires immediately with current status', () => {
     const statuses: string[] = [];
 
-    auth.subscribeAuthStatus((status) => statuses.push(status));
+    auth.subscribeAuthStatus(status => statuses.push(status));
 
     // Should have received the initial 'idle' status immediately
     expect(statuses).toEqual(['idle']);
@@ -189,7 +189,7 @@ describe('createAuthManager', () => {
   it('subscribeAuthStatus receives status string on changes', () => {
     const statuses: string[] = [];
 
-    auth.subscribeAuthStatus((status) => statuses.push(status));
+    auth.subscribeAuthStatus(status => statuses.push(status));
 
     auth.setState({ status: 'pairing', payload: 'data' });
     auth.setState({ status: 'attesting' });

@@ -13,7 +13,7 @@ export function createLocalStorageAdapter(prefix: string): StorageAdapter {
     async read(key: string): Promise<Uint8Array | null> {
       const raw = localStorage.getItem(withPrefix(key));
       if (raw === null) return null;
-      return Uint8Array.from(atob(raw), (c) => c.charCodeAt(0));
+      return Uint8Array.from(atob(raw), c => c.charCodeAt(0));
     },
 
     async write(key: string, value: Uint8Array): Promise<void> {

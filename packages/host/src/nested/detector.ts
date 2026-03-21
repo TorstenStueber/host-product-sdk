@@ -3,7 +3,7 @@
  *
  * Listens for Uint8Array postMessage events from windows other than the
  * primary iframe. When a new source is detected, creates a full bridge
- * (Provider + Container + handlers) for that window.
+ * (Provider + ProtocolHandler + handlers) for that window.
  *
  * This enables nested dApps (dApp-in-dApp) to communicate with the host,
  * since all dApps send to window.top regardless of depth.

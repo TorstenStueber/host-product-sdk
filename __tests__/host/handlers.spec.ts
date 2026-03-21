@@ -3,7 +3,7 @@
  *
  * Tests for wireHostHandlers, wirePermissionHandlers, and wireStorageHandlers
  * using a mock container approach. Since the handlers interact with the
- * Container interface, we test them through the container's handler
+ * ProtocolHandler interface, we test them through the container's handler
  * registration pattern.
  */
 
@@ -20,12 +20,10 @@ describe('Host handler logic', () => {
 
       // Simulate the handler logic from host.ts
       const feature = { tag: 'SomeFeature', value: undefined };
-      const result = onFeatureSupported
-        ? okAsync(onFeatureSupported(feature))
-        : okAsync(false);
+      const result = onFeatureSupported ? okAsync(onFeatureSupported(feature)) : okAsync(false);
 
       const value = await result.match(
-        (v) => v,
+        v => v,
         () => undefined,
       );
       expect(value).toBe(true);
@@ -40,7 +38,7 @@ describe('Host handler logic', () => {
         : okAsync(false);
 
       const value = await result.match(
-        (v) => v,
+        v => v,
         () => undefined,
       );
       expect(value).toBe(false);
@@ -58,7 +56,7 @@ describe('Host handler logic', () => {
       const result = okAsync(undefined);
 
       const value = await result.match(
-        (v) => v,
+        v => v,
         () => 'error',
       );
       expect(onNavigateTo).toHaveBeenCalledWith(url);
@@ -77,7 +75,7 @@ describe('Host handler logic', () => {
       const result = okAsync(undefined);
 
       const value = await result.match(
-        (v) => v,
+        v => v,
         () => 'error',
       );
       expect(onPushNotification).toHaveBeenCalledWith(notification);
@@ -102,12 +100,10 @@ describe('Permission handler logic', () => {
     it('returns false by default when no callback provided', async () => {
       const onDevicePermission = undefined;
 
-      const result = onDevicePermission
-        ? okAsync(true)
-        : okAsync(false);
+      const result = onDevicePermission ? okAsync(true) : okAsync(false);
 
       const value = await result.match(
-        (v) => v,
+        v => v,
         () => undefined,
       );
       expect(value).toBe(false);
@@ -120,7 +116,7 @@ describe('Permission handler logic', () => {
       const result = okAsync(granted);
 
       const value = await result.match(
-        (v) => v,
+        v => v,
         () => undefined,
       );
       expect(value).toBe(true);
@@ -132,7 +128,7 @@ describe('Permission handler logic', () => {
     it('returns false by default', async () => {
       const result = okAsync(false);
       const value = await result.match(
-        (v) => v,
+        v => v,
         () => undefined,
       );
       expect(value).toBe(false);
@@ -152,7 +148,7 @@ describe('Storage handler logic', () => {
       const raw = null;
       const result = raw === null ? okAsync(undefined) : okAsync(raw);
       const value = await result.match(
-        (v) => v,
+        v => v,
         () => 'error',
       );
       expect(value).toBeUndefined();

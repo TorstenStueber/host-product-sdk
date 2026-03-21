@@ -29,24 +29,39 @@ import { DevicePermissionRequest } from './v1/devicePermission.js';
 import { RemotePermissionRequest } from './v1/remotePermission.js';
 import { StorageKey, StorageValue, StorageErr } from './v1/localStorage.js';
 import {
-  ProductAccountId, Account, ContextualAlias, RingLocation, RingVrfProof,
-  RequestCredentialsErr, CreateProofErr, AccountConnectionStatus,
+  ProductAccountId,
+  Account,
+  ContextualAlias,
+  RingLocation,
+  RingVrfProof,
+  RequestCredentialsErr,
+  CreateProofErr,
+  AccountConnectionStatus,
 } from './v1/accounts.js';
 import { CreateTransactionErr, VersionedTxPayload } from './v1/createTransaction.js';
 import { SigningRawPayload, SigningPayload, SigningResult, SigningErr } from './v1/sign.js';
 import {
-  ChatRoomRequest, ChatRoomRegistrationResult, ChatRoomRegistrationErr,
-  ChatBotRequest, ChatBotRegistrationResult, ChatBotRegistrationErr,
-  ChatRoom, ChatMessageContent, ChatPostMessageResult, ChatMessagePostingErr,
+  ChatRoomRequest,
+  ChatRoomRegistrationResult,
+  ChatRoomRegistrationErr,
+  ChatBotRequest,
+  ChatBotRegistrationResult,
+  ChatBotRegistrationErr,
+  ChatRoom,
+  ChatMessageContent,
+  ChatPostMessageResult,
+  ChatMessagePostingErr,
   ReceivedChatAction,
 } from './v1/chat.js';
 import { CustomRendererNode } from './v1/customRenderer.js';
-import {
-  Topic, SignedStatement, Statement, StatementProof, StatementProofErr,
-} from './v1/statementStore.js';
+import { Topic, SignedStatement, Statement, StatementProof, StatementProofErr } from './v1/statementStore.js';
 import { PreimageKey, PreimageValue, PreimageSubmitErr } from './v1/preimage.js';
 import {
-  BlockHash, OperationId, StorageQueryItem, OperationStartedResult, ChainHeadEvent,
+  BlockHash,
+  OperationId,
+  StorageQueryItem,
+  OperationStartedResult,
+  ChainHeadEvent,
 } from './v1/chainInteraction.js';
 
 // -- Protocol registry --------------------------------------------------------
@@ -220,11 +235,27 @@ export const hostApiProtocol = {
     _response: Enum({ v1: Result(OperationStartedResult, GenericErr) }),
   },
   remote_chain_head_storage: {
-    _request: Enum({ v1: Struct({ genesisHash: GenesisHash, followSubscriptionId: str, hash: BlockHash, items: Vector(StorageQueryItem), childTrie: Nullable(Hex()) }) }),
+    _request: Enum({
+      v1: Struct({
+        genesisHash: GenesisHash,
+        followSubscriptionId: str,
+        hash: BlockHash,
+        items: Vector(StorageQueryItem),
+        childTrie: Nullable(Hex()),
+      }),
+    }),
     _response: Enum({ v1: Result(OperationStartedResult, GenericErr) }),
   },
   remote_chain_head_call: {
-    _request: Enum({ v1: Struct({ genesisHash: GenesisHash, followSubscriptionId: str, hash: BlockHash, function: str, callParameters: Hex() }) }),
+    _request: Enum({
+      v1: Struct({
+        genesisHash: GenesisHash,
+        followSubscriptionId: str,
+        hash: BlockHash,
+        function: str,
+        callParameters: Hex(),
+      }),
+    }),
     _response: Enum({ v1: Result(OperationStartedResult, GenericErr) }),
   },
   remote_chain_head_unpin: {
@@ -288,9 +319,7 @@ type RequestSuffix = 'request' | 'response';
 type SubscriptionSuffix = 'start' | 'receive' | 'stop' | 'interrupt';
 
 /** Union of all valid action strings on the wire. */
-export type ActionString =
-  | `${RequestMethod}_${RequestSuffix}`
-  | `${SubscriptionMethod}_${SubscriptionSuffix}`;
+export type ActionString = `${RequestMethod}_${RequestSuffix}` | `${SubscriptionMethod}_${SubscriptionSuffix}`;
 
 // -- Derived per-method per-version types -------------------------------------
 //
@@ -325,16 +354,13 @@ export type StartVersions<M extends SubscriptionMethod> = StartCodecType<M>['tag
 export type ReceiveVersions<M extends SubscriptionMethod> = ReceiveCodecType<M>['tag'];
 
 /** Extract the inner value type for a specific version tag from a versioned enum type. */
-type VersionValue<T, V extends string> =
-  Extract<T, { tag: V }> extends { value: infer U } ? U : never;
+type VersionValue<T, V extends string> = Extract<T, { tag: V }> extends { value: infer U } ? U : never;
 
 /** Request params type for method M at version V. */
-export type RequestParams<M extends RequestMethod, V extends string> =
-  VersionValue<RequestCodecType<M>, V>;
+export type RequestParams<M extends RequestMethod, V extends string> = VersionValue<RequestCodecType<M>, V>;
 
 /** The full Result type for method M's response at version V. */
-type ResponseResultType<M extends RequestMethod, V extends string> =
-  VersionValue<ResponseCodecType<M>, V>;
+type ResponseResultType<M extends RequestMethod, V extends string> = VersionValue<ResponseCodecType<M>, V>;
 
 /** Ok type from a request method's response Result at version V. */
 export type ResponseOk<M extends RequestMethod, V extends string> =
@@ -345,12 +371,10 @@ export type ResponseErr<M extends RequestMethod, V extends string> =
   Extract<ResponseResultType<M, V>, { success: false }> extends { value: infer U } ? U : never;
 
 /** Subscription start params type for method M at version V. */
-export type SubscriptionParams<M extends SubscriptionMethod, V extends string> =
-  VersionValue<StartCodecType<M>, V>;
+export type SubscriptionParams<M extends SubscriptionMethod, V extends string> = VersionValue<StartCodecType<M>, V>;
 
 /** Subscription receive payload type for method M at version V. */
-export type SubscriptionPayload<M extends SubscriptionMethod, V extends string> =
-  VersionValue<ReceiveCodecType<M>, V>;
+export type SubscriptionPayload<M extends SubscriptionMethod, V extends string> = VersionValue<ReceiveCodecType<M>, V>;
 
 // -- Build MessagePayload enum ------------------------------------------------
 

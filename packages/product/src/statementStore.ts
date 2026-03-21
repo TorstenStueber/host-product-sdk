@@ -10,12 +10,7 @@
 
 import type { HostApi } from '@polkadot/host-api';
 import { hostApi as defaultHostApi } from '@polkadot/host-api';
-import type {
-  ProductAccountId,
-  SignedStatement,
-  Statement,
-  Topic,
-} from './types.js';
+import type { ProductAccountId, SignedStatement, Statement, Topic } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -34,16 +29,10 @@ export const createStatementStore = (hostApi: HostApi = defaultHostApi) => {
      * The callback fires whenever the host pushes a new batch of
      * signed statements that match at least one of the subscribed topics.
      */
-    subscribe(
-      topics: Topic[],
-      callback: (statements: SignedStatement[]) => void,
-    ) {
-      return hostApi.statementStoreSubscribe(
-        topics,
-        (payload) => {
-          callback(payload);
-        },
-      );
+    subscribe(topics: Topic[], callback: (statements: SignedStatement[]) => void) {
+      return hostApi.statementStoreSubscribe(topics, payload => {
+        callback(payload);
+      });
     },
 
     /**
@@ -51,19 +40,14 @@ export const createStatementStore = (hostApi: HostApi = defaultHostApi) => {
      *
      * Returns the signed proof that can be submitted via `submit()`.
      */
-    async createProof(
-      accountId: ProductAccountId,
-      statement: Statement,
-    ): Promise<unknown> {
-      const result = await hostApi.statementStoreCreateProof(
-        [accountId, statement],
-      );
+    async createProof(accountId: ProductAccountId, statement: Statement): Promise<unknown> {
+      const result = await hostApi.statementStoreCreateProof([accountId, statement]);
 
       return result.match(
-        (payload) => {
+        payload => {
           return payload;
         },
-        (err) => {
+        err => {
           throw err;
         },
       );
@@ -73,15 +57,13 @@ export const createStatementStore = (hostApi: HostApi = defaultHostApi) => {
      * Submit a signed statement to the statement store.
      */
     async submit(signedStatement: SignedStatement): Promise<void> {
-      const result = await hostApi.statementStoreSubmit(
-        signedStatement,
-      );
+      const result = await hostApi.statementStoreSubmit(signedStatement);
 
       return result.match(
         () => {
           return;
         },
-        (err) => {
+        err => {
           throw err;
         },
       );

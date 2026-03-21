@@ -20,9 +20,13 @@ import type { CodecAdapter, ProtocolMessage } from '../codec/adapter.js';
 import { structuredCloneCodecAdapter } from '../codec/structured/index.js';
 import { scaleCodecAdapter } from '../codec/scale/protocol.js';
 import type {
-  RequestMethod, SubscriptionMethod, ActionString,
-  RequestCodecType, ResponseCodecType,
-  StartCodecType, ReceiveCodecType,
+  RequestMethod,
+  SubscriptionMethod,
+  ActionString,
+  RequestCodecType,
+  ResponseCodecType,
+  StartCodecType,
+  ReceiveCodecType,
 } from '../codec/scale/protocol.js';
 import { composeAction, delay, promiseWithResolvers } from '../util/helpers.js';
 import { createIdFactory } from '../util/idFactory.js';
@@ -185,14 +189,16 @@ export function createTransport(options: CreateTransportOptions): Transport {
    * is automatically upgraded to structured clone as well (preferred).
    */
   function decodeIncoming(message: Uint8Array | unknown): ProtocolMessage {
-    if (message instanceof Uint8Array ||
-        (typeof message === 'object' && message !== null &&
-         (message as { constructor?: { name?: string } }).constructor?.name === 'Uint8Array')) {
+    if (
+      message instanceof Uint8Array ||
+      (typeof message === 'object' &&
+        message !== null &&
+        (message as { constructor?: { name?: string } }).constructor?.name === 'Uint8Array')
+    ) {
       return scaleCodecAdapter.decode(message as Uint8Array);
     }
 
-    if (typeof message === 'object' && message !== null &&
-        'requestId' in (message as Record<string, unknown>)) {
+    if (typeof message === 'object' && message !== null && 'requestId' in (message as Record<string, unknown>)) {
       // Upgrade outgoing codec to structured clone on first structured clone message.
       codecAdapter = structuredCloneCodecAdapter;
       return message as ProtocolMessage;
@@ -288,16 +294,13 @@ export function createTransport(options: CreateTransportOptions): Transport {
         };
 
         return new Promise<boolean>(resolve => {
-          const unsubscribe = transport.listenMessages(
-            'host_handshake_response',
-            (responseId) => {
-              if (responseId === id) {
-                cleanup(interval, unsubscribe);
-                resolved = true;
-                resolve(true);
-              }
-            },
-          );
+          const unsubscribe = transport.listenMessages('host_handshake_response', responseId => {
+            if (responseId === id) {
+              cleanup(interval, unsubscribe);
+              resolved = true;
+              resolve(true);
+            }
+          });
 
           handshakeAbortController.signal.addEventListener('abort', unsubscribe, {
             once: true,
@@ -323,10 +326,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
         });
       };
 
-      const timedOutRequest = Promise.race([
-        performHandshake(),
-        delay(HANDSHAKE_TIMEOUT).then(() => false),
-      ]);
+      const timedOutRequest = Promise.race([performHandshake(), delay(HANDSHAKE_TIMEOUT).then(() => false)]);
 
       handshakePromise = timedOutRequest.then(result => {
         handshakePromise = null;
@@ -369,20 +369,17 @@ export function createTransport(options: CreateTransportOptions): Transport {
         reject(signal?.reason ?? new Error('Request aborted'));
       };
 
-      const unsubscribe = transport.listenMessages(
-        responseAction,
-        (receivedId, value) => {
-          if (receivedId === requestId) {
-            cleanup();
-            const v = value as Record<string, unknown>;
-            if (v && v._notSupported) {
-              reject(new MethodNotSupportedError(method));
-            } else {
-              resolve(value as ResponseCodecType<M>);
-            }
+      const unsubscribe = transport.listenMessages(responseAction, (receivedId, value) => {
+        if (receivedId === requestId) {
+          cleanup();
+          const v = value as Record<string, unknown>;
+          if (v && v._notSupported) {
+            reject(new MethodNotSupportedError(method));
+          } else {
+            resolve(value as ResponseCodecType<M>);
           }
-        },
-      );
+        }
+      });
 
       signal?.addEventListener('abort', onAbort, { once: true });
 
@@ -458,29 +455,23 @@ export function createTransport(options: CreateTransportOptions): Transport {
         const interruptAction = composeAction(method, 'interrupt');
         const receiveAction = composeAction(method, 'receive');
 
-        const unsubscribeReceive = transport.listenMessages(
-          receiveAction,
-          (receivedId, value) => {
-            if (receivedId === requestId) {
-              const sub = activeSubscriptions.get(subscriptionKey);
-              if (sub) {
-                for (const l of sub.listeners) {
-                  l.call(value);
-                }
+        const unsubscribeReceive = transport.listenMessages(receiveAction, (receivedId, value) => {
+          if (receivedId === requestId) {
+            const sub = activeSubscriptions.get(subscriptionKey);
+            if (sub) {
+              for (const l of sub.listeners) {
+                l.call(value);
               }
             }
-          },
-        );
+          }
+        });
 
-        const unsubscribeInterrupt = transport.listenMessages(
-          interruptAction,
-          (receivedId) => {
-            if (receivedId === requestId) {
-              subEvents.emit('interrupt');
-              stopSubscription();
-            }
-          },
-        );
+        const unsubscribeInterrupt = transport.listenMessages(interruptAction, receivedId => {
+          if (receivedId === requestId) {
+            subEvents.emit('interrupt');
+            stopSubscription();
+          }
+        });
 
         const stopSubscription = (): void => {
           unsubscribeReceive();
@@ -525,36 +516,33 @@ export function createTransport(options: CreateTransportOptions): Transport {
 
       const subscriptions: Map<string, VoidFunction> = new Map();
 
-      const unsubStart = transport.listenMessages(
-        startAction,
-        (requestId, value) => {
-          if (subscriptions.has(requestId)) return;
+      const unsubStart = transport.listenMessages(startAction, (requestId, value) => {
+        if (subscriptions.has(requestId)) return;
 
-          let interrupted = false;
+        let interrupted = false;
 
-          const unsubscribe = handler(
-            value as StartCodecType<M>,
-            // send callback
-            (value) => {
-              transport.postMessage(requestId, { tag: receiveAction, value });
-            },
-            // interrupt callback
-            () => {
-              interrupted = true;
-              subscriptions.delete(requestId);
-              transport.postMessage(requestId, { tag: interruptAction, value: undefined });
-            },
-          );
+        const unsubscribe = handler(
+          value as StartCodecType<M>,
+          // send callback
+          value => {
+            transport.postMessage(requestId, { tag: receiveAction, value });
+          },
+          // interrupt callback
+          () => {
+            interrupted = true;
+            subscriptions.delete(requestId);
+            transport.postMessage(requestId, { tag: interruptAction, value: undefined });
+          },
+        );
 
-          if (interrupted) {
-            unsubscribe();
-          } else {
-            subscriptions.set(requestId, unsubscribe);
-          }
-        },
-      );
+        if (interrupted) {
+          unsubscribe();
+        } else {
+          subscriptions.set(requestId, unsubscribe);
+        }
+      });
 
-      const unsubStop = transport.listenMessages(stopAction, (requestId) => {
+      const unsubStop = transport.listenMessages(stopAction, requestId => {
         subscriptions.get(requestId)?.();
         subscriptions.delete(requestId);
       });

@@ -54,10 +54,7 @@ export type {
 // Local storage
 // ---------------------------------------------------------------------------
 
-export type {
-  StorageKeyType as StorageKey,
-  StorageValueType as StorageValue,
-} from '../codec/scale/v1/localStorage.js';
+export type { StorageKeyType as StorageKey, StorageValueType as StorageValue } from '../codec/scale/v1/localStorage.js';
 
 // ---------------------------------------------------------------------------
 // Chat
@@ -145,10 +142,7 @@ export type {
 // Preimage
 // ---------------------------------------------------------------------------
 
-export type {
-  PreimageKeyType as PreimageKey,
-  PreimageValueType as PreimageValue,
-} from '../codec/scale/v1/preimage.js';
+export type { PreimageKeyType as PreimageKey, PreimageValueType as PreimageValue } from '../codec/scale/v1/preimage.js';
 
 // ---------------------------------------------------------------------------
 // Custom renderer

@@ -5,10 +5,10 @@
  * Hosts that support preimage should override these.
  */
 
-import type { Container } from '@polkadot/host-api';
+import type { ProtocolHandler } from '@polkadot/host-api';
 import { errAsync } from '@polkadot/host-api';
 
-export function wirePreimageHandlers(container: Container): VoidFunction[] {
+export function wirePreimageHandlers(container: ProtocolHandler): VoidFunction[] {
   const cleanups: VoidFunction[] = [];
 
   cleanups.push(
@@ -19,7 +19,7 @@ export function wirePreimageHandlers(container: Container): VoidFunction[] {
   );
 
   cleanups.push(
-    container.handlePreimageSubmit((_params) => {
+    container.handlePreimageSubmit(_params => {
       return errAsync({ tag: 'Unknown', value: { reason: 'Preimage not supported' } });
     }),
   );

@@ -64,7 +64,7 @@ describe('Host SDK (auth manager integration)', () => {
       const auth = createAuthManager();
       const states: string[] = [];
 
-      auth.subscribe((state) => states.push(state.status));
+      auth.subscribe(state => states.push(state.status));
 
       auth.setState({ status: 'pairing', payload: 'data' });
       auth.setState({

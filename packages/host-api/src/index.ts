@@ -116,13 +116,30 @@ export type {
 // ===========================================================================
 
 export type { CodecAdapter, PostMessageData, ProtocolMessage } from './shared/codec/adapter.js';
-export { createScaleCodecAdapter, scaleCodecAdapter, Message, MessagePayload, hostApiProtocol } from './shared/codec/scale/protocol.js';
+export {
+  createScaleCodecAdapter,
+  scaleCodecAdapter,
+  Message,
+  MessagePayload,
+  hostApiProtocol,
+} from './shared/codec/scale/protocol.js';
 export type {
-  RequestMethod, SubscriptionMethod, ActionString,
-  RequestVersions, ResponseVersions, StartVersions, ReceiveVersions,
-  RequestCodecType, ResponseCodecType, StartCodecType, ReceiveCodecType,
-  RequestParams, ResponseOk, ResponseErr,
-  SubscriptionParams, SubscriptionPayload,
+  RequestMethod,
+  SubscriptionMethod,
+  ActionString,
+  RequestVersions,
+  ResponseVersions,
+  StartVersions,
+  ReceiveVersions,
+  RequestCodecType,
+  ResponseCodecType,
+  StartCodecType,
+  ReceiveCodecType,
+  RequestParams,
+  ResponseOk,
+  ResponseErr,
+  SubscriptionParams,
+  SubscriptionPayload,
 } from './shared/codec/scale/protocol.js';
 export { structuredCloneCodecAdapter } from './shared/codec/structured/index.js';
 export { UPGRADE_TIMEOUT, requestCodecUpgrade, handleCodecUpgrade } from './shared/codec/negotiation.js';
@@ -166,12 +183,7 @@ export { createDefaultLogger } from './shared/util/logger.js';
 export type { Logger } from './shared/util/logger.js';
 
 export { createIdFactory } from './shared/util/idFactory.js';
-export {
-  delay,
-  promiseWithResolvers,
-  composeAction,
-  extractErrorMessage,
-} from './shared/util/helpers.js';
+export { delay, promiseWithResolvers, composeAction, extractErrorMessage } from './shared/util/helpers.js';
 
 // ===========================================================================
 // Shared: common types
@@ -189,7 +201,7 @@ export type { Ok, Err } from 'neverthrow';
 
 export { createProtocolHandler } from './host/protocolHandler.js';
 export type { CreateProtocolHandlerOptions } from './host/protocolHandler.js';
-export type { Container } from './host/types.js';
+export type { ProtocolHandler } from './host/types.js';
 
 export { createHostWebviewProvider } from './host/webviewProvider.js';
 export type { CreateHostWebviewProviderParams, WebviewTag } from './host/webviewProvider.js';

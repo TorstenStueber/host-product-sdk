@@ -29,7 +29,11 @@ function createMockPort() {
       }
     },
   };
-  return port as unknown as MessagePort & { _emit: (data: unknown) => void; start: ReturnType<typeof vi.fn>; postMessage: ReturnType<typeof vi.fn> };
+  return port as unknown as MessagePort & {
+    _emit: (data: unknown) => void;
+    start: ReturnType<typeof vi.fn>;
+    postMessage: ReturnType<typeof vi.fn>;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -118,7 +122,9 @@ describe('createMessagePortProvider', () => {
 
   it('queues postMessage calls until port resolves', async () => {
     let resolvePort!: (port: MessagePort) => void;
-    const portPromise = new Promise<MessagePort>(r => { resolvePort = r; });
+    const portPromise = new Promise<MessagePort>(r => {
+      resolvePort = r;
+    });
 
     const provider = createMessagePortProvider(portPromise);
 
@@ -229,7 +235,9 @@ describe('createMessagePortProvider', () => {
 
   it('dispose before async port resolves clears onmessage after resolve', async () => {
     let resolvePort!: (port: MessagePort) => void;
-    const portPromise = new Promise<MessagePort>(r => { resolvePort = r; });
+    const portPromise = new Promise<MessagePort>(r => {
+      resolvePort = r;
+    });
 
     const provider = createMessagePortProvider(portPromise);
     provider.dispose();

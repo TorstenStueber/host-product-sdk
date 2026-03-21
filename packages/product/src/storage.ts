@@ -32,15 +32,11 @@ export const createLocalStorage = (hostApi: HostApi = defaultHostApi) => {
   }
 
   function writeBytes(key: string, value: Uint8Array): Promise<void> {
-    return new Promise<void>((resolve, reject) =>
-      hostApi.localStorageWrite([key, value]).match(resolve, reject),
-    );
+    return new Promise<void>((resolve, reject) => hostApi.localStorageWrite([key, value]).match(resolve, reject));
   }
 
   function clearKey(key: string): Promise<void> {
-    return new Promise<void>((resolve, reject) =>
-      hostApi.localStorageClear(key).match(resolve, reject),
-    );
+    return new Promise<void>((resolve, reject) => hostApi.localStorageClear(key).match(resolve, reject));
   }
 
   return {

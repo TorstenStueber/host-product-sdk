@@ -5,10 +5,10 @@
  * Hosts that support statement store should override these.
  */
 
-import type { Container } from '@polkadot/host-api';
+import type { ProtocolHandler } from '@polkadot/host-api';
 import { errAsync } from '@polkadot/host-api';
 
-export function wireStatementStoreHandlers(container: Container): VoidFunction[] {
+export function wireStatementStoreHandlers(container: ProtocolHandler): VoidFunction[] {
   const cleanups: VoidFunction[] = [];
 
   cleanups.push(
@@ -19,13 +19,13 @@ export function wireStatementStoreHandlers(container: Container): VoidFunction[]
   );
 
   cleanups.push(
-    container.handleStatementStoreCreateProof((_params) => {
+    container.handleStatementStoreCreateProof(_params => {
       return errAsync({ tag: 'Unknown', value: { reason: 'Statement store not supported' } });
     }),
   );
 
   cleanups.push(
-    container.handleStatementStoreSubmit((_params) => {
+    container.handleStatementStoreSubmit(_params => {
       return errAsync({ reason: 'Statement store not supported' });
     }),
   );

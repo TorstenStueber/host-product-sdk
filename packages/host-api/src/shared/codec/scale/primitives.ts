@@ -137,7 +137,6 @@ export function Status<const T>(...list: T[]): Codec<T> {
 export function lazy<T>(fn: () => Codec<T>): Codec<T> {
   return createCodec(
     (v: T) => fn().enc(v),
-    (v) => fn().dec(v),
+    v => fn().dec(v),
   );
 }
-

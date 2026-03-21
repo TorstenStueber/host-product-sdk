@@ -105,19 +105,17 @@ export async function createNonProductExtensionEnableFactory(
 
   async function enable(_origin?: string): Promise<Injected> {
     async function getAccounts(): Promise<InjectedAccount[]> {
-      const response = await hostApi.getNonProductAccounts(
-        undefined,
-      );
+      const response = await hostApi.getNonProductAccounts(undefined);
 
       return response.match(
-        (response) => {
+        response => {
           return response.map<InjectedAccount>(account => ({
             name: account.name ?? undefined,
             address: accountId.dec(account.publicKey),
             type: 'sr25519',
           }));
         },
-        (err) => {
+        err => {
           throw err;
         },
       );
@@ -149,14 +147,14 @@ export async function createNonProductExtensionEnableFactory(
           const response = await hostApi.signRaw(payload);
 
           return response.match(
-            (response) => {
+            response => {
               return {
                 id: 0,
                 signature: response.signature,
                 signedTransaction: response.signedTransaction,
               };
             },
-            (err) => {
+            err => {
               throw err;
             },
           );
@@ -182,37 +180,30 @@ export async function createNonProductExtensionEnableFactory(
             withSignedTransaction: payload.withSignedTransaction,
           };
 
-          const response = await hostApi.signPayload(
-            codecPayload,
-          );
+          const response = await hostApi.signPayload(codecPayload);
 
           return response.match(
-            (response) => {
+            response => {
               return {
                 id: 0,
                 signature: response.signature,
                 signedTransaction: response.signedTransaction,
               };
             },
-            (err) => {
+            err => {
               throw err;
             },
           );
         },
 
-        async createTransaction(
-          payload: VersionedTxPayload,
-        ): Promise<HexString> {
-          const response =
-            await hostApi.createTransactionWithNonProductAccount(
-              payload,
-            );
+        async createTransaction(payload: VersionedTxPayload): Promise<HexString> {
+          const response = await hostApi.createTransactionWithNonProductAccount(payload);
 
           return response.match(
-            (response) => {
+            response => {
               return response;
             },
-            (err) => {
+            err => {
               throw err;
             },
           );
@@ -238,9 +229,7 @@ export async function createNonProductExtensionEnableFactory(
  * @param transport - The transport to use. Pass `null` to skip injection.
  * @returns `true` if injection succeeded, `false` otherwise.
  */
-export async function injectSpektrExtension(
-  hostApi: HostApi = defaultHostApi,
-): Promise<boolean> {
+export async function injectSpektrExtension(hostApi: HostApi = defaultHostApi): Promise<boolean> {
   try {
     const enable = await createNonProductExtensionEnableFactory(hostApi);
 

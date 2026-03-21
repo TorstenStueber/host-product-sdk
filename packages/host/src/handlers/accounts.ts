@@ -8,12 +8,12 @@
  * - accountConnectionStatusSubscribe: tracks auth state
  */
 
-import type { Container } from '@polkadot/host-api';
+import type { ProtocolHandler } from '@polkadot/host-api';
 import type { HandlersConfig } from './registry.js';
 import { deriveProductPublicKey } from '../auth/crypto.js';
 import { okAsync, errAsync } from '@polkadot/host-api';
 
-export function wireAccountHandlers(container: Container, config: HandlersConfig): VoidFunction[] {
+export function wireAccountHandlers(container: ProtocolHandler, config: HandlersConfig): VoidFunction[] {
   const cleanups: VoidFunction[] = [];
 
   // Account get - derives product-specific key from session
@@ -24,11 +24,7 @@ export function wireAccountHandlers(container: Container, config: HandlersConfig
         return errAsync({ tag: 'NotConnected', value: undefined });
       }
 
-      const publicKey = deriveProductPublicKey(
-        session.rootPublicKey,
-        dotNsIdentifier,
-        derivationIndex,
-      );
+      const publicKey = deriveProductPublicKey(session.rootPublicKey, dotNsIdentifier, derivationIndex);
 
       return okAsync({ publicKey, name: undefined });
     }),
@@ -36,7 +32,7 @@ export function wireAccountHandlers(container: Container, config: HandlersConfig
 
   // Account get alias - requires ring VRF, not yet implemented
   cleanups.push(
-    container.handleAccountGetAlias((_params) => {
+    container.handleAccountGetAlias(_params => {
       // TODO: Implement ring VRF alias derivation
       return errAsync({ tag: 'Unknown', value: { reason: 'Ring VRF alias not yet implemented' } });
     }),
@@ -44,7 +40,7 @@ export function wireAccountHandlers(container: Container, config: HandlersConfig
 
   // Account create proof - requires ring VRF, not yet implemented
   cleanups.push(
-    container.handleAccountCreateProof((_params) => {
+    container.handleAccountCreateProof(_params => {
       // TODO: Implement ring VRF proof creation
       return errAsync({ tag: 'Unknown', value: { reason: 'Ring VRF proof not yet implemented' } });
     }),
@@ -52,7 +48,7 @@ export function wireAccountHandlers(container: Container, config: HandlersConfig
 
   // Get non-product accounts - returns root account from session
   cleanups.push(
-    container.handleGetNonProductAccounts((_params) => {
+    container.handleGetNonProductAccounts(_params => {
       const session = config.getSession?.();
       if (!session) {
         return okAsync([]);
@@ -75,7 +71,7 @@ export function wireAccountHandlers(container: Container, config: HandlersConfig
         return () => {};
       }
 
-      return config.subscribeAuthState((state) => {
+      return config.subscribeAuthState(state => {
         send(state === 'authenticated' ? 'connected' : 'disconnected');
       });
     }),

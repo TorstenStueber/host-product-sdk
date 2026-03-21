@@ -117,107 +117,83 @@ async function waitReady(): Promise<boolean> {
 }
 
 async function testFeatureSupported(genesisHash: string): Promise<unknown> {
-  const result = await transport.request(
-    'host_feature_supported',
-    { tag: 'v1', value: { tag: 'Chain', value: genesisHash } },
-  );
+  const result = await transport.request('host_feature_supported', {
+    tag: 'v1',
+    value: { tag: 'Chain', value: genesisHash },
+  });
   return result;
 }
 
 async function testAccountGet(): Promise<unknown> {
-  const result = await transport.request(
-    'host_account_get',
-    { tag: 'v1', value: ['testProduct', 0] },
-  );
+  const result = await transport.request('host_account_get', { tag: 'v1', value: ['testProduct', 0] });
   return result;
 }
 
 async function testGetNonProductAccounts(): Promise<unknown> {
-  const result = await transport.request(
-    'host_get_non_product_accounts',
-    { tag: 'v1', value: undefined },
-  );
+  const result = await transport.request('host_get_non_product_accounts', { tag: 'v1', value: undefined });
   return result;
 }
 
 async function testSignPayload(): Promise<unknown> {
-  const result = await transport.request(
-    'host_sign_payload',
-    {
-      tag: 'v1',
-      value: {
-        address: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
-        blockHash: '0x1234',
-        blockNumber: '0x01',
-        era: '0x00',
-        genesisHash: '0xabc123',
-        method: '0xcafe',
-        nonce: '0x01',
-        specVersion: '0x01',
-        tip: '0x00',
-        transactionVersion: '0x01',
-        signedExtensions: [],
-        version: 4,
-        assetId: undefined,
-        metadataHash: undefined,
-        mode: undefined,
-        withSignedTransaction: undefined,
-      },
+  const result = await transport.request('host_sign_payload', {
+    tag: 'v1',
+    value: {
+      address: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
+      blockHash: '0x1234',
+      blockNumber: '0x01',
+      era: '0x00',
+      genesisHash: '0xabc123',
+      method: '0xcafe',
+      nonce: '0x01',
+      specVersion: '0x01',
+      tip: '0x00',
+      transactionVersion: '0x01',
+      signedExtensions: [],
+      version: 4,
+      assetId: undefined,
+      metadataHash: undefined,
+      mode: undefined,
+      withSignedTransaction: undefined,
     },
-  );
+  });
   return result;
 }
 
 async function testSignRaw(): Promise<unknown> {
-  const result = await transport.request(
-    'host_sign_raw',
-    {
-      tag: 'v1',
-      value: {
-        address: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
-        data: { tag: 'Payload', value: 'hello world' },
-      },
+  const result = await transport.request('host_sign_raw', {
+    tag: 'v1',
+    value: {
+      address: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
+      data: { tag: 'Payload', value: 'hello world' },
     },
-  );
+  });
   return result;
 }
 
 async function testLocalStorage(): Promise<unknown> {
   // Write
   const writeValue = new TextEncoder().encode('test-value-123');
-  await transport.request(
-    'host_local_storage_write',
-    { tag: 'v1', value: ['myKey', writeValue] },
-  );
+  await transport.request('host_local_storage_write', { tag: 'v1', value: ['myKey', writeValue] });
 
   // Read
-  const readResult = await transport.request(
-    'host_local_storage_read',
-    { tag: 'v1', value: 'myKey' },
-  );
+  const readResult = await transport.request('host_local_storage_read', { tag: 'v1', value: 'myKey' });
 
   // Clear
-  await transport.request(
-    'host_local_storage_clear',
-    { tag: 'v1', value: 'myKey' },
-  );
+  await transport.request('host_local_storage_clear', { tag: 'v1', value: 'myKey' });
 
   // Read after clear
-  const readAfterClear = await transport.request(
-    'host_local_storage_read',
-    { tag: 'v1', value: 'myKey' },
-  );
+  const readAfterClear = await transport.request('host_local_storage_read', { tag: 'v1', value: 'myKey' });
 
   return { readResult, readAfterClear };
 }
 
 async function testConnectionStatus(): Promise<unknown> {
-  return new Promise<unknown>((resolve) => {
+  return new Promise<unknown>(resolve => {
     const statuses: unknown[] = [];
     const sub: Subscription = transport.subscribe(
       'host_account_connection_status_subscribe',
       { tag: 'v1', value: undefined },
-      (payload) => {
+      payload => {
         statuses.push(payload);
         if (statuses.length >= 1) {
           sub.unsubscribe();
@@ -232,103 +208,84 @@ async function testConnectionStatus(): Promise<unknown> {
 }
 
 async function testNavigateTo(): Promise<unknown> {
-  const result = await transport.request(
-    'host_navigate_to',
-    { tag: 'v1', value: 'https://polkadot.network' },
-  );
+  const result = await transport.request('host_navigate_to', { tag: 'v1', value: 'https://polkadot.network' });
   return result;
 }
 
 async function testDevicePermission(): Promise<unknown> {
-  const result = await transport.request(
-    'host_device_permission',
-    { tag: 'v1', value: 'Camera' },
-  );
+  const result = await transport.request('host_device_permission', { tag: 'v1', value: 'Camera' });
   return result;
 }
 
 // -- Error test runners -------------------------------------------------------
 
 async function testSignPayloadRejected(): Promise<unknown> {
-  const result = await transport.request(
-    'host_sign_payload',
-    {
-      tag: 'v1',
-      value: {
-        address: 'REJECT_ME',
-        blockHash: '0x1234',
-        blockNumber: '0x01',
-        era: '0x00',
-        genesisHash: '0xabc123',
-        method: '0xcafe',
-        nonce: '0x01',
-        specVersion: '0x01',
-        tip: '0x00',
-        transactionVersion: '0x01',
-        signedExtensions: [],
-        version: 4,
-        assetId: undefined,
-        metadataHash: undefined,
-        mode: undefined,
-        withSignedTransaction: undefined,
-      },
+  const result = await transport.request('host_sign_payload', {
+    tag: 'v1',
+    value: {
+      address: 'REJECT_ME',
+      blockHash: '0x1234',
+      blockNumber: '0x01',
+      era: '0x00',
+      genesisHash: '0xabc123',
+      method: '0xcafe',
+      nonce: '0x01',
+      specVersion: '0x01',
+      tip: '0x00',
+      transactionVersion: '0x01',
+      signedExtensions: [],
+      version: 4,
+      assetId: undefined,
+      metadataHash: undefined,
+      mode: undefined,
+      withSignedTransaction: undefined,
     },
-  );
+  });
   return result;
 }
 
 async function testCreateTransactionError(): Promise<unknown> {
-  const result = await transport.request(
-    'host_create_transaction',
-    {
-      tag: 'v1',
-      value: [
-        ['testApp', 0],
-        {
-          tag: 'v1',
-          value: {
-            signer: null,
-            callData: '0xcafe',
-            extensions: [],
-            txExtVersion: 0,
-            context: {
-              metadata: '0x00',
-              tokenSymbol: 'DOT',
-              tokenDecimals: 10,
-              bestBlockHeight: 100,
-            },
+  const result = await transport.request('host_create_transaction', {
+    tag: 'v1',
+    value: [
+      ['testApp', 0],
+      {
+        tag: 'v1',
+        value: {
+          signer: null,
+          callData: '0xcafe',
+          extensions: [],
+          txExtVersion: 0,
+          context: {
+            metadata: '0x00',
+            tokenSymbol: 'DOT',
+            tokenDecimals: 10,
+            bestBlockHeight: 100,
           },
         },
-      ],
-    },
-  );
+      },
+    ],
+  });
   return result;
 }
 
 async function testAccountGetAliasError(): Promise<unknown> {
-  const result = await transport.request(
-    'host_account_get_alias',
-    { tag: 'v1', value: ['testApp', 0] },
-  );
+  const result = await transport.request('host_account_get_alias', { tag: 'v1', value: ['testApp', 0] });
   return result;
 }
 
 async function testNavigateToBlocked(): Promise<unknown> {
-  const result = await transport.request(
-    'host_navigate_to',
-    { tag: 'v1', value: 'blocked://denied' },
-  );
+  const result = await transport.request('host_navigate_to', { tag: 'v1', value: 'blocked://denied' });
   return result;
 }
 
 async function testStorageWriteFull(): Promise<unknown> {
-  const result = await transport.request(
-    'host_local_storage_write',
-    { tag: 'v1', value: ['__FULL__', new TextEncoder().encode('data')] },
-  );
+  const result = await transport.request('host_local_storage_write', {
+    tag: 'v1',
+    value: ['__FULL__', new TextEncoder().encode('data')],
+  });
   return result;
 }
-
 
 // -- Dispatcher (Playwright calls window.__e2e.run('testName')) ---------------
 

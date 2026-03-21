@@ -13,11 +13,7 @@ export type MockProvider = Provider & {
   _injectMessage(message: unknown): void;
 };
 
-function createMockProvider(
-  name: string,
-  isCorrectEnv: boolean,
-  sendTo: () => MockProvider | null,
-): MockProvider {
+function createMockProvider(name: string, isCorrectEnv: boolean, sendTo: () => MockProvider | null): MockProvider {
   const logger: Logger = createDefaultLogger(name);
   const subscribers = new Set<(message: unknown) => void>();
   let disposed = false;
@@ -71,11 +67,7 @@ export function createMockProviderPair(): [MockProvider, MockProvider] {
   let productProvider: MockProvider;
 
   // Host provider: correct environment = true (it IS the host)
-  hostProvider = createMockProvider(
-    'host',
-    true,
-    () => productProvider,
-  );
+  hostProvider = createMockProvider('host', true, () => productProvider);
 
   // Product provider: correct environment = true as well.
   // Both sides must report isCorrectEnvironment() = true for their
@@ -83,11 +75,7 @@ export function createMockProviderPair(): [MockProvider, MockProvider] {
   // The host transport auto-wires the handshake handler only when
   // isCorrectEnvironment is true, so we distinguish host from product
   // by which provider auto-wires the handler (the host one).
-  productProvider = createMockProvider(
-    'product',
-    true,
-    () => hostProvider,
-  );
+  productProvider = createMockProvider('product', true, () => hostProvider);
 
   return [hostProvider, productProvider];
 }
@@ -100,11 +88,7 @@ export function createSyncMockProviderPair(): [MockProvider, MockProvider] {
   let hostProvider: MockProvider;
   let productProvider: MockProvider;
 
-  function createSyncProvider(
-    name: string,
-    isCorrectEnv: boolean,
-    sendTo: () => MockProvider | null,
-  ): MockProvider {
+  function createSyncProvider(name: string, isCorrectEnv: boolean, sendTo: () => MockProvider | null): MockProvider {
     const logger: Logger = createDefaultLogger(name);
     const subscribers = new Set<(message: unknown) => void>();
     let disposed = false;

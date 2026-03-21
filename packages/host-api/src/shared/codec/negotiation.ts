@@ -84,11 +84,7 @@ export async function requestCodecUpgrade(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort('Codec upgrade timeout'), UPGRADE_TIMEOUT);
 
-    const response = await transport.request(
-      'host_codec_upgrade',
-      { tag: 'v1', value: request },
-      controller.signal,
-    );
+    const response = await transport.request('host_codec_upgrade', { tag: 'v1', value: request }, controller.signal);
 
     clearTimeout(timeout);
 
@@ -128,55 +124,49 @@ export async function requestCodecUpgrade(
  * @param adapters - Map of format → CodecAdapter the host supports.
  * @returns An unsubscribe function that removes the handler.
  */
-export function handleCodecUpgrade(
-  transport: Transport,
-  adapters: CodecAdapterMap,
-): VoidFunction {
+export function handleCodecUpgrade(transport: Transport, adapters: CodecAdapterMap): VoidFunction {
   const preference: CodecFormat[] = ['structured_clone', 'scale'];
   const fallbackResponse = { tag: 'v1', value: { selectedFormat: 'scale' } };
 
-  return transport.listenMessages(
-    'host_codec_upgrade_request',
-    (requestId, value) => {
-      const envelope = value as { tag: string; value: CodecUpgradeRequest };
-      const request = envelope?.value;
+  return transport.listenMessages('host_codec_upgrade_request', (requestId, value) => {
+    const envelope = value as { tag: string; value: CodecUpgradeRequest };
+    const request = envelope?.value;
 
-      if (!request?.supportedFormats) {
-        transport.postMessage(requestId, {
-          tag: 'host_codec_upgrade_response',
-          value: fallbackResponse,
-        });
-        return;
-      }
-
-      const productFormats = new Set(request.supportedFormats);
-
-      // Pick the best format from the intersection (structured_clone preferred).
-      let selected: CodecFormat | undefined;
-      for (const format of preference) {
-        if (productFormats.has(format) && adapters[format]) {
-          selected = format;
-          break;
-        }
-      }
-
-      if (!selected) {
-        transport.postMessage(requestId, {
-          tag: 'host_codec_upgrade_response',
-          value: fallbackResponse,
-        });
-        return;
-      }
-
-      // Swap BEFORE sending the response so the response itself is
-      // encoded with the new codec. The product's decodeIncoming will
-      // detect the format and auto-upgrade its outgoing codec too.
-      transport.swapCodecAdapter(adapters[selected]!);
-
+    if (!request?.supportedFormats) {
       transport.postMessage(requestId, {
         tag: 'host_codec_upgrade_response',
-        value: { tag: 'v1', value: { selectedFormat: selected } },
+        value: fallbackResponse,
       });
-    },
-  );
+      return;
+    }
+
+    const productFormats = new Set(request.supportedFormats);
+
+    // Pick the best format from the intersection (structured_clone preferred).
+    let selected: CodecFormat | undefined;
+    for (const format of preference) {
+      if (productFormats.has(format) && adapters[format]) {
+        selected = format;
+        break;
+      }
+    }
+
+    if (!selected) {
+      transport.postMessage(requestId, {
+        tag: 'host_codec_upgrade_response',
+        value: fallbackResponse,
+      });
+      return;
+    }
+
+    // Swap BEFORE sending the response so the response itself is
+    // encoded with the new codec. The product's decodeIncoming will
+    // detect the format and auto-upgrade its outgoing codec too.
+    transport.swapCodecAdapter(adapters[selected]!);
+
+    transport.postMessage(requestId, {
+      tag: 'host_codec_upgrade_response',
+      value: { tag: 'v1', value: { selectedFormat: selected } },
+    });
+  });
 }

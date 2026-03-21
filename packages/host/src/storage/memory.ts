@@ -6,12 +6,8 @@
 
 import type { StorageAdapter } from './types.js';
 
-export function createMemoryStorageAdapter(
-  initial?: Record<string, Uint8Array>,
-): StorageAdapter {
-  const storage = new Map<string, Uint8Array>(
-    initial ? Object.entries(initial) : [],
-  );
+export function createMemoryStorageAdapter(initial?: Record<string, Uint8Array>): StorageAdapter {
+  const storage = new Map<string, Uint8Array>(initial ? Object.entries(initial) : []);
 
   return {
     async read(key: string): Promise<Uint8Array | null> {

@@ -22,7 +22,7 @@ import type { MockProvider } from '../helpers/mockProvider.js';
 
 /** Flush microtask queue (for async provider delivery). */
 function flush(): Promise<void> {
-  return new Promise((r) => setTimeout(r, 0));
+  return new Promise(r => setTimeout(r, 0));
 }
 
 // ---------------------------------------------------------------------------
@@ -40,8 +40,16 @@ describe('Transport', () => {
   });
 
   afterEach(() => {
-    try { hostTransport?.destroy(); } catch { /* already destroyed */ }
-    try { productTransport?.destroy(); } catch { /* already destroyed */ }
+    try {
+      hostTransport?.destroy();
+    } catch {
+      /* already destroyed */
+    }
+    try {
+      productTransport?.destroy();
+    } catch {
+      /* already destroyed */
+    }
   });
 
   // -----------------------------------------------------------------------
@@ -120,7 +128,7 @@ describe('Transport', () => {
       });
 
       const statuses: string[] = [];
-      productTransport.onConnectionStatusChange((status) => {
+      productTransport.onConnectionStatusChange(status => {
         statuses.push(status);
       });
 
@@ -147,7 +155,7 @@ describe('Transport', () => {
 
     it('send request with ID, response with same ID resolves promise', async () => {
       // Host handles "host_feature_supported" requests
-      hostTransport.handleRequest('host_feature_supported', async (msg) => {
+      hostTransport.handleRequest('host_feature_supported', async msg => {
         // Unwrap and respond with a valid versioned response
         return { tag: 'v1', value: { success: true, value: true } };
       });
@@ -163,11 +171,11 @@ describe('Transport', () => {
     });
 
     it('multiple concurrent requests resolve independently', async () => {
-      hostTransport.handleRequest('host_feature_supported', async (msg) => {
+      hostTransport.handleRequest('host_feature_supported', async msg => {
         // Add a small delay to keep the concurrency test meaningful
-        await new Promise((r) => setTimeout(r, 5));
+        await new Promise(r => setTimeout(r, 5));
         // Differentiate responses based on the genesis hash in the payload
-        const inner = (msg as { tag: string; value: { tag: string; value: string } });
+        const inner = msg as { tag: string; value: { tag: string; value: string } };
         const isFirst = inner.value.value === '0xaaa111';
         return {
           tag: 'v1',
@@ -231,11 +239,11 @@ describe('Transport', () => {
 
       await productTransport.isReady();
 
-      await new Promise<void>((resolve) => {
+      await new Promise<void>(resolve => {
         const sub = productTransport.subscribe(
           'host_account_connection_status_subscribe',
           { tag: 'v1', value: undefined },
-          (value) => {
+          value => {
             received.push(value);
           },
         );
@@ -271,20 +279,20 @@ describe('Transport', () => {
       const sub = productTransport.subscribe(
         'host_account_connection_status_subscribe',
         { tag: 'v1', value: undefined },
-        (value) => {
+        value => {
           received.push(value);
         },
       );
 
       // Wait for a few ticks
-      await new Promise((r) => setTimeout(r, 30));
+      await new Promise(r => setTimeout(r, 30));
       const countBefore = received.length;
       expect(countBefore).toBeGreaterThan(0);
 
       sub.unsubscribe();
 
       // Wait more and verify no new values
-      await new Promise((r) => setTimeout(r, 30));
+      await new Promise(r => setTimeout(r, 30));
       expect(received.length).toBe(countBefore);
     });
   });
@@ -327,15 +335,19 @@ describe('Transport', () => {
       const sub1 = productTransport.subscribe(
         'host_account_connection_status_subscribe',
         { tag: 'v1', value: undefined },
-        (v) => { received1.push(v); },
+        v => {
+          received1.push(v);
+        },
       );
       const sub2 = productTransport.subscribe(
         'host_account_connection_status_subscribe',
         { tag: 'v1', value: undefined },
-        (v) => { received2.push(v); },
+        v => {
+          received2.push(v);
+        },
       );
 
-      await new Promise((r) => setTimeout(r, 50));
+      await new Promise(r => setTimeout(r, 50));
 
       // Both should have received the same events
       expect(received1.length).toBeGreaterThan(0);
@@ -361,7 +373,7 @@ describe('Transport', () => {
       });
 
       const statuses: string[] = [];
-      transport.onConnectionStatusChange((s) => statuses.push(s));
+      transport.onConnectionStatusChange(s => statuses.push(s));
 
       // Initial status should be 'disconnected' (before handshake)
       expect(statuses).toContain('disconnected');
@@ -379,7 +391,7 @@ describe('Transport', () => {
       });
 
       const statuses: string[] = [];
-      productTransport.onConnectionStatusChange((s) => statuses.push(s));
+      productTransport.onConnectionStatusChange(s => statuses.push(s));
 
       await productTransport.isReady();
 
@@ -411,7 +423,7 @@ describe('Transport', () => {
       });
 
       const statuses: string[] = [];
-      hostTransport.onConnectionStatusChange((s) => statuses.push(s));
+      hostTransport.onConnectionStatusChange(s => statuses.push(s));
 
       hostTransport.destroy();
 
@@ -441,16 +453,22 @@ describe('Transport', () => {
       });
 
       const messages: unknown[] = [];
-      pp.subscribe((msg) => messages.push(msg));
+      pp.subscribe(msg => messages.push(msg));
 
       // Before swap: transport starts with SCALE codec, so messages are Uint8Array
-      transport.postMessage('id1', { tag: 'host_feature_supported_request', value: { tag: 'v1', value: { tag: 'Chain', value: '0xabc123' } } });
+      transport.postMessage('id1', {
+        tag: 'host_feature_supported_request',
+        value: { tag: 'v1', value: { tag: 'Chain', value: '0xabc123' } },
+      });
       expect(messages.length).toBe(1);
       expect(messages[0]).toBeInstanceOf(Uint8Array);
 
       // Swap to structured clone
       transport.swapCodecAdapter(structuredCloneCodecAdapter);
-      transport.postMessage('id2', { tag: 'host_feature_supported_request', value: { tag: 'v1', value: { tag: 'Chain', value: '0xdef456' } } });
+      transport.postMessage('id2', {
+        tag: 'host_feature_supported_request',
+        value: { tag: 'v1', value: { tag: 'Chain', value: '0xdef456' } },
+      });
 
       expect(messages.length).toBe(2);
       // After swap: messages are plain objects, not Uint8Array
@@ -482,15 +500,24 @@ describe('Transport', () => {
       // (the transport auto-detects plain objects with requestId)
       pp.postMessage({
         requestId: 'r1',
-        payload: { tag: 'host_feature_supported_request', value: { tag: 'v1', value: { tag: 'Chain', value: '0xaaa' } } },
+        payload: {
+          tag: 'host_feature_supported_request',
+          value: { tag: 'v1', value: { tag: 'Chain', value: '0xaaa' } },
+        },
       });
       pp.postMessage({
         requestId: 'r2',
-        payload: { tag: 'host_feature_supported_response', value: { tag: 'v1', value: { success: true, value: true } } },
+        payload: {
+          tag: 'host_feature_supported_response',
+          value: { tag: 'v1', value: { success: true, value: true } },
+        },
       });
       pp.postMessage({
         requestId: 'r3',
-        payload: { tag: 'host_feature_supported_request', value: { tag: 'v1', value: { tag: 'Chain', value: '0xbbb' } } },
+        payload: {
+          tag: 'host_feature_supported_request',
+          value: { tag: 'v1', value: { tag: 'Chain', value: '0xbbb' } },
+        },
       });
 
       await flush();
@@ -538,7 +565,7 @@ describe('Transport', () => {
     it('subscription to method with no handler gets interrupted', async () => {
       await productTransport.isReady();
 
-      const interrupted = await new Promise<boolean>((resolve) => {
+      const interrupted = await new Promise<boolean>(resolve => {
         const sub = productTransport.subscribe(
           'host_account_connection_status_subscribe',
           { tag: 'v1', value: undefined },
@@ -667,7 +694,7 @@ describe('Transport', () => {
       });
 
       const outgoing: unknown[] = [];
-      pp.subscribe((msg) => outgoing.push(msg));
+      pp.subscribe(msg => outgoing.push(msg));
 
       // Initially, outgoing messages are SCALE-encoded (Uint8Array)
       hostTransport.postMessage('id1', {

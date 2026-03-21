@@ -1,7 +1,7 @@
 /**
- * Container factory.
+ * ProtocolHandler factory.
  *
- * Creates a Container that bridges host and product via a Transport.
+ * Creates a ProtocolHandler that bridges host and product via a Transport.
  * Each handler method translates between the versioned wire format
  * (v1 tagged enums with Ok/Err results) and plain TypeScript types.
  *
@@ -13,18 +13,26 @@ import type { CodecAdapterMap } from '../shared/codec/negotiation.js';
 import type { Provider } from '../shared/transport/provider.js';
 import type { HexString } from '../shared/codec/scale/primitives.js';
 import type {
-  RequestMethod, SubscriptionMethod,
-  RequestVersions, StartVersions,
-  RequestCodecType, ResponseCodecType, StartCodecType, ReceiveCodecType,
-  RequestParams, ResponseOk, ResponseErr,
-  SubscriptionParams, SubscriptionPayload,
+  RequestMethod,
+  SubscriptionMethod,
+  RequestVersions,
+  StartVersions,
+  RequestCodecType,
+  ResponseCodecType,
+  StartCodecType,
+  ReceiveCodecType,
+  RequestParams,
+  ResponseOk,
+  ResponseErr,
+  SubscriptionParams,
+  SubscriptionPayload,
 } from '../shared/codec/scale/protocol.js';
 import { createTransport } from '../shared/transport/transport.js';
 import { handleCodecUpgrade } from '../shared/codec/negotiation.js';
 import type { ResultAsync } from 'neverthrow';
 
 import { createChainConnectionManager } from './connectionManager.js';
-import type { Container } from './types.js';
+import type { ProtocolHandler } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Wire format helpers
@@ -63,7 +71,7 @@ function genericError(reason: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Container options
+// ProtocolHandler options
 // ---------------------------------------------------------------------------
 
 export type CreateProtocolHandlerOptions = {
@@ -85,7 +93,7 @@ export type CreateProtocolHandlerOptions = {
 // Factory
 // ---------------------------------------------------------------------------
 
-export function createProtocolHandler(options: CreateProtocolHandlerOptions): Container {
+export function createProtocolHandler(options: CreateProtocolHandlerOptions): ProtocolHandler {
   const { provider, supportedCodecs } = options;
 
   const transport = createTransport({
@@ -149,8 +157,8 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
 
       const result = await handler(unwrapped.value as RequestParams<M, V>);
       return result.match(
-        (ok) => wrapOk(version, ok) as ResponseCodecType<M>,
-        (err) => wrapErr(version, err) as ResponseCodecType<M>,
+        ok => wrapOk(version, ok) as ResponseCodecType<M>,
+        err => wrapErr(version, err) as ResponseCodecType<M>,
       );
     }
 
@@ -204,12 +212,12 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
       const unwrapped = unwrap(params, version);
       if (!unwrapped.ok) {
         interrupt();
-        return () => { };
+        return () => {};
       }
 
       return handler(
         unwrapped.value as SubscriptionParams<M, V>,
-        (payload) => send(wrap(version, payload) as ReceiveCodecType<M>),
+        payload => send(wrap(version, payload) as ReceiveCodecType<M>),
         interrupt,
       );
     }
@@ -225,13 +233,13 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
       }
 
       interrupt();
-      return () => { };
+      return () => {};
     });
   }
 
-  // -- Container implementation ---------------------------------------------
+  // -- ProtocolHandler implementation ---------------------------------------------
 
-  const container: Container = {
+  const container: ProtocolHandler = {
     transport,
 
     // -- Core / lifecycle ---------------------------------------------------
@@ -253,39 +261,71 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
     },
 
     handleNavigateTo(handler) {
-      return wireRequest('host_navigate_to', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'host_navigate_to',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     // -- Local storage ------------------------------------------------------
 
     handleLocalStorageRead(handler) {
-      return wireRequest('host_local_storage_read', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'host_local_storage_read',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     handleLocalStorageWrite(handler) {
-      return wireRequest('host_local_storage_write', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'host_local_storage_write',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     handleLocalStorageClear(handler) {
-      return wireRequest('host_local_storage_clear', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'host_local_storage_clear',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     // -- Accounts -----------------------------------------------------------
 
     handleAccountGet(handler) {
-      return wireRequest('host_account_get', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'host_account_get',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     handleAccountGetAlias(handler) {
-      return wireRequest('host_account_get_alias', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'host_account_get_alias',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     handleAccountCreateProof(handler) {
-      return wireRequest('host_account_create_proof', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'host_account_create_proof',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     handleGetNonProductAccounts(handler) {
-      return wireRequest('host_get_non_product_accounts', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'host_get_non_product_accounts',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     handleAccountConnectionStatusSubscribe(handler) {
@@ -295,29 +335,53 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
     // -- Signing ------------------------------------------------------------
 
     handleSignPayload(handler) {
-      return wireRequest('host_sign_payload', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'host_sign_payload',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     handleSignRaw(handler) {
-      return wireRequest('host_sign_raw', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'host_sign_raw',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     handleCreateTransaction(handler) {
-      return wireRequest('host_create_transaction', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'host_create_transaction',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     handleCreateTransactionWithNonProductAccount(handler) {
-      return wireRequest('host_create_transaction_with_non_product_account', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'host_create_transaction_with_non_product_account',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     // -- Chat ---------------------------------------------------------------
 
     handleChatCreateRoom(handler) {
-      return wireRequest('host_chat_create_room', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'host_chat_create_room',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     handleChatRegisterBot(handler) {
-      return wireRequest('host_chat_register_bot', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'host_chat_register_bot',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     handleChatListSubscribe(handler) {
@@ -325,7 +389,11 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
     },
 
     handleChatPostMessage(handler) {
-      return wireRequest('host_chat_post_message', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'host_chat_post_message',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     handleChatActionSubscribe(handler) {
@@ -334,16 +402,12 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
 
     renderChatCustomMessage(params, callback) {
       init();
-      return transport.subscribe(
-        'product_chat_custom_message_render_subscribe',
-        { tag: 'v1', value: params },
-        (data) => {
-          const tagged = data as { tag: string; value: unknown };
-          if (tagged.tag === 'v1') {
-            callback(tagged.value as Parameters<typeof callback>[0]);
-          }
-        },
-      );
+      return transport.subscribe('product_chat_custom_message_render_subscribe', { tag: 'v1', value: params }, data => {
+        const tagged = data as { tag: string; value: unknown };
+        if (tagged.tag === 'v1') {
+          callback(tagged.value as Parameters<typeof callback>[0]);
+        }
+      });
     },
 
     // -- Statement store ----------------------------------------------------
@@ -353,11 +417,19 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
     },
 
     handleStatementStoreCreateProof(handler) {
-      return wireRequest('remote_statement_store_create_proof', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'remote_statement_store_create_proof',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     handleStatementStoreSubmit(handler) {
-      return wireRequest('remote_statement_store_submit', { v1: handler }, genericError(UNSUPPORTED_MESSAGE_FORMAT_ERROR));
+      return wireRequest(
+        'remote_statement_store_submit',
+        { v1: handler },
+        genericError(UNSUPPORTED_MESSAGE_FORMAT_ERROR),
+      );
     },
 
     // -- Preimage -----------------------------------------------------------
@@ -367,7 +439,11 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
     },
 
     handlePreimageSubmit(handler) {
-      return wireRequest('remote_preimage_submit', { v1: handler }, { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } });
+      return wireRequest(
+        'remote_preimage_submit',
+        { v1: handler },
+        { tag: 'Unknown', value: { reason: UNSUPPORTED_MESSAGE_FORMAT_ERROR } },
+      );
     },
 
     // -- Chain (individual methods) -----------------------------------------
@@ -401,27 +477,51 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
     },
 
     handleChainHeadStopOperation(handler) {
-      return wireRequest('remote_chain_head_stop_operation', { v1: handler }, genericError(UNSUPPORTED_MESSAGE_FORMAT_ERROR));
+      return wireRequest(
+        'remote_chain_head_stop_operation',
+        { v1: handler },
+        genericError(UNSUPPORTED_MESSAGE_FORMAT_ERROR),
+      );
     },
 
     handleChainSpecGenesisHash(handler) {
-      return wireRequest('remote_chain_spec_genesis_hash', { v1: handler }, genericError(UNSUPPORTED_MESSAGE_FORMAT_ERROR));
+      return wireRequest(
+        'remote_chain_spec_genesis_hash',
+        { v1: handler },
+        genericError(UNSUPPORTED_MESSAGE_FORMAT_ERROR),
+      );
     },
 
     handleChainSpecChainName(handler) {
-      return wireRequest('remote_chain_spec_chain_name', { v1: handler }, genericError(UNSUPPORTED_MESSAGE_FORMAT_ERROR));
+      return wireRequest(
+        'remote_chain_spec_chain_name',
+        { v1: handler },
+        genericError(UNSUPPORTED_MESSAGE_FORMAT_ERROR),
+      );
     },
 
     handleChainSpecProperties(handler) {
-      return wireRequest('remote_chain_spec_properties', { v1: handler }, genericError(UNSUPPORTED_MESSAGE_FORMAT_ERROR));
+      return wireRequest(
+        'remote_chain_spec_properties',
+        { v1: handler },
+        genericError(UNSUPPORTED_MESSAGE_FORMAT_ERROR),
+      );
     },
 
     handleChainTransactionBroadcast(handler) {
-      return wireRequest('remote_chain_transaction_broadcast', { v1: handler }, genericError(UNSUPPORTED_MESSAGE_FORMAT_ERROR));
+      return wireRequest(
+        'remote_chain_transaction_broadcast',
+        { v1: handler },
+        genericError(UNSUPPORTED_MESSAGE_FORMAT_ERROR),
+      );
     },
 
     handleChainTransactionStop(handler) {
-      return wireRequest('remote_chain_transaction_stop', { v1: handler }, genericError(UNSUPPORTED_MESSAGE_FORMAT_ERROR));
+      return wireRequest(
+        'remote_chain_transaction_stop',
+        { v1: handler },
+        genericError(UNSUPPORTED_MESSAGE_FORMAT_ERROR),
+      );
     },
 
     // -- High-level chain connection ----------------------------------------
@@ -440,14 +540,14 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
           const unwrapped = unwrap(params, version);
           if (!unwrapped.ok) {
             interrupt();
-            return () => { };
+            return () => {};
           }
           const { genesisHash, withRuntime } = unwrapped.value as { genesisHash: HexString; withRuntime: boolean };
 
           const entry = manager.getOrCreateChain(genesisHash);
           if (!entry) {
             interrupt();
-            return () => { };
+            return () => {};
           }
 
           const { followId } = manager.startFollow(genesisHash, withRuntime, (event: unknown) => {
@@ -482,7 +582,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
               return errorResult(UNSUPPORTED_MESSAGE_FORMAT_ERROR) as ResponseCodecType<M>;
             }
             try {
-              return await handler(unwrapped.value) as ResponseCodecType<M>;
+              return (await handler(unwrapped.value)) as ResponseCodecType<M>;
             } catch (e) {
               return errorResult(String(e)) as ResponseCodecType<M>;
             }
@@ -491,7 +591,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
       }
 
       // Header
-      wireChainRequest('remote_chain_head_header', async (value) => {
+      wireChainRequest('remote_chain_head_header', async value => {
         const { genesisHash, hash } = value as { genesisHash: HexString; hash: HexString };
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
@@ -500,7 +600,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
       });
 
       // Body
-      wireChainRequest('remote_chain_head_body', async (value) => {
+      wireChainRequest('remote_chain_head_body', async value => {
         const { genesisHash, hash } = value as { genesisHash: HexString; hash: HexString };
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
@@ -509,42 +609,51 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
       });
 
       // Storage
-      wireChainRequest('remote_chain_head_storage', async (value) => {
+      wireChainRequest('remote_chain_head_storage', async value => {
         const { genesisHash, hash, items, childTrie } = value as {
-          genesisHash: HexString; hash: HexString;
+          genesisHash: HexString;
+          hash: HexString;
           items: { key: HexString; type: string }[];
           childTrie: HexString | null;
         };
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
 
-        const jsonRpcItems = items.map((item) => ({
+        const jsonRpcItems = items.map(item => ({
           key: item.key,
           type: manager.convertStorageQueryTypeToJsonRpc(item.type),
         }));
 
         const result = await manager.sendRequest(genesisHash, 'chainHead_v1_storage', [
-          realSubId, hash, jsonRpcItems, childTrie,
+          realSubId,
+          hash,
+          jsonRpcItems,
+          childTrie,
         ]);
         return wrapOk(version, manager.convertOperationStartedResult(result));
       });
 
       // Call
-      wireChainRequest('remote_chain_head_call', async (value) => {
+      wireChainRequest('remote_chain_head_call', async value => {
         const params = value as {
-          genesisHash: HexString; hash: HexString;
-          function: string; callParameters: HexString;
+          genesisHash: HexString;
+          hash: HexString;
+          function: string;
+          callParameters: HexString;
         };
         const realSubId = manager.getChainFollowSubId(params.genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
         const result = await manager.sendRequest(params.genesisHash, 'chainHead_v1_call', [
-          realSubId, params.hash, params.function, params.callParameters,
+          realSubId,
+          params.hash,
+          params.function,
+          params.callParameters,
         ]);
         return wrapOk(version, manager.convertOperationStartedResult(result));
       });
 
       // Unpin
-      wireChainRequest('remote_chain_head_unpin', async (value) => {
+      wireChainRequest('remote_chain_head_unpin', async value => {
         const { genesisHash, hashes } = value as { genesisHash: HexString; hashes: HexString[] };
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
@@ -553,7 +662,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
       });
 
       // Continue
-      wireChainRequest('remote_chain_head_continue', async (value) => {
+      wireChainRequest('remote_chain_head_continue', async value => {
         const { genesisHash, operationId } = value as { genesisHash: HexString; operationId: string };
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
@@ -562,7 +671,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
       });
 
       // StopOperation
-      wireChainRequest('remote_chain_head_stop_operation', async (value) => {
+      wireChainRequest('remote_chain_head_stop_operation', async value => {
         const { genesisHash, operationId } = value as { genesisHash: HexString; operationId: string };
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
@@ -571,7 +680,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
       });
 
       // ChainSpec: genesis hash
-      wireChainRequest('remote_chain_spec_genesis_hash', async (value) => {
+      wireChainRequest('remote_chain_spec_genesis_hash', async value => {
         const genesisHash = value as HexString;
         const entry = manager.getOrCreateChain(genesisHash);
         if (!entry) return errorResult('Chain not supported');
@@ -586,7 +695,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
       });
 
       // ChainSpec: chain name
-      wireChainRequest('remote_chain_spec_chain_name', async (value) => {
+      wireChainRequest('remote_chain_spec_chain_name', async value => {
         const genesisHash = value as HexString;
         const entry = manager.getOrCreateChain(genesisHash);
         if (!entry) return errorResult('Chain not supported');
@@ -601,7 +710,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
       });
 
       // ChainSpec: properties
-      wireChainRequest('remote_chain_spec_properties', async (value) => {
+      wireChainRequest('remote_chain_spec_properties', async value => {
         const genesisHash = value as HexString;
         const entry = manager.getOrCreateChain(genesisHash);
         if (!entry) return errorResult('Chain not supported');
@@ -616,7 +725,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
       });
 
       // Transaction broadcast
-      wireChainRequest('remote_chain_transaction_broadcast', async (value) => {
+      wireChainRequest('remote_chain_transaction_broadcast', async value => {
         const { genesisHash, transaction } = value as { genesisHash: HexString; transaction: HexString };
         const entry = manager.getOrCreateChain(genesisHash);
         if (!entry) return errorResult('Chain not supported');
@@ -631,7 +740,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Co
       });
 
       // Transaction stop
-      wireChainRequest('remote_chain_transaction_stop', async (value) => {
+      wireChainRequest('remote_chain_transaction_stop', async value => {
         const { genesisHash, operationId } = value as { genesisHash: HexString; operationId: string };
         const entry = manager.getOrCreateChain(genesisHash);
         if (!entry) return errorResult('Chain not supported');

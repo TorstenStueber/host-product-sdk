@@ -5,16 +5,16 @@
  * - pushNotification
  */
 
-import type { Container } from '@polkadot/host-api';
+import type { ProtocolHandler } from '@polkadot/host-api';
 import type { HandlersConfig } from './registry.js';
 import { okAsync } from '@polkadot/host-api';
 
-export function wireHostHandlers(container: Container, config: HandlersConfig): VoidFunction[] {
+export function wireHostHandlers(container: ProtocolHandler, config: HandlersConfig): VoidFunction[] {
   const cleanups: VoidFunction[] = [];
 
   // Feature supported - delegates to config callback or returns false
   cleanups.push(
-    container.handleFeatureSupported((feature) => {
+    container.handleFeatureSupported(feature => {
       if (config.onFeatureSupported) {
         const result = config.onFeatureSupported(feature);
         return okAsync(result);
@@ -32,7 +32,7 @@ export function wireHostHandlers(container: Container, config: HandlersConfig): 
 
   // Navigate to - opens URL in new tab by default
   cleanups.push(
-    container.handleNavigateTo((url) => {
+    container.handleNavigateTo(url => {
       if (config.onNavigateTo) {
         config.onNavigateTo(url);
       } else if (typeof window !== 'undefined') {
@@ -44,7 +44,7 @@ export function wireHostHandlers(container: Container, config: HandlersConfig): 
 
   // Push notification - logs by default
   cleanups.push(
-    container.handlePushNotification((notification) => {
+    container.handlePushNotification(notification => {
       if (config.onPushNotification) {
         config.onPushNotification(notification);
       } else {

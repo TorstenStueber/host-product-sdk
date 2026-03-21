@@ -82,7 +82,7 @@ describe('RateLimiter', () => {
       await expect(limiter.schedule(() => 'blocked')).rejects.toThrow();
 
       // Wait for token refill
-      await new Promise((r) => setTimeout(r, 60));
+      await new Promise(r => setTimeout(r, 60));
 
       const result = await limiter.schedule(() => 'second');
       expect(result).toBe('second');
@@ -99,7 +99,7 @@ describe('RateLimiter', () => {
       });
 
       const result = await limiter.schedule(async () => {
-        await new Promise((r) => setTimeout(r, 10));
+        await new Promise(r => setTimeout(r, 10));
         return 'async-result';
       });
 
@@ -157,10 +157,7 @@ describe('RateLimiter', () => {
       });
 
       // First goes through immediately, second is queued
-      const results = await Promise.all([
-        limiter.schedule(() => 'immediate'),
-        limiter.schedule(() => 'queued'),
-      ]);
+      const results = await Promise.all([limiter.schedule(() => 'immediate'), limiter.schedule(() => 'queued')]);
 
       expect(results).toEqual(['immediate', 'queued']);
       limiter.destroy();

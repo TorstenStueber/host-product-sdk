@@ -11,7 +11,9 @@
     "typecheck": "nx run-many -t typecheck",
     "test": "vitest run",
     "test:e2e": "npx playwright test",
-    "lint": "nx run-many -t lint"
+    "lint": "nx run-many -t lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@nx/js": "22.5.3",
@@ -19,6 +21,7 @@
     "@types/node": "25.2.0",
     "nx": "22.5.3",
     "playwright": "^1.58.2",
+    "prettier": "^3.8.1",
     "typescript": "5.9.3",
     "vite": "7.3.1",
     "vite-plugin-dts": "4.5.4",

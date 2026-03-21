@@ -40,10 +40,7 @@ export type CreateHostWebviewProviderParams = {
  * `<webview>` tag.  Resolves once the webview's DOM is ready and the
  * port has been transferred.
  */
-function acquireWebviewPort(
-  webview: WebviewTag,
-  openDevTools?: boolean,
-): Promise<MessagePort> {
+function acquireWebviewPort(webview: WebviewTag, openDevTools?: boolean): Promise<MessagePort> {
   return new Promise<MessagePort>((resolve, reject) => {
     webview.addEventListener('did-fail-load', ((e: { errorDescription: string }) => {
       reject(new Error(e.errorDescription));
@@ -68,11 +65,7 @@ function acquireWebviewPort(
         )
         .catch(reject);
 
-      (webview as unknown as { contentWindow: Window }).contentWindow.postMessage(
-        portInitMessage,
-        '*',
-        [port2],
-      );
+      (webview as unknown as { contentWindow: Window }).contentWindow.postMessage(portInitMessage, '*', [port2]);
 
       if (openDevTools) {
         webview.openDevTools();

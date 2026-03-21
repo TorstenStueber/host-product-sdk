@@ -31,8 +31,16 @@ describe('handleCustomMessageRendering', () => {
   });
 
   afterEach(() => {
-    try { hostTransport?.destroy(); } catch { /* */ }
-    try { productTransport?.destroy(); } catch { /* */ }
+    try {
+      hostTransport?.destroy();
+    } catch {
+      /* */
+    }
+    try {
+      productTransport?.destroy();
+    } catch {
+      /* */
+    }
   });
 
   it('registers a handler and receives rendering requests from the host', async () => {
@@ -42,16 +50,13 @@ describe('handleCustomMessageRendering', () => {
     const rendererCalls: { messageId: string; messageType: string }[] = [];
     const cleanupFn = vi.fn();
 
-    handleCustomMessageRendering(
-      (params, _render) => {
-        rendererCalls.push({
-          messageId: params.messageId,
-          messageType: params.messageType,
-        });
-        return cleanupFn;
-      },
-      hostApi,
-    );
+    handleCustomMessageRendering((params, _render) => {
+      rendererCalls.push({
+        messageId: params.messageId,
+        messageType: params.messageType,
+      });
+      return cleanupFn;
+    }, hostApi);
 
     // Host initiates a custom message rendering subscription
     hostTransport.subscribe(
@@ -81,13 +86,10 @@ describe('handleCustomMessageRendering', () => {
 
     let renderFn: ((node: unknown) => void) | null = null;
 
-    handleCustomMessageRendering(
-      (_params, render) => {
-        renderFn = render;
-        return () => {};
-      },
-      hostApi,
-    );
+    handleCustomMessageRendering((_params, render) => {
+      renderFn = render;
+      return () => {};
+    }, hostApi);
 
     hostTransport.subscribe(
       'product_chat_custom_message_render_subscribe',
@@ -113,10 +115,7 @@ describe('handleCustomMessageRendering', () => {
     const hostApi = createHostApi(productTransport);
     await hostApi.isReady();
 
-    const unsub = handleCustomMessageRendering(
-      () => () => {},
-      hostApi,
-    );
+    const unsub = handleCustomMessageRendering(() => () => {}, hostApi);
 
     expect(typeof unsub).toBe('function');
     unsub();

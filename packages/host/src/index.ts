@@ -22,14 +22,14 @@ export type {
   AuthState,
   UserSession,
   Identity,
-  Container,
+  ProtocolHandler,
   HandlersConfig,
   UserSessionInfo,
   StorageAdapter,
 } from './types.js';
 
 // ---------------------------------------------------------------------------
-// Container
+// ProtocolHandler
 // ---------------------------------------------------------------------------
 
 export { createProtocolHandler } from '@polkadot/host-api';
@@ -80,12 +80,7 @@ export type { AuthManager } from './auth/authManager.js';
 export { deriveProductPublicKey } from './auth/crypto.js';
 
 export { createPappAdapterStub } from './auth/pappAdapter.js';
-export type {
-  PappAdapter,
-  PappAdapterConfig,
-  PairingStatus,
-  AttestationStatus,
-} from './auth/pappAdapter.js';
+export type { PappAdapter, PappAdapterConfig, PairingStatus, AttestationStatus } from './auth/pappAdapter.js';
 
 // ---------------------------------------------------------------------------
 // Nested bridge

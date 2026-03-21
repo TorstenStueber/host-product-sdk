@@ -29,8 +29,16 @@ describe('HostApi transport proxies', () => {
   });
 
   afterEach(() => {
-    try { hostTransport?.destroy(); } catch { /* */ }
-    try { productTransport?.destroy(); } catch { /* */ }
+    try {
+      hostTransport?.destroy();
+    } catch {
+      /* */
+    }
+    try {
+      productTransport?.destroy();
+    } catch {
+      /* */
+    }
   });
 
   it('logger returns the transport provider logger', () => {
@@ -58,13 +66,10 @@ describe('HostApi transport proxies', () => {
 
     // Register a handler for a subscription method on the product side.
     // The host will initiate this subscription.
-    hostApi.handleHostSubscription(
-      'product_chat_custom_message_render_subscribe',
-      (params, send, interrupt) => {
-        receivedValues.push(params);
-        return () => {};
-      },
-    );
+    hostApi.handleHostSubscription('product_chat_custom_message_render_subscribe', (params, send, interrupt) => {
+      receivedValues.push(params);
+      return () => {};
+    });
 
     // Host subscribes to the product's handler
     hostTransport.subscribe(
@@ -87,10 +92,7 @@ describe('HostApi transport proxies', () => {
     const hostApi = createHostApi(productTransport);
     await hostApi.isReady();
 
-    const unsub = hostApi.handleHostSubscription(
-      'product_chat_custom_message_render_subscribe',
-      () => () => {},
-    );
+    const unsub = hostApi.handleHostSubscription('product_chat_custom_message_render_subscribe', () => () => {});
 
     expect(typeof unsub).toBe('function');
     unsub(); // Should not throw

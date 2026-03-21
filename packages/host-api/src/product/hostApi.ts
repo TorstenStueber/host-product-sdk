@@ -14,10 +14,16 @@
 import type { Subscription, Transport } from '../shared/transport/transport.js';
 import type { Logger } from '../shared/util/logger.js';
 import type {
-  RequestMethod, SubscriptionMethod,
-  RequestCodecType, StartCodecType, ReceiveCodecType,
-  RequestParams, ResponseOk, ResponseErr,
-  SubscriptionParams, SubscriptionPayload,
+  RequestMethod,
+  SubscriptionMethod,
+  RequestCodecType,
+  StartCodecType,
+  ReceiveCodecType,
+  RequestParams,
+  ResponseOk,
+  ResponseErr,
+  SubscriptionParams,
+  SubscriptionPayload,
 } from '../shared/codec/scale/protocol.js';
 import { ResultAsync } from 'neverthrow';
 import { extractErrorMessage } from '../shared/util/helpers.js';
@@ -55,22 +61,15 @@ function makeRequest<M extends RequestMethod, V extends string>(
       tag: string;
       value: { success: boolean; value: unknown };
     }>,
-    (e: unknown) => ({ tag: 'Unknown', value: { reason: extractErrorMessage(e) } } as Err),
+    (e: unknown) => ({ tag: 'Unknown', value: { reason: extractErrorMessage(e) } }) as Err,
   );
 
-  return response.andThen(
-    (resp): ResultAsync<Ok, Err> => {
-      if (resp.value.success) {
-        return ResultAsync.fromSafePromise(
-          Promise.resolve(resp.value.value as Ok),
-        );
-      }
-      return ResultAsync.fromPromise(
-        Promise.reject(resp.value.value as Err),
-        (e) => e as Err,
-      );
-    },
-  );
+  return response.andThen((resp): ResultAsync<Ok, Err> => {
+    if (resp.value.success) {
+      return ResultAsync.fromSafePromise(Promise.resolve(resp.value.value as Ok));
+    }
+    return ResultAsync.fromPromise(Promise.reject(resp.value.value as Err), e => e as Err);
+  });
 }
 
 /**
@@ -86,7 +85,7 @@ function makeSubscription<M extends SubscriptionMethod, V extends string>(
   payload: SubscriptionParams<M, V>,
   callback: (payload: SubscriptionPayload<M, V>) => void,
 ): Subscription {
-  return transport.subscribe(method, { tag: version, value: payload } as StartCodecType<M>, (data) => {
+  return transport.subscribe(method, { tag: version, value: payload } as StartCodecType<M>, data => {
     const tagged = data as { tag: string; value: unknown };
     if (tagged.tag === version) {
       callback(tagged.value as SubscriptionPayload<M, V>);
@@ -212,7 +211,9 @@ export function createHostApi(transport: Transport) {
       return makeRequest(transport, 'host_create_transaction', 'v1', payload);
     },
 
-    createTransactionWithNonProductAccount(payload: RequestParams<'host_create_transaction_with_non_product_account', 'v1'>) {
+    createTransactionWithNonProductAccount(
+      payload: RequestParams<'host_create_transaction_with_non_product_account', 'v1'>,
+    ) {
       return makeRequest(transport, 'host_create_transaction_with_non_product_account', 'v1', payload);
     },
 

@@ -1,7 +1,7 @@
 /**
  * E2E host harness.
  *
- * Creates a Container from the iframe, wires handlers, and exposes
+ * Creates a ProtocolHandler from the iframe, wires handlers, and exposes
  * results on window.__e2e for Playwright to inspect.
  *
  * Reads `?codec=scale|structured_clone|upgrade` from the URL:
@@ -10,11 +10,13 @@
  * - `upgrade`: start with SCALE, allow upgrade to structured clone
  */
 import { createProtocolHandler } from '@polkadot/host';
-import type { Container } from '@polkadot/host';
+import type { ProtocolHandler } from '@polkadot/host';
 import {
-  structuredCloneCodecAdapter, scaleCodecAdapter,
+  structuredCloneCodecAdapter,
+  scaleCodecAdapter,
   createWindowProvider,
-  okAsync, errAsync,
+  okAsync,
+  errAsync,
 } from '@polkadot/host-api';
 import type { CodecAdapterMap } from '@polkadot/host-api';
 
@@ -22,7 +24,7 @@ declare global {
   interface Window {
     __e2e: {
       ready: boolean;
-      container: Container | null;
+      container: ProtocolHandler | null;
       signPayloadCalls: unknown[];
       signRawCalls: unknown[];
       storageBacking: Record<string, string>;
@@ -36,7 +38,7 @@ const codecParam = new URLSearchParams(location.search).get('codec') ?? 'structu
 // For the 'upgrade' and 'structured_clone' tests, register codec support
 // so the product can negotiate an upgrade from SCALE to structured clone.
 const supportedCodecs: CodecAdapterMap | undefined =
-  (codecParam === 'upgrade' || codecParam === 'structured_clone')
+  codecParam === 'upgrade' || codecParam === 'structured_clone'
     ? { scale: scaleCodecAdapter, structured_clone: structuredCloneCodecAdapter }
     : undefined;
 
@@ -57,7 +59,7 @@ const container = createProtocolHandler({ provider, supportedCodecs });
 e2e.container = container;
 
 // --- Feature supported ---
-container.handleFeatureSupported((_feature) => {
+container.handleFeatureSupported(_feature => {
   // Only support "Chain" feature with a specific genesis hash
   const f = _feature as { tag: string; value: unknown } | undefined;
   if (f && f.tag === 'Chain' && f.value === '0xabc123') {
@@ -67,11 +69,11 @@ container.handleFeatureSupported((_feature) => {
 });
 
 // --- Permissions (deny all) ---
-container.handleDevicePermission((_req) => okAsync(false));
-container.handlePermission((_req) => okAsync(false));
+container.handleDevicePermission(_req => okAsync(false));
+container.handlePermission(_req => okAsync(false));
 
 // --- Navigation ---
-container.handleNavigateTo((url) => {
+container.handleNavigateTo(url => {
   if (url === 'blocked://denied') {
     return errAsync({ tag: 'PermissionDenied' as const, value: undefined });
   }
@@ -81,7 +83,7 @@ container.handleNavigateTo((url) => {
 });
 
 // --- Push notification ---
-container.handlePushNotification((_notif) => {
+container.handlePushNotification(_notif => {
   return okAsync(undefined);
 });
 
@@ -89,13 +91,13 @@ container.handlePushNotification((_notif) => {
 const storagePrefix = 'e2e:';
 const storageData: Record<string, Uint8Array> = {};
 
-container.handleLocalStorageRead((key) => {
+container.handleLocalStorageRead(key => {
   const fullKey = storagePrefix + (key as string);
   const val = storageData[fullKey];
   return okAsync(val ?? undefined);
 });
 
-container.handleLocalStorageWrite((params) => {
+container.handleLocalStorageWrite(params => {
   const [key, value] = params as [string, Uint8Array];
   if (key === '__FULL__') {
     return errAsync({ tag: 'Full' as const, value: undefined });
@@ -106,7 +108,7 @@ container.handleLocalStorageWrite((params) => {
   return okAsync(undefined);
 });
 
-container.handleLocalStorageClear((key) => {
+container.handleLocalStorageClear(key => {
   const fullKey = storagePrefix + (key as string);
   delete storageData[fullKey];
   delete e2e.storageBacking[fullKey];
@@ -114,16 +116,16 @@ container.handleLocalStorageClear((key) => {
 });
 
 // --- Accounts ---
-container.handleAccountGet((params) => {
+container.handleAccountGet(params => {
   // Return a mock account with a deterministic public key
   const pk = new Uint8Array(32);
   pk[0] = 0x42;
   return okAsync({ publicKey: pk, name: 'TestAccount' });
 });
 
-container.handleGetNonProductAccounts((_params) => {
+container.handleGetNonProductAccounts(_params => {
   const pk = new Uint8Array(32);
-  pk[0] = 0xAA;
+  pk[0] = 0xaa;
   return okAsync([{ publicKey: pk, name: 'RootAccount' }]);
 });
 
@@ -134,16 +136,16 @@ container.handleAccountConnectionStatusSubscribe((_params, send, _interrupt) => 
   return () => {};
 });
 
-container.handleAccountGetAlias((_params) => {
+container.handleAccountGetAlias(_params => {
   return errAsync({ tag: 'Unknown' as const, value: { reason: 'Not supported' } });
 });
 
-container.handleAccountCreateProof((_params) => {
+container.handleAccountCreateProof(_params => {
   return errAsync({ tag: 'Unknown' as const, value: { reason: 'Not supported' } });
 });
 
 // --- Signing ---
-container.handleSignPayload((params) => {
+container.handleSignPayload(params => {
   const p = params as { address?: string };
   if (p.address === 'REJECT_ME') {
     return errAsync({ tag: 'Rejected' as const, value: undefined });
@@ -155,7 +157,7 @@ container.handleSignPayload((params) => {
   });
 });
 
-container.handleSignRaw((params) => {
+container.handleSignRaw(params => {
   e2e.signRawCalls.push(params);
   return okAsync({
     signature: '0x' + 'cd'.repeat(64),
@@ -163,46 +165,61 @@ container.handleSignRaw((params) => {
   });
 });
 
-container.handleCreateTransaction((_params) => {
+container.handleCreateTransaction(_params => {
   return errAsync({ tag: 'NotSupported' as const, value: 'Not implemented in E2E' });
 });
 
-container.handleCreateTransactionWithNonProductAccount((_params) => {
+container.handleCreateTransactionWithNonProductAccount(_params => {
   return errAsync({ tag: 'NotSupported' as const, value: 'Not implemented in E2E' });
 });
 
 // --- Chat (no-op) ---
-container.handleChatCreateRoom((_p) => errAsync({ tag: 'PermissionDenied' as const, value: undefined }));
-container.handleChatRegisterBot((_p) => errAsync({ tag: 'PermissionDenied' as const, value: undefined }));
-container.handleChatPostMessage((_p) => errAsync({ tag: 'Unknown' as const, value: { reason: 'disabled' } }));
-container.handleChatListSubscribe((_p, _s, interrupt) => { interrupt(); return () => {}; });
-container.handleChatActionSubscribe((_p, _s, interrupt) => { interrupt(); return () => {}; });
+container.handleChatCreateRoom(_p => errAsync({ tag: 'PermissionDenied' as const, value: undefined }));
+container.handleChatRegisterBot(_p => errAsync({ tag: 'PermissionDenied' as const, value: undefined }));
+container.handleChatPostMessage(_p => errAsync({ tag: 'Unknown' as const, value: { reason: 'disabled' } }));
+container.handleChatListSubscribe((_p, _s, interrupt) => {
+  interrupt();
+  return () => {};
+});
+container.handleChatActionSubscribe((_p, _s, interrupt) => {
+  interrupt();
+  return () => {};
+});
 // Note: product_chat_custom_message_render_subscribe is host-initiated
 // (via container.renderChatCustomMessage), so no handler registration needed.
 
 // --- Statement store (no-op) ---
-container.handleStatementStoreCreateProof((_p) => errAsync({ tag: 'Unknown' as const, value: { reason: 'disabled' } }));
-container.handleStatementStoreSubmit((_p) => errAsync({ reason: 'disabled' }));  // GenericErr — plain object
-container.handleStatementStoreSubscribe((_p, _s, interrupt) => { interrupt(); return () => {}; });
+container.handleStatementStoreCreateProof(_p => errAsync({ tag: 'Unknown' as const, value: { reason: 'disabled' } }));
+container.handleStatementStoreSubmit(_p => errAsync({ reason: 'disabled' })); // GenericErr — plain object
+container.handleStatementStoreSubscribe((_p, _s, interrupt) => {
+  interrupt();
+  return () => {};
+});
 
 // --- Preimage (no-op) ---
-container.handlePreimageSubmit((_p) => errAsync({ tag: 'Unknown' as const, value: { reason: 'disabled' } }));
-container.handlePreimageLookupSubscribe((_p, _s, interrupt) => { interrupt(); return () => {}; });
+container.handlePreimageSubmit(_p => errAsync({ tag: 'Unknown' as const, value: { reason: 'disabled' } }));
+container.handlePreimageLookupSubscribe((_p, _s, interrupt) => {
+  interrupt();
+  return () => {};
+});
 
 // --- Chain (minimal stub) ---
-container.handleChainHeadFollow((_p, _s, interrupt) => { interrupt(); return () => {}; });
-container.handleChainHeadHeader((_p) => okAsync(undefined));
-container.handleChainHeadBody((_p) => okAsync({ tag: 'LimitReached' as const, value: undefined }));
-container.handleChainHeadStorage((_p) => okAsync({ tag: 'LimitReached' as const, value: undefined }));
-container.handleChainHeadCall((_p) => okAsync({ tag: 'LimitReached' as const, value: undefined }));
-container.handleChainHeadUnpin((_p) => okAsync(undefined));
-container.handleChainHeadContinue((_p) => okAsync(undefined));
-container.handleChainHeadStopOperation((_p) => okAsync(undefined));
-container.handleChainSpecGenesisHash((_p) => okAsync('0xabc123'));
-container.handleChainSpecChainName((_p) => okAsync('TestChain'));
-container.handleChainSpecProperties((_p) => okAsync('{"tokenSymbol":"DOT"}'));
-container.handleChainTransactionBroadcast((_p) => okAsync(undefined));
-container.handleChainTransactionStop((_p) => okAsync(undefined));
+container.handleChainHeadFollow((_p, _s, interrupt) => {
+  interrupt();
+  return () => {};
+});
+container.handleChainHeadHeader(_p => okAsync(undefined));
+container.handleChainHeadBody(_p => okAsync({ tag: 'LimitReached' as const, value: undefined }));
+container.handleChainHeadStorage(_p => okAsync({ tag: 'LimitReached' as const, value: undefined }));
+container.handleChainHeadCall(_p => okAsync({ tag: 'LimitReached' as const, value: undefined }));
+container.handleChainHeadUnpin(_p => okAsync(undefined));
+container.handleChainHeadContinue(_p => okAsync(undefined));
+container.handleChainHeadStopOperation(_p => okAsync(undefined));
+container.handleChainSpecGenesisHash(_p => okAsync('0xabc123'));
+container.handleChainSpecChainName(_p => okAsync('TestChain'));
+container.handleChainSpecProperties(_p => okAsync('{"tokenSymbol":"DOT"}'));
+container.handleChainTransactionBroadcast(_p => okAsync(undefined));
+container.handleChainTransactionStop(_p => okAsync(undefined));
 
 e2e.ready = true;
 document.getElementById('status')!.textContent = 'host-ready';

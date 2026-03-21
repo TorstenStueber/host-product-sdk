@@ -5,20 +5,20 @@
  * Hosts that support chat should override these.
  */
 
-import type { Container } from '@polkadot/host-api';
+import type { ProtocolHandler } from '@polkadot/host-api';
 import { errAsync } from '@polkadot/host-api';
 
-export function wireChatHandlers(container: Container): VoidFunction[] {
+export function wireChatHandlers(container: ProtocolHandler): VoidFunction[] {
   const cleanups: VoidFunction[] = [];
 
   cleanups.push(
-    container.handleChatCreateRoom((_params) => {
+    container.handleChatCreateRoom(_params => {
       return errAsync({ tag: 'PermissionDenied', value: undefined });
     }),
   );
 
   cleanups.push(
-    container.handleChatRegisterBot((_params) => {
+    container.handleChatRegisterBot(_params => {
       return errAsync({ tag: 'PermissionDenied', value: undefined });
     }),
   );
@@ -31,7 +31,7 @@ export function wireChatHandlers(container: Container): VoidFunction[] {
   );
 
   cleanups.push(
-    container.handleChatPostMessage((_params) => {
+    container.handleChatPostMessage(_params => {
       return errAsync({ tag: 'Unknown', value: { reason: 'Chat not supported' } });
     }),
   );

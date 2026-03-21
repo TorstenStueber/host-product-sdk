@@ -31,11 +31,11 @@ function setupTransports() {
   return { hostTransport, productTransport };
 }
 
-async function connectTransports(hostTransport: ReturnType<typeof createTransport>, productTransport: ReturnType<typeof createTransport>) {
-  const [hostReady, productReady] = await Promise.all([
-    hostTransport.isReady(),
-    productTransport.isReady(),
-  ]);
+async function connectTransports(
+  hostTransport: ReturnType<typeof createTransport>,
+  productTransport: ReturnType<typeof createTransport>,
+) {
+  const [hostReady, productReady] = await Promise.all([hostTransport.isReady(), productTransport.isReady()]);
   expect(hostReady).toBe(true);
   expect(productReady).toBe(true);
 }
@@ -89,10 +89,10 @@ describe('Codec negotiation', () => {
     const { hostTransport, productTransport } = setupTransports();
 
     // Host supports both (structured_clone always preferred).
-    const cleanup = handleCodecUpgrade(
-      hostTransport,
-      { structured_clone: structuredCloneCodecAdapter, scale: scaleCodecAdapter },
-    );
+    const cleanup = handleCodecUpgrade(hostTransport, {
+      structured_clone: structuredCloneCodecAdapter,
+      scale: scaleCodecAdapter,
+    });
 
     await connectTransports(hostTransport, productTransport);
 
@@ -121,7 +121,7 @@ describe('Codec negotiation', () => {
     await connectTransports(hostTransport, productTransport);
 
     // Register a test handler on the host side.
-    hostTransport.handleRequest('host_feature_supported', async (message) => {
+    hostTransport.handleRequest('host_feature_supported', async message => {
       return { tag: 'v1', value: { success: true, value: true } };
     });
 
@@ -135,10 +135,10 @@ describe('Codec negotiation', () => {
     await new Promise(resolve => setTimeout(resolve, 10));
 
     // Now send a request — should work with the new codec.
-    const response = await productTransport.request(
-      'host_feature_supported',
-      { tag: 'v1', value: { tag: 'Chain', value: '0xabc' } },
-    );
+    const response = await productTransport.request('host_feature_supported', {
+      tag: 'v1',
+      value: { tag: 'Chain', value: '0xabc' },
+    });
 
     expect(response).toEqual({ tag: 'v1', value: { success: true, value: true } });
 

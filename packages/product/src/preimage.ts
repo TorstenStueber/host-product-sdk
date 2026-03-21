@@ -28,16 +28,10 @@ export const createPreimageManager = (hostApi: HostApi = defaultHostApi) => {
      * The callback fires whenever the preimage is available (or `null`
      * if it has been removed / is not yet known).
      */
-    lookup(
-      key: HexString,
-      callback: (preimage: Uint8Array | null) => void,
-    ) {
-      return hostApi.preimageLookupSubscribe(
-        key,
-        (payload) => {
-          callback(payload as Uint8Array | null);
-        },
-      );
+    lookup(key: HexString, callback: (preimage: Uint8Array | null) => void) {
+      return hostApi.preimageLookupSubscribe(key, payload => {
+        callback(payload as Uint8Array | null);
+      });
     },
 
     /**
@@ -47,7 +41,9 @@ export const createPreimageManager = (hostApi: HostApi = defaultHostApi) => {
       const result = await hostApi.preimageSubmit(value);
       result.match(
         () => {},
-        (err) => { throw err; },
+        err => {
+          throw err;
+        },
       );
     },
   };

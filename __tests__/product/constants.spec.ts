@@ -60,10 +60,7 @@ describe('WellKnownChain', () => {
       expect(hash.startsWith('0x'), `${name} should start with 0x`).toBe(true);
       // Genesis hashes are 32 bytes = 64 hex chars + '0x' = 66 chars
       expect(hash.length, `${name} hash should be 66 chars`).toBe(66);
-      expect(
-        /^0x[0-9a-f]{64}$/.test(hash),
-        `${name} hash should be valid lowercase hex`,
-      ).toBe(true);
+      expect(/^0x[0-9a-f]{64}$/.test(hash), `${name} hash should be valid lowercase hex`).toBe(true);
     }
   });
 

@@ -11,12 +11,7 @@
 
 import type { HostApi } from '@polkadot/host-api';
 import { hostApi as defaultHostApi } from '@polkadot/host-api';
-import type {
-  AccountConnectionStatus,
-  HexString,
-  ProductAccount,
-  RingLocation,
-} from './types.js';
+import type { AccountConnectionStatus, HexString, ProductAccount, RingLocation } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -46,39 +41,28 @@ export const createAccountsProvider = (hostApi: HostApi = defaultHostApi) => {
      * Get the product account for a given dotNs identifier and derivation index.
      */
     getProductAccount(dotNsIdentifier: string, derivationIndex = 0) {
-      return hostApi
-        .accountGet([dotNsIdentifier, derivationIndex]);
+      return hostApi.accountGet([dotNsIdentifier, derivationIndex]);
     },
 
     /**
      * Get the contextual alias for a product account.
      */
     getProductAccountAlias(dotNsIdentifier: string, derivationIndex = 0) {
-      return hostApi
-        .accountGetAlias([dotNsIdentifier, derivationIndex]);
+      return hostApi.accountGetAlias([dotNsIdentifier, derivationIndex]);
     },
 
     /**
      * Get all non-product (external) accounts connected to the host.
      */
     getNonProductAccounts() {
-      return hostApi
-        .getNonProductAccounts(undefined);
+      return hostApi.getNonProductAccounts(undefined);
     },
 
     /**
      * Create a ring VRF proof for a product account.
      */
-    createRingVRFProof(
-      dotNsIdentifier: string,
-      derivationIndex = 0,
-      location: RingLocation,
-      message: Uint8Array,
-    ) {
-      return hostApi
-        .accountCreateProof(
-          [[dotNsIdentifier, derivationIndex], location, message],
-        );
+    createRingVRFProof(dotNsIdentifier: string, derivationIndex = 0, location: RingLocation, message: Uint8Array) {
+      return hostApi.accountCreateProof([[dotNsIdentifier, derivationIndex], location, message]);
     },
 
     /**
@@ -106,12 +90,9 @@ export const createAccountsProvider = (hostApi: HostApi = defaultHostApi) => {
      * Subscribe to account connection status changes.
      */
     subscribeAccountConnectionStatus(callback: (status: AccountConnectionStatus) => void) {
-      return hostApi.accountConnectionStatusSubscribe(
-        undefined,
-        (status) => {
-          callback(status);
-        },
-      );
+      return hostApi.accountConnectionStatusSubscribe(undefined, status => {
+        callback(status);
+      });
     },
   };
 };
@@ -120,10 +101,7 @@ export const createAccountsProvider = (hostApi: HostApi = defaultHostApi) => {
 // Signer helper
 // ---------------------------------------------------------------------------
 
-function createSignerForAccount(
-  hostApi: HostApi,
-  account: ProductAccount,
-) {
+function createSignerForAccount(hostApi: HostApi, account: ProductAccount) {
   return {
     publicKey: account.publicKey,
 
@@ -165,14 +143,14 @@ function createSignerForAccount(
       const response = await hostApi.signPayload(codecPayload);
 
       return response.match(
-        (result) => {
+        result => {
           return {
             id: 0,
             signature: result.signature,
             signedTransaction: result.signedTransaction ?? null,
           };
         },
-        (error) => {
+        error => {
           throw error;
         },
       );
@@ -194,14 +172,14 @@ function createSignerForAccount(
       const response = await hostApi.signRaw(payload);
 
       return response.match(
-        (result) => {
+        result => {
           return {
             id: 0,
             signature: result.signature,
             signedTransaction: result.signedTransaction ?? null,
           };
         },
-        (error) => {
+        error => {
           throw error;
         },
       );

@@ -6,12 +6,7 @@
  * of this package should use these types directly.
  */
 
-import type {
-  ConnectionStatus,
-  HexString,
-  Subscription,
-  Transport,
-} from '@polkadot/host-api';
+import type { ConnectionStatus, HexString, Subscription, Transport } from '@polkadot/host-api';
 
 // Re-export shared types that are part of our public API
 export type { ConnectionStatus, HexString, Subscription, Transport };
@@ -62,9 +57,7 @@ export type SigningResult = {
   signedTransaction: HexString | undefined;
 };
 
-export type RawPayload =
-  | { tag: 'Bytes'; value: Uint8Array }
-  | { tag: 'Payload'; value: string };
+export type RawPayload = { tag: 'Bytes'; value: Uint8Array } | { tag: 'Payload'; value: string };
 
 export type SigningRawRequest = {
   address: string;
@@ -115,8 +108,7 @@ export type TxPayloadV1 = {
   context: TxPayloadContext;
 };
 
-export type VersionedTxPayload =
-  | { tag: 'v1'; value: TxPayloadV1 };
+export type VersionedTxPayload = { tag: 'v1'; value: TxPayloadV1 };
 
 // ---------------------------------------------------------------------------
 // Chat
@@ -261,8 +253,7 @@ export type SignedStatement = {
 // Feature
 // ---------------------------------------------------------------------------
 
-export type Feature =
-  | { tag: 'Chain'; value: HexString };
+export type Feature = { tag: 'Chain'; value: HexString };
 
 // ---------------------------------------------------------------------------
 // HostApi type

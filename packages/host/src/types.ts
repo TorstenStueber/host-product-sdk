@@ -14,7 +14,7 @@ import type {
   PushNotification,
 } from '@polkadot/host-api';
 
-import type { Container } from '@polkadot/host-api';
+import type { ProtocolHandler } from '@polkadot/host-api';
 import type { AuthManager, UserSession, Identity } from './auth/authManager.js';
 
 // ---------------------------------------------------------------------------
@@ -49,7 +49,8 @@ export type HostSdkConfig = {
   onCreateTransactionWithNonProductAccount?: (
     session: UserSession,
     payload: RequestParams<'host_create_transaction_with_non_product_account', 'v1'>,
-  ) => ResponseOk<'host_create_transaction_with_non_product_account', 'v1'>
+  ) =>
+    | ResponseOk<'host_create_transaction_with_non_product_account', 'v1'>
     | Promise<ResponseOk<'host_create_transaction_with_non_product_account', 'v1'>>;
 
   // -- Permission callbacks -------------------------------------------------
@@ -75,7 +76,7 @@ export type HostSdkConfig = {
 
 export type EmbeddedProduct = {
   /** The container managing this product's protocol bridge. */
-  readonly container: Container;
+  readonly container: ProtocolHandler;
   /** Dispose the embedded product and its container. */
   dispose(): void;
 };
@@ -117,6 +118,6 @@ export type HostSdk = {
 // ---------------------------------------------------------------------------
 
 export type { AuthState, UserSession, Identity } from './auth/authManager.js';
-export type { Container } from '@polkadot/host-api';
+export type { ProtocolHandler } from '@polkadot/host-api';
 export type { HandlersConfig, UserSessionInfo } from './handlers/registry.js';
 export type { StorageAdapter } from './storage/types.js';

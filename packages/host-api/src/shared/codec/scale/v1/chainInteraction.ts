@@ -24,7 +24,13 @@ export const RuntimeType = Enum({
 
 // -- Storage query types ------------------------------------------------------
 
-export const StorageQueryType = Status('Value', 'Hash', 'ClosestDescendantMerkleValue', 'DescendantsValues', 'DescendantsHashes');
+export const StorageQueryType = Status(
+  'Value',
+  'Hash',
+  'ClosestDescendantMerkleValue',
+  'DescendantsValues',
+  'DescendantsHashes',
+);
 
 export const StorageQueryItem = Struct({
   key: Hex(),

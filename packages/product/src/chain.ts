@@ -10,11 +10,7 @@
  * abstraction from @polkadot/host-api.
  */
 
-import type {
-  SubscriptionPayload,
-  RuntimeType,
-  OperationStartedResult,
-} from '@polkadot/host-api';
+import type { SubscriptionPayload, RuntimeType, OperationStartedResult } from '@polkadot/host-api';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 import { getSyncProvider } from '@polkadot-api/json-rpc-provider-proxy';
 
@@ -56,7 +52,7 @@ export function createPapiProvider(
   // The typed provider (inner provider that receives onMessage callback)
   // -------------------------------------------------------------------------
 
-  const typedProvider: JsonRpcProvider = (onMessage) => {
+  const typedProvider: JsonRpcProvider = onMessage => {
     const activeFollows = new Map<string, FollowState>();
     const activeBroadcasts = new Set<string>();
     let nextSubId = 0;
@@ -230,13 +226,10 @@ export function createPapiProvider(
           const [withRuntime] = params as [boolean];
           const syntheticSubId = getNextSubId();
 
-          const subscription = hostApi.chainHeadFollow(
-            { genesisHash, withRuntime },
-            (payload) => {
-              const jsonRpcEvent = convertTypedEventToJsonRpc(payload);
-              sendFollowEvent(syntheticSubId, jsonRpcEvent);
-            },
-          );
+          const subscription = hostApi.chainHeadFollow({ genesisHash, withRuntime }, payload => {
+            const jsonRpcEvent = convertTypedEventToJsonRpc(payload);
+            sendFollowEvent(syntheticSubId, jsonRpcEvent);
+          });
 
           activeFollows.set(syntheticSubId, {
             syntheticSubId,
@@ -269,10 +262,8 @@ export function createPapiProvider(
               hash,
             })
             .match(
-              (result) =>
-                sendJsonRpcResponse(id, result),
-              (error) =>
-                sendJsonRpcError(id, -32603, extractErrorReason(error)),
+              result => sendJsonRpcResponse(id, result),
+              error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
             );
           break;
         }
@@ -287,13 +278,8 @@ export function createPapiProvider(
               hash,
             })
             .match(
-              (result) =>
-                sendJsonRpcResponse(
-                  id,
-                  convertOperationResultToJsonRpc(result),
-                ),
-              (error) =>
-                sendJsonRpcError(id, -32603, extractErrorReason(error)),
+              result => sendJsonRpcResponse(id, convertOperationResultToJsonRpc(result)),
+              error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
             );
           break;
         }
@@ -319,25 +305,15 @@ export function createPapiProvider(
               childTrie,
             })
             .match(
-              (result) =>
-                sendJsonRpcResponse(
-                  id,
-                  convertOperationResultToJsonRpc(result),
-                ),
-              (error) =>
-                sendJsonRpcError(id, -32603, extractErrorReason(error)),
+              result => sendJsonRpcResponse(id, convertOperationResultToJsonRpc(result)),
+              error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
             );
           break;
         }
 
         // -- chainHead_v1_call ----------------------------------------------
         case 'chainHead_v1_call': {
-          const [followSubId, hash, fn, callParameters] = params as [
-            string,
-            HexString,
-            string,
-            HexString,
-          ];
+          const [followSubId, hash, fn, callParameters] = params as [string, HexString, string, HexString];
           hostApi
             .chainHeadCall({
               genesisHash,
@@ -347,26 +323,16 @@ export function createPapiProvider(
               callParameters,
             })
             .match(
-              (result) =>
-                sendJsonRpcResponse(
-                  id,
-                  convertOperationResultToJsonRpc(result),
-                ),
-              (error) =>
-                sendJsonRpcError(id, -32603, extractErrorReason(error)),
+              result => sendJsonRpcResponse(id, convertOperationResultToJsonRpc(result)),
+              error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
             );
           break;
         }
 
         // -- chainHead_v1_unpin ---------------------------------------------
         case 'chainHead_v1_unpin': {
-          const [followSubId, hashOrHashes] = params as [
-            string,
-            HexString | HexString[],
-          ];
-          const hashes = Array.isArray(hashOrHashes)
-            ? hashOrHashes
-            : [hashOrHashes];
+          const [followSubId, hashOrHashes] = params as [string, HexString | HexString[]];
+          const hashes = Array.isArray(hashOrHashes) ? hashOrHashes : [hashOrHashes];
           hostApi
             .chainHeadUnpin({
               genesisHash,
@@ -375,8 +341,7 @@ export function createPapiProvider(
             })
             .match(
               () => sendJsonRpcResponse(id, null),
-              (error) =>
-                sendJsonRpcError(id, -32603, extractErrorReason(error)),
+              error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
             );
           break;
         }
@@ -392,8 +357,7 @@ export function createPapiProvider(
             })
             .match(
               () => sendJsonRpcResponse(id, null),
-              (error) =>
-                sendJsonRpcError(id, -32603, extractErrorReason(error)),
+              error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
             );
           break;
         }
@@ -409,8 +373,7 @@ export function createPapiProvider(
             })
             .match(
               () => sendJsonRpcResponse(id, null),
-              (error) =>
-                sendJsonRpcError(id, -32603, extractErrorReason(error)),
+              error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
             );
           break;
         }
@@ -418,10 +381,8 @@ export function createPapiProvider(
         // -- chainSpec_v1_genesisHash ---------------------------------------
         case 'chainSpec_v1_genesisHash': {
           hostApi.chainSpecGenesisHash(genesisHash).match(
-            (result) =>
-              sendJsonRpcResponse(id, result),
-            (error) =>
-              sendJsonRpcError(id, -32603, extractErrorReason(error)),
+            result => sendJsonRpcResponse(id, result),
+            error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
           );
           break;
         }
@@ -429,10 +390,8 @@ export function createPapiProvider(
         // -- chainSpec_v1_chainName -----------------------------------------
         case 'chainSpec_v1_chainName': {
           hostApi.chainSpecChainName(genesisHash).match(
-            (result) =>
-              sendJsonRpcResponse(id, result),
-            (error) =>
-              sendJsonRpcError(id, -32603, extractErrorReason(error)),
+            result => sendJsonRpcResponse(id, result),
+            error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
           );
           break;
         }
@@ -440,15 +399,14 @@ export function createPapiProvider(
         // -- chainSpec_v1_properties ----------------------------------------
         case 'chainSpec_v1_properties': {
           hostApi.chainSpecProperties(genesisHash).match(
-            (result) => {
+            result => {
               try {
                 sendJsonRpcResponse(id, JSON.parse(result));
               } catch {
                 sendJsonRpcResponse(id, result);
               }
             },
-            (error) =>
-              sendJsonRpcError(id, -32603, extractErrorReason(error)),
+            error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
           );
           break;
         }
@@ -456,21 +414,16 @@ export function createPapiProvider(
         // -- transaction_v1_broadcast ---------------------------------------
         case 'transaction_v1_broadcast': {
           const [transaction] = params as [HexString];
-          hostApi
-            .chainTransactionBroadcast(
-              { genesisHash, transaction },
-            )
-            .match(
-              (result) => {
-                const opId = result;
-                if (opId !== null) {
-                  activeBroadcasts.add(opId);
-                }
-                sendJsonRpcResponse(id, opId);
-              },
-              (error) =>
-                sendJsonRpcError(id, -32603, extractErrorReason(error)),
-            );
+          hostApi.chainTransactionBroadcast({ genesisHash, transaction }).match(
+            result => {
+              const opId = result;
+              if (opId !== null) {
+                activeBroadcasts.add(opId);
+              }
+              sendJsonRpcResponse(id, opId);
+            },
+            error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
+          );
           break;
         }
 
@@ -478,25 +431,16 @@ export function createPapiProvider(
         case 'transaction_v1_stop': {
           const [operationId] = params as [string];
           activeBroadcasts.delete(operationId);
-          hostApi
-            .chainTransactionStop(
-              { genesisHash, operationId },
-            )
-            .match(
-              () => sendJsonRpcResponse(id, null),
-              (error) =>
-                sendJsonRpcError(id, -32603, extractErrorReason(error)),
-            );
+          hostApi.chainTransactionStop({ genesisHash, operationId }).match(
+            () => sendJsonRpcResponse(id, null),
+            error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
+          );
           break;
         }
 
         // -- Unsupported method ---------------------------------------------
         default: {
-          sendJsonRpcError(
-            id,
-            -32601,
-            `Method "${method}" is not supported by HostAPI`,
-          );
+          sendJsonRpcError(id, -32601, `Method "${method}" is not supported by HostAPI`);
           break;
         }
       }
@@ -516,18 +460,14 @@ export function createPapiProvider(
 
         // Stop all active broadcasts
         for (const operationId of activeBroadcasts) {
-          hostApi
-            .chainTransactionStop(
-              { genesisHash, operationId },
-            )
-            .match(
-              () => {
-                /* fire-and-forget on disconnect */
-              },
-              () => {
-                /* transport may already be torn down */
-              },
-            );
+          hostApi.chainTransactionStop({ genesisHash, operationId }).match(
+            () => {
+              /* fire-and-forget on disconnect */
+            },
+            () => {
+              /* transport may already be torn down */
+            },
+          );
         }
         activeBroadcasts.clear();
       },
@@ -542,12 +482,10 @@ export function createPapiProvider(
     return hostApi.isReady().then(ready => {
       if (!ready) return false;
 
-      return hostApi
-        .featureSupported({ tag: 'Chain' as const, value: genesisHash })
-        .match(
-          (supported) => supported,
-          () => false,
-        );
+      return hostApi.featureSupported({ tag: 'Chain' as const, value: genesisHash }).match(
+        supported => supported,
+        () => false,
+      );
     });
   }
 
@@ -564,9 +502,7 @@ export function createPapiProvider(
       return () => {
         return {
           send() {
-            hostApi.logger.error(
-              `Provider for chain ${genesisHash} was not started because Host doesn't support it`,
-            );
+            hostApi.logger.error(`Provider for chain ${genesisHash} was not started because Host doesn't support it`);
           },
           disconnect() {
             /* empty */

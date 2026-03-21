@@ -55,9 +55,7 @@ export function createMessagePortProvider(
 
   // Resolve the port — sync if already available, async otherwise.
   const portReady: Promise<MessagePort> =
-    portOrPromise instanceof Promise
-      ? portOrPromise
-      : Promise.resolve(portOrPromise);
+    portOrPromise instanceof Promise ? portOrPromise : Promise.resolve(portOrPromise);
 
   portReady.then(p => {
     if (disposed) return;

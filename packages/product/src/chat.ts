@@ -45,11 +45,7 @@ export const createProductChatManager = (hostApi: HostApi = defaultHostApi) => {
      * Returns the registration status ('New' or 'Exists').
      * Idempotent: repeated calls for the same roomId return the cached result.
      */
-    async registerRoom(params: {
-      roomId: string;
-      name: string;
-      icon: string;
-    }): Promise<ChatRoomRegistrationStatus> {
+    async registerRoom(params: { roomId: string; name: string; icon: string }): Promise<ChatRoomRegistrationStatus> {
       const existingRegistration = roomRegistrationStatus[params.roomId];
       if (existingRegistration) {
         return existingRegistration;
@@ -58,11 +54,11 @@ export const createProductChatManager = (hostApi: HostApi = defaultHostApi) => {
       const result = await hostApi.chatCreateRoom(params);
 
       return result.match(
-        (payload) => {
+        payload => {
           roomRegistrationStatus[params.roomId] = payload.status;
           return payload.status;
         },
-        (err) => {
+        err => {
           throw err;
         },
       );
@@ -73,11 +69,7 @@ export const createProductChatManager = (hostApi: HostApi = defaultHostApi) => {
      * Returns the registration status ('New' or 'Exists').
      * Idempotent: repeated calls for the same botId return the cached result.
      */
-    async registerBot(params: {
-      botId: string;
-      name: string;
-      icon: string;
-    }): Promise<ChatBotRegistrationStatus> {
+    async registerBot(params: { botId: string; name: string; icon: string }): Promise<ChatBotRegistrationStatus> {
       const existingRegistration = botRegistrationStatus[params.botId];
       if (existingRegistration) {
         return existingRegistration;
@@ -86,11 +78,11 @@ export const createProductChatManager = (hostApi: HostApi = defaultHostApi) => {
       const result = await hostApi.chatRegisterBot(params);
 
       return result.match(
-        (payload) => {
+        payload => {
           botRegistrationStatus[params.botId] = payload.status;
           return payload.status;
         },
-        (err) => {
+        err => {
           throw err;
         },
       );
@@ -100,19 +92,14 @@ export const createProductChatManager = (hostApi: HostApi = defaultHostApi) => {
      * Send a message to a chat room.
      * Returns the message ID assigned by the host.
      */
-    async sendMessage(
-      roomId: string,
-      payload: ChatMessageContent,
-    ): Promise<{ messageId: string }> {
-      const result = await hostApi.chatPostMessage(
-        { roomId, payload },
-      );
+    async sendMessage(roomId: string, payload: ChatMessageContent): Promise<{ messageId: string }> {
+      const result = await hostApi.chatPostMessage({ roomId, payload });
 
       return result.match(
-        (payload) => {
+        payload => {
           return { messageId: payload.messageId };
         },
-        (err) => {
+        err => {
           throw err;
         },
       );
@@ -122,24 +109,18 @@ export const createProductChatManager = (hostApi: HostApi = defaultHostApi) => {
      * Subscribe to the list of chat rooms the product participates in.
      */
     subscribeChatList(callback: (rooms: ChatRoom[]) => void) {
-      return hostApi.chatListSubscribe(
-        undefined,
-        (action) => {
-          callback(action);
-        },
-      );
+      return hostApi.chatListSubscribe(undefined, action => {
+        callback(action);
+      });
     },
 
     /**
      * Subscribe to incoming chat actions (messages, triggers, commands).
      */
     subscribeAction(callback: (action: ReceivedChatAction) => void) {
-      return hostApi.chatActionSubscribe(
-        undefined,
-        (action) => {
-          callback(action);
-        },
-      );
+      return hostApi.chatActionSubscribe(undefined, action => {
+        callback(action);
+      });
     },
   };
 };
@@ -168,56 +149,40 @@ export function handleCustomMessageRendering(
   callback: ChatCustomMessageRenderer,
   hostApi: HostApi = defaultHostApi,
 ): VoidFunction {
-  return hostApi.handleHostSubscription(
-    'product_chat_custom_message_render_subscribe',
-    (params, send, interrupt) => {
-      const typed = params as { tag: string; value: unknown };
-      if (typed.tag !== 'v1') {
-        interrupt();
-        return () => {
-          /* empty */
-        };
-      }
-
-      const { messageId, messageType, payload } = typed.value as {
-        messageId: string;
-        messageType: string;
-        payload: Uint8Array;
+  return hostApi.handleHostSubscription('product_chat_custom_message_render_subscribe', (params, send, interrupt) => {
+    const typed = params as { tag: string; value: unknown };
+    if (typed.tag !== 'v1') {
+      interrupt();
+      return () => {
+        /* empty */
       };
+    }
 
-      return callback(
-        {
-          messageId,
-          messageType,
-          payload,
-          subscribeActions(
-            actionCallback: (
-              actionId: string,
-              payload: Uint8Array | undefined,
-            ) => void,
-          ) {
-            const actionsSubscription = hostApi.chatActionSubscribe(
-              undefined,
-              (action) => {
-                if (
-                  action.payload.tag === 'ActionTriggered' &&
-                  action.payload.value.messageId === messageId
-                ) {
-                  actionCallback(
-                    action.payload.value.actionId,
-                    action.payload.value.payload ?? undefined,
-                  );
-                }
-              },
-            );
+    const { messageId, messageType, payload } = typed.value as {
+      messageId: string;
+      messageType: string;
+      payload: Uint8Array;
+    };
 
-            return actionsSubscription.unsubscribe;
-          },
+    return callback(
+      {
+        messageId,
+        messageType,
+        payload,
+        subscribeActions(actionCallback: (actionId: string, payload: Uint8Array | undefined) => void) {
+          const actionsSubscription = hostApi.chatActionSubscribe(undefined, action => {
+            if (action.payload.tag === 'ActionTriggered' && action.payload.value.messageId === messageId) {
+              actionCallback(action.payload.value.actionId, action.payload.value.payload ?? undefined);
+            }
+          });
+
+          return actionsSubscription.unsubscribe;
         },
-        (node: CustomRendererNode) => send({ tag: 'v1', value: node } as ReceiveCodecType<'product_chat_custom_message_render_subscribe'>),
-      );
-    },
-  );
+      },
+      (node: CustomRendererNode) =>
+        send({ tag: 'v1', value: node } as ReceiveCodecType<'product_chat_custom_message_render_subscribe'>),
+    );
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -230,17 +195,13 @@ export function handleCustomMessageRendering(
  *
  * @param map - A record mapping message type strings to renderer functions.
  */
-export function matchChatCustomRenderers(
-  map: Record<string, ChatCustomMessageRenderer>,
-): ChatCustomMessageRenderer {
+export function matchChatCustomRenderers(map: Record<string, ChatCustomMessageRenderer>): ChatCustomMessageRenderer {
   return (params, render) => {
     const { messageType } = params;
     const renderer = map[messageType];
 
     if (!renderer) {
-      throw new Error(
-        `Renderer for message type ${messageType} is not defined`,
-      );
+      throw new Error(`Renderer for message type ${messageType} is not defined`);
     }
 
     return renderer(params, render);

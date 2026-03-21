@@ -19,7 +19,7 @@ import type {
 } from '@polkadot/host-api';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 
-import type { Container } from '@polkadot/host-api';
+import type { ProtocolHandler } from '@polkadot/host-api';
 import { wireHostHandlers } from './host.js';
 import { wirePermissionHandlers } from './permissions.js';
 import { wireStorageHandlers } from './storage.js';
@@ -93,7 +93,8 @@ export type HandlersConfig = {
   onCreateTransactionWithNonProductAccount?: (
     session: UserSessionInfo,
     payload: RequestParams<'host_create_transaction_with_non_product_account', 'v1'>,
-  ) => ResponseOk<'host_create_transaction_with_non_product_account', 'v1'>
+  ) =>
+    | ResponseOk<'host_create_transaction_with_non_product_account', 'v1'>
     | Promise<ResponseOk<'host_create_transaction_with_non_product_account', 'v1'>>;
 
   // -- Chain connection -----------------------------------------------------
@@ -105,7 +106,7 @@ export type HandlersConfig = {
 // Wire everything
 // ---------------------------------------------------------------------------
 
-export function wireAllHandlers(container: Container, config: HandlersConfig): VoidFunction {
+export function wireAllHandlers(container: ProtocolHandler, config: HandlersConfig): VoidFunction {
   const allCleanups: VoidFunction[] = [];
 
   allCleanups.push(...wireHostHandlers(container, config));

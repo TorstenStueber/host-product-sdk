@@ -36,9 +36,7 @@ describe('structuredCloneCodecAdapter', () => {
 
   it('decode rejects Uint8Array input', () => {
     const binaryData = new Uint8Array([1, 2, 3]);
-    expect(() => codec.decode(binaryData)).toThrow(
-      'StructuredClone codec does not accept Uint8Array',
-    );
+    expect(() => codec.decode(binaryData)).toThrow('StructuredClone codec does not accept Uint8Array');
   });
 
   it('round-trip with nested objects', () => {

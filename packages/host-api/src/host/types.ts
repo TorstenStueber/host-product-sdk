@@ -1,7 +1,7 @@
 /**
- * Container types.
+ * ProtocolHandler types.
  *
- * The Container is the central type that bridges a host application with
+ * The ProtocolHandler is the central type that bridges a host application with
  * an embedded product via the transport layer. It exposes handler
  * registration methods for every protocol method, translating between
  * the versioned wire format (v1 tagged enums) and plain TypeScript types.
@@ -11,11 +11,7 @@
  * `SubscriptionParams`, and `SubscriptionPayload`.
  */
 
-import type {
-  ConnectionStatus,
-  Transport,
-  Subscription,
-} from '../shared/transport/transport.js';
+import type { ConnectionStatus, Transport, Subscription } from '../shared/transport/transport.js';
 import type { HexString } from '../shared/codec/scale/primitives.js';
 import type {
   RequestParams,
@@ -46,10 +42,10 @@ type SubscriptionHandlerFn<M extends SubscriptionMethod, SV extends string = 'v1
 ) => VoidFunction;
 
 // ---------------------------------------------------------------------------
-// Container interface
+// ProtocolHandler interface
 // ---------------------------------------------------------------------------
 
-export type Container = {
+export type ProtocolHandler = {
   // -- Core / lifecycle -----------------------------------------------------
   handleFeatureSupported(handler: RequestHandler<'host_feature_supported'>): VoidFunction;
   handleDevicePermission(handler: RequestHandler<'host_device_permission'>): VoidFunction;
@@ -67,13 +63,17 @@ export type Container = {
   handleAccountGetAlias(handler: RequestHandler<'host_account_get_alias'>): VoidFunction;
   handleAccountCreateProof(handler: RequestHandler<'host_account_create_proof'>): VoidFunction;
   handleGetNonProductAccounts(handler: RequestHandler<'host_get_non_product_accounts'>): VoidFunction;
-  handleAccountConnectionStatusSubscribe(handler: SubscriptionHandlerFn<'host_account_connection_status_subscribe'>): VoidFunction;
+  handleAccountConnectionStatusSubscribe(
+    handler: SubscriptionHandlerFn<'host_account_connection_status_subscribe'>,
+  ): VoidFunction;
 
   // -- Signing --------------------------------------------------------------
   handleSignPayload(handler: RequestHandler<'host_sign_payload'>): VoidFunction;
   handleSignRaw(handler: RequestHandler<'host_sign_raw'>): VoidFunction;
   handleCreateTransaction(handler: RequestHandler<'host_create_transaction'>): VoidFunction;
-  handleCreateTransactionWithNonProductAccount(handler: RequestHandler<'host_create_transaction_with_non_product_account'>): VoidFunction;
+  handleCreateTransactionWithNonProductAccount(
+    handler: RequestHandler<'host_create_transaction_with_non_product_account'>,
+  ): VoidFunction;
 
   // -- Chat -----------------------------------------------------------------
   handleChatCreateRoom(handler: RequestHandler<'host_chat_create_room'>): VoidFunction;
@@ -119,9 +119,7 @@ export type Container = {
   handleChainTransactionStop(handler: RequestHandler<'remote_chain_transaction_stop'>): VoidFunction;
 
   // -- High-level chain connection (wraps all chain_* methods) ---------------
-  handleChainConnection(
-    factory: (genesisHash: HexString) => JsonRpcProvider | null,
-  ): VoidFunction;
+  handleChainConnection(factory: (genesisHash: HexString) => JsonRpcProvider | null): VoidFunction;
 
   // -- Transport lifecycle ---------------------------------------------------
   readonly transport: Transport;
