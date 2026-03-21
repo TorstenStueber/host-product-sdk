@@ -8,7 +8,6 @@
  */
 
 import type { HostApi } from '@polkadot/host-api';
-import { hostApi as defaultHostApi } from '@polkadot/host-api';
 import type { HexString } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -20,7 +19,7 @@ import type { HexString } from './types.js';
  *
  * @param hostApi - The HostApi instance to use. Defaults to the singleton.
  */
-export const createPreimageManager = (hostApi: HostApi = defaultHostApi) => {
+export const createPreimageManager = (hostApi: HostApi) => {
   return {
     /**
      * Subscribe to a preimage lookup by key.
@@ -48,12 +47,3 @@ export const createPreimageManager = (hostApi: HostApi = defaultHostApi) => {
     },
   };
 };
-
-// ---------------------------------------------------------------------------
-// Singleton
-// ---------------------------------------------------------------------------
-
-/**
- * Default preimage manager instance bound to the sandbox transport.
- */
-export const preimageManager = createPreimageManager();

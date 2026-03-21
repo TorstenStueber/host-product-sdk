@@ -69,7 +69,7 @@ export type Subscription = {
 };
 
 export type Transport = {
-  isCorrectEnvironment(): boolean;
+  /** Resolves when the handshake completes (initiator or responder). */
   isReady(): Promise<boolean>;
   destroy(): void;
   onConnectionStatusChange(callback: (status: ConnectionStatus) => void): () => void;
@@ -128,10 +128,6 @@ type InternalSubscription = {
   listeners: InternalListener[];
 };
 
-function isConnected(status: ConnectionStatus): boolean {
-  return status === 'connected';
-}
-
 /**
  * Build a deterministic key for subscription de-duplication.
  *
@@ -158,6 +154,13 @@ export type CreateTransportOptions = {
   provider: Provider;
 
   /**
+   * Handshake role:
+   * - `'initiate'`: eagerly sends handshake requests until the other side responds.
+   * - `'respond'`: registers a handler that responds to incoming handshake requests.
+   */
+  handshake: 'initiate' | 'respond';
+
+  /**
    * Protocol version id sent during handshake.
    * Defaults to `1` (the original JAM_CODEC_PROTOCOL_ID).
    */
@@ -173,7 +176,7 @@ export type CreateTransportOptions = {
 };
 
 export function createTransport(options: CreateTransportOptions): Transport {
-  const { provider, protocolVersionId = 1, idPrefix = '' } = options;
+  const { provider, handshake, protocolVersionId = 1, idPrefix = '' } = options;
 
   /** Codec used for encoding outgoing messages. Starts as SCALE, upgrades to structured clone. */
   let codecAdapter = scaleCodecAdapter;
@@ -209,8 +212,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
 
   const handshakeAbortController = new AbortController();
 
-  let handshakePromise: Promise<boolean> | undefined;
-  let connectionStatusResolved = false;
+  let handshakePromise: Promise<boolean>;
   let connectionStatus: ConnectionStatus = 'disconnected';
   let disposed = false;
 
@@ -233,17 +235,6 @@ export function createTransport(options: CreateTransportOptions): Transport {
     }
   }
 
-  function throwIfIncorrectEnvironment(): void {
-    if (!provider.isCorrectEnvironment()) {
-      throw new Error('Environment is not correct');
-    }
-  }
-
-  function checks(): void {
-    throwIfDisposed();
-    throwIfIncorrectEnvironment();
-  }
-
   // -- Subscription multiplexing --------------------------------------------
 
   const activeSubscriptions: Map<string, InternalSubscription> = new Map();
@@ -256,10 +247,6 @@ export function createTransport(options: CreateTransportOptions): Transport {
   // -- Transport implementation ---------------------------------------------
 
   const transport: Transport = {
-    isCorrectEnvironment() {
-      return provider.isCorrectEnvironment();
-    },
-
     swapCodecAdapter(adapter: CodecAdapter) {
       codecAdapter = adapter;
     },
@@ -267,70 +254,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
     // -- Handshake ----------------------------------------------------------
 
     isReady() {
-      checks();
-
-      if (connectionStatusResolved) {
-        return Promise.resolve(isConnected(connectionStatus));
-      }
-
-      if (handshakePromise) {
-        return handshakePromise;
-      }
-
-      changeConnectionStatus('connecting');
-
-      const performHandshake = (): Promise<boolean> => {
-        const id = nextId();
-        let resolved = false;
-
-        const cleanup = (interval: ReturnType<typeof setInterval>, unsubscribe: () => void): void => {
-          clearInterval(interval);
-          unsubscribe();
-          handshakeAbortController.signal.removeEventListener('abort', unsubscribe);
-        };
-
-        return new Promise<boolean>(resolve => {
-          const unsubscribe = transport.listenMessages('host_handshake_response', responseId => {
-            if (responseId === id) {
-              cleanup(interval, unsubscribe);
-              resolved = true;
-              resolve(true);
-            }
-          });
-
-          handshakeAbortController.signal.addEventListener('abort', unsubscribe, {
-            once: true,
-          });
-
-          const interval = setInterval(() => {
-            if (handshakeAbortController.signal.aborted) {
-              clearInterval(interval);
-              resolve(false);
-              return;
-            }
-
-            transport.postMessage(id, {
-              tag: 'host_handshake_request',
-              value: { tag: 'v1', value: protocolVersionId },
-            });
-          }, HANDSHAKE_INTERVAL);
-        }).then(success => {
-          if (!success && !resolved) {
-            handshakeAbortController.abort('Timeout');
-          }
-          return success;
-        });
-      };
-
-      const timedOutRequest = Promise.race([performHandshake(), delay(HANDSHAKE_TIMEOUT).then(() => false)]);
-
-      handshakePromise = timedOutRequest.then(result => {
-        handshakePromise = undefined;
-        connectionStatusResolved = true;
-        changeConnectionStatus(result ? 'connected' : 'disconnected');
-        return result;
-      });
-
+      throwIfDisposed();
       return handshakePromise;
     },
 
@@ -341,7 +265,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
       payload: RequestCodecType<M>,
       signal?: AbortSignal,
     ): Promise<ResponseCodecType<M>> {
-      checks();
+      throwIfDisposed();
 
       if (!(await transport.isReady())) {
         throw new Error('Polkadot host is not ready');
@@ -390,7 +314,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
       method: M,
       handler: (message: RequestCodecType<M>) => Promise<ResponseCodecType<M>>,
     ): () => void {
-      checks();
+      throwIfDisposed();
 
       const requestAction = composeAction(method, 'request');
       const responseAction = composeAction(method, 'response');
@@ -409,7 +333,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
       payload: StartCodecType<M>,
       callback: (payload: ReceiveCodecType<M>) => void,
     ): Subscription {
-      checks();
+      throwIfDisposed();
 
       const subEvents = createNanoEvents<{ interrupt: () => void }>();
 
@@ -503,7 +427,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
         interrupt: () => void,
       ) => () => void,
     ): () => void {
-      checks();
+      throwIfDisposed();
 
       const startAction = composeAction(method, 'start');
       const stopAction = composeAction(method, 'stop');
@@ -554,7 +478,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
     // -- Low-level message I/O ---------------------------------------------
 
     postMessage(requestId: string, payload: { tag: ActionString; value: unknown }): void {
-      checks();
+      throwIfDisposed();
 
       const message: ProtocolMessage = { requestId, payload };
       const encoded = codecAdapter.encode(message);
@@ -638,21 +562,77 @@ export function createTransport(options: CreateTransportOptions): Transport {
     }
   });
 
-  // -- Auto-wire handshake handler on the host side -------------------------
-  //
-  // When the provider detects that it is in the correct environment (i.e.
-  // it is the host, not the product) it automatically responds to
-  // handshake requests.
+  // -- Handshake setup -------------------------------------------------------
 
-  if (provider.isCorrectEnvironment()) {
+  if (handshake === 'respond') {
+    // Host side: register handler and resolve isReady() when the first
+    // handshake request arrives and is successfully responded to.
+    const { resolve: resolveHandshake, promise } = promiseWithResolvers<boolean>();
+    handshakePromise = promise;
+
     transport.handleRequest('host_handshake', async (version): Promise<ResponseCodecType<'host_handshake'>> => {
       if (version.tag === 'v1' && version.value === protocolVersionId) {
+        changeConnectionStatus('connected');
+        resolveHandshake(true);
         return { tag: 'v1', value: { success: true, value: undefined } };
       }
       return {
         tag: 'v1',
         value: { success: false, value: { tag: 'UnsupportedProtocolVersion', value: undefined } },
       };
+    });
+  } else {
+    // Product side: eagerly start sending handshake requests.
+    changeConnectionStatus('connecting');
+
+    const performHandshake = (): Promise<boolean> => {
+      const id = nextId();
+      let resolved = false;
+
+      const cleanup = (interval: ReturnType<typeof setInterval>, unsubscribe: () => void): void => {
+        clearInterval(interval);
+        unsubscribe();
+        handshakeAbortController.signal.removeEventListener('abort', unsubscribe);
+      };
+
+      return new Promise<boolean>(resolve => {
+        const unsubscribe = transport.listenMessages('host_handshake_response', responseId => {
+          if (responseId === id) {
+            cleanup(interval, unsubscribe);
+            resolved = true;
+            resolve(true);
+          }
+        });
+
+        handshakeAbortController.signal.addEventListener('abort', unsubscribe, {
+          once: true,
+        });
+
+        const interval = setInterval(() => {
+          if (handshakeAbortController.signal.aborted) {
+            clearInterval(interval);
+            resolve(false);
+            return;
+          }
+
+          transport.postMessage(id, {
+            tag: 'host_handshake_request',
+            value: { tag: 'v1', value: protocolVersionId },
+          });
+        }, HANDSHAKE_INTERVAL);
+      }).then(success => {
+        if (!success && !resolved) {
+          handshakeAbortController.abort('Timeout');
+        }
+        return success;
+      });
+    };
+
+    const timedOutRequest = Promise.race([performHandshake(), delay(HANDSHAKE_TIMEOUT).then(() => false)]);
+
+    handshakePromise = timedOutRequest.then(result => {
+      changeConnectionStatus(result ? 'connected' : 'disconnected');
+      return result;
     });
   }
 

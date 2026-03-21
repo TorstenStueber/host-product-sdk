@@ -56,10 +56,6 @@ export function createWindowProvider(target: WindowRef): Provider {
   window.addEventListener('message', messageHandler);
 
   return {
-    isCorrectEnvironment() {
-      return true;
-    },
-
     postMessage(message) {
       if (disposed) return;
       const targetWindow = resolveWindow(target);

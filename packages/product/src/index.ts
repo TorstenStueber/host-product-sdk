@@ -5,7 +5,7 @@
  *
  * Usage:
  * ```ts
- * import { hostApi, createPapiProvider, createAccountsProvider } from '@polkadot/product';
+ * import { createHostApi, createPapiProvider, createAccountsProvider } from '@polkadot/product';
  * ```
  */
 
@@ -19,7 +19,7 @@ export { createPapiProvider } from './chain.js';
 export { createAccountsProvider } from './accounts.js';
 
 // -- Local storage ----------------------------------------------------------
-export { createLocalStorage, hostLocalStorage } from './storage.js';
+export { createLocalStorage } from './storage.js';
 
 // -- Chat -------------------------------------------------------------------
 export { createProductChatManager, handleCustomMessageRendering, matchChatCustomRenderers } from './chat.js';
@@ -28,7 +28,7 @@ export { createProductChatManager, handleCustomMessageRendering, matchChatCustom
 export { createStatementStore } from './statementStore.js';
 
 // -- Preimage ---------------------------------------------------------------
-export { createPreimageManager, preimageManager } from './preimage.js';
+export { createPreimageManager } from './preimage.js';
 
 // -- Extension injection (legacy polkadot-js compat) ------------------------
 export { injectSpektrExtension, createNonProductExtensionEnableFactory } from './extension.js';

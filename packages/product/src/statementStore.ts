@@ -9,7 +9,6 @@
  */
 
 import type { HostApi } from '@polkadot/host-api';
-import { hostApi as defaultHostApi } from '@polkadot/host-api';
 import type { ProductAccountId, SignedStatement, Statement, Topic } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -21,7 +20,7 @@ import type { ProductAccountId, SignedStatement, Statement, Topic } from './type
  *
  * @param hostApi - The HostApi instance to use. Defaults to the singleton.
  */
-export const createStatementStore = (hostApi: HostApi = defaultHostApi) => {
+export const createStatementStore = (hostApi: HostApi) => {
   return {
     /**
      * Subscribe to statements matching the given topics.

@@ -60,10 +60,10 @@ describe('Transport', () => {
     it('returns a Transport object with all expected methods', () => {
       const transport = createTransport({
         provider: hostProvider,
+        handshake: 'respond',
       });
 
       expect(transport).toBeDefined();
-      expect(typeof transport.isCorrectEnvironment).toBe('function');
       expect(typeof transport.isReady).toBe('function');
       expect(typeof transport.destroy).toBe('function');
       expect(typeof transport.onConnectionStatusChange).toBe('function');
@@ -78,23 +78,6 @@ describe('Transport', () => {
 
       transport.destroy();
     });
-
-    it('isCorrectEnvironment delegates to provider', () => {
-      const transport = createTransport({
-        provider: hostProvider,
-      });
-      expect(transport.isCorrectEnvironment()).toBe(true);
-
-      // Both mock providers return true (both sides are in their
-      // "correct" environment for sending/receiving).
-      const transport2 = createTransport({
-        provider: productProvider,
-      });
-      expect(transport2.isCorrectEnvironment()).toBe(true);
-
-      transport.destroy();
-      transport2.destroy();
-    });
   });
 
   // -----------------------------------------------------------------------
@@ -105,14 +88,16 @@ describe('Transport', () => {
     it('product receives handshake response from host and becomes connected', async () => {
       hostTransport = createTransport({
         provider: hostProvider,
+        handshake: 'respond',
       });
 
       productTransport = createTransport({
         provider: productProvider,
+        handshake: 'initiate',
       });
 
       // The host transport auto-wires handshake handler in createTransport
-      // when isCorrectEnvironment() returns true.
+      // The host transport uses handshake: 'respond' to auto-wire the handler.
       const ready = await productTransport.isReady();
       expect(ready).toBe(true);
     });
@@ -120,10 +105,12 @@ describe('Transport', () => {
     it('connection status changes to connected after successful handshake', async () => {
       hostTransport = createTransport({
         provider: hostProvider,
+        handshake: 'respond',
       });
 
       productTransport = createTransport({
         provider: productProvider,
+        handshake: 'initiate',
       });
 
       const statuses: string[] = [];
@@ -145,10 +132,12 @@ describe('Transport', () => {
     beforeEach(() => {
       hostTransport = createTransport({
         provider: hostProvider,
+        handshake: 'respond',
       });
 
       productTransport = createTransport({
         provider: productProvider,
+        handshake: 'initiate',
       });
     });
 
@@ -209,10 +198,12 @@ describe('Transport', () => {
     beforeEach(() => {
       hostTransport = createTransport({
         provider: hostProvider,
+        handshake: 'respond',
       });
 
       productTransport = createTransport({
         provider: productProvider,
+        handshake: 'initiate',
       });
     });
 
@@ -304,10 +295,12 @@ describe('Transport', () => {
     beforeEach(() => {
       hostTransport = createTransport({
         provider: hostProvider,
+        handshake: 'respond',
       });
 
       productTransport = createTransport({
         provider: productProvider,
+        handshake: 'initiate',
       });
     });
 
@@ -369,6 +362,7 @@ describe('Transport', () => {
     it('onConnectionStatusChange fires with current status immediately', () => {
       const transport = createTransport({
         provider: hostProvider,
+        handshake: 'respond',
       });
 
       const statuses: string[] = [];
@@ -383,10 +377,12 @@ describe('Transport', () => {
     it('status transitions through connecting -> connected on handshake', async () => {
       hostTransport = createTransport({
         provider: hostProvider,
+        handshake: 'respond',
       });
 
       productTransport = createTransport({
         provider: productProvider,
+        handshake: 'initiate',
       });
 
       const statuses: string[] = [];
@@ -407,6 +403,7 @@ describe('Transport', () => {
     it('fires onDestroy callback', () => {
       const transport = createTransport({
         provider: hostProvider,
+        handshake: 'respond',
       });
 
       const destroyed = vi.fn();
@@ -419,6 +416,7 @@ describe('Transport', () => {
     it('sets connection status to disconnected', () => {
       hostTransport = createTransport({
         provider: hostProvider,
+        handshake: 'respond',
       });
 
       const statuses: string[] = [];
@@ -432,6 +430,7 @@ describe('Transport', () => {
     it('throws on use after destroy', () => {
       const transport = createTransport({
         provider: hostProvider,
+        handshake: 'respond',
       });
       transport.destroy();
 
@@ -449,6 +448,7 @@ describe('Transport', () => {
 
       const transport = createTransport({
         provider: hp,
+        handshake: 'respond',
       });
 
       const messages: unknown[] = [];
@@ -488,6 +488,7 @@ describe('Transport', () => {
 
       const transport = createTransport({
         provider: hp,
+        handshake: 'respond',
       });
 
       const received: unknown[] = [];
@@ -538,10 +539,12 @@ describe('Transport', () => {
     beforeEach(() => {
       hostTransport = createTransport({
         provider: hostProvider,
+        handshake: 'respond',
       });
 
       productTransport = createTransport({
         provider: productProvider,
+        handshake: 'initiate',
       });
     });
 
@@ -631,6 +634,7 @@ describe('Transport', () => {
 
       hostTransport = createTransport({
         provider: hp,
+        handshake: 'respond',
       });
 
       const received: unknown[] = [];
@@ -663,6 +667,7 @@ describe('Transport', () => {
 
       hostTransport = createTransport({
         provider: hp,
+        handshake: 'respond',
       });
 
       const received: unknown[] = [];
@@ -690,6 +695,7 @@ describe('Transport', () => {
 
       hostTransport = createTransport({
         provider: hp,
+        handshake: 'respond',
       });
 
       const outgoing: unknown[] = [];

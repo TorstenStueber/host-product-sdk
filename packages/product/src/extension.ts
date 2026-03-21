@@ -51,7 +51,7 @@ interface SignerResult {
 
 import { SpektrExtensionName } from './constants.js';
 import type { HostApi } from '@polkadot/host-api';
-import { hostApi as defaultHostApi, productLogger } from '@polkadot/host-api';
+import { productLogger } from '@polkadot/host-api';
 import type { HexString, VersionedTxPayload } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ interface Injected {
  * Returns `undefined` if the transport is not ready (e.g. handshake failed).
  */
 export async function createNonProductExtensionEnableFactory(
-  hostApi: HostApi = defaultHostApi,
+  hostApi: HostApi,
 ): Promise<((_origin: string) => Promise<Injected>) | undefined> {
   const ready = await hostApi.isReady();
   if (!ready) return undefined;
@@ -229,7 +229,7 @@ export async function createNonProductExtensionEnableFactory(
  * @param transport - The transport to use. Pass `undefined` to skip injection.
  * @returns `true` if injection succeeded, `false` otherwise.
  */
-export async function injectSpektrExtension(hostApi: HostApi = defaultHostApi): Promise<boolean> {
+export async function injectSpektrExtension(hostApi: HostApi): Promise<boolean> {
   try {
     const enable = await createNonProductExtensionEnableFactory(hostApi);
 

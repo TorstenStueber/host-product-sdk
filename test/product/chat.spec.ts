@@ -26,8 +26,8 @@ describe('handleCustomMessageRendering', () => {
 
   beforeEach(() => {
     [hostProvider, productProvider] = createMockProviderPair();
-    hostTransport = createTransport({ provider: hostProvider, idPrefix: 'h:' });
-    productTransport = createTransport({ provider: productProvider, idPrefix: 'p:' });
+    hostTransport = createTransport({ provider: hostProvider, handshake: 'respond', idPrefix: 'h:' });
+    productTransport = createTransport({ provider: productProvider, handshake: 'initiate', idPrefix: 'p:' });
   });
 
   afterEach(() => {

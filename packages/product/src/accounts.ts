@@ -10,7 +10,6 @@
  */
 
 import type { HostApi } from '@polkadot/host-api';
-import { hostApi as defaultHostApi } from '@polkadot/host-api';
 import type { AccountConnectionStatus, HexString, ProductAccount, RingLocation } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -35,7 +34,7 @@ function fromHex(hex: string): Uint8Array {
  *
  * @param hostApi - The HostApi instance to use. Defaults to the singleton.
  */
-export const createAccountsProvider = (hostApi: HostApi = defaultHostApi) => {
+export const createAccountsProvider = (hostApi: HostApi) => {
   return {
     /**
      * Get the product account for a given dotNs identifier and derivation index.

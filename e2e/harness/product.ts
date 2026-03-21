@@ -60,7 +60,6 @@ function createProductProvider(): Provider {
   window.addEventListener('message', handler);
 
   return {
-    isCorrectEnvironment: () => window !== window.top,
     postMessage(message) {
       if (message instanceof Uint8Array) {
         window.top!.postMessage(message, '*', [message.buffer]);
@@ -84,6 +83,7 @@ function createProductProvider(): Provider {
 const provider = createProductProvider();
 const transport = createTransport({
   provider,
+  handshake: 'initiate',
 });
 
 const e2e: ProductE2E = {

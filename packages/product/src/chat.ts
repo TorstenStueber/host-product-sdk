@@ -15,7 +15,6 @@
 import type { ReceiveCodecType } from '@polkadot/host-api';
 
 import type { HostApi } from '@polkadot/host-api';
-import { hostApi as defaultHostApi } from '@polkadot/host-api';
 import type {
   ChatBotRegistrationStatus,
   ChatCustomMessageRenderer,
@@ -35,7 +34,7 @@ import type {
  *
  * @param hostApi - The HostApi instance to use. Defaults to the singleton.
  */
-export const createProductChatManager = (hostApi: HostApi = defaultHostApi) => {
+export const createProductChatManager = (hostApi: HostApi) => {
   const roomRegistrationStatus: Record<string, ChatRoomRegistrationStatus> = {};
   const botRegistrationStatus: Record<string, ChatBotRegistrationStatus> = {};
 
@@ -145,10 +144,7 @@ export const createProductChatManager = (hostApi: HostApi = defaultHostApi) => {
  * @param transport - The transport for handler registration. Defaults to the sandbox transport.
  * @returns An unsubscribe function.
  */
-export function handleCustomMessageRendering(
-  callback: ChatCustomMessageRenderer,
-  hostApi: HostApi = defaultHostApi,
-): () => void {
+export function handleCustomMessageRendering(callback: ChatCustomMessageRenderer, hostApi: HostApi): () => void {
   return hostApi.handleHostSubscription('product_chat_custom_message_render_subscribe', (params, send, interrupt) => {
     const typed = params as { tag: string; value: unknown };
     if (typed.tag !== 'v1') {

@@ -20,11 +20,13 @@ function setupTransports() {
 
   const hostTransport = createTransport({
     provider: hostProvider,
+    handshake: 'respond',
     idPrefix: 'h:',
   });
 
   const productTransport = createTransport({
     provider: productProvider,
+    handshake: 'initiate',
     idPrefix: 'p:',
   });
 

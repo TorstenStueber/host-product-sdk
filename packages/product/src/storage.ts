@@ -10,7 +10,6 @@
  */
 
 import type { HostApi } from '@polkadot/host-api';
-import { hostApi as defaultHostApi } from '@polkadot/host-api';
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -21,7 +20,7 @@ import { hostApi as defaultHostApi } from '@polkadot/host-api';
  *
  * @param hostApi - The HostApi instance to use. Defaults to the singleton.
  */
-export const createLocalStorage = (hostApi: HostApi = defaultHostApi) => {
+export const createLocalStorage = (hostApi: HostApi) => {
   const textEncoder = new TextEncoder();
   const textDecoder = new TextDecoder();
 
@@ -92,12 +91,3 @@ export const createLocalStorage = (hostApi: HostApi = defaultHostApi) => {
     },
   };
 };
-
-// ---------------------------------------------------------------------------
-// Singleton
-// ---------------------------------------------------------------------------
-
-/**
- * Default host local storage instance bound to the sandbox transport.
- */
-export const hostLocalStorage = createLocalStorage();

@@ -98,25 +98,14 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
 
   const transport = createTransport({
     provider,
+    handshake: 'respond',
     idPrefix: 'h:',
   });
-
-  if (!transport.isCorrectEnvironment()) {
-    throw new Error('Transport is not available: provider has incorrect environment');
-  }
 
   // Auto-register codec upgrade handler if the host supports multiple codecs.
   let cleanupCodecUpgrade: (() => void) | undefined;
   if (supportedCodecs && Object.keys(supportedCodecs).length > 0) {
     cleanupCodecUpgrade = handleCodecUpgrade(transport, supportedCodecs);
-  }
-
-  let initialized = false;
-
-  function init(): void {
-    if (initialized) return;
-    initialized = true;
-    transport.isReady();
   }
 
   // -- Request handler wiring helper ----------------------------------------
@@ -142,8 +131,6 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
     handlers: RequestVersionHandlers<M>,
     defaultError: ResponseErr<M, 'v1'>,
   ): () => void {
-    init();
-
     /** Dispatch a single version — generic over V so types flow through. */
     async function dispatchVersion<V extends RequestVersions<M>>(
       version: V,
@@ -199,8 +186,6 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
     method: M,
     handlers: SubscriptionVersionHandlers<M>,
   ): () => void {
-    init();
-
     /** Dispatch a single version — generic over V so types flow through. */
     function dispatchVersion<V extends StartVersions<M>>(
       version: V,
@@ -401,7 +386,6 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
     },
 
     renderChatCustomMessage(params, callback) {
-      init();
       return transport.subscribe('product_chat_custom_message_render_subscribe', { tag: 'v1', value: params }, data => {
         const tagged = data as { tag: string; value: unknown };
         if (tagged.tag === 'v1') {
@@ -527,7 +511,6 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
     // -- High-level chain connection ----------------------------------------
 
     handleChainConnection(factory) {
-      init();
       const manager = createChainConnectionManager(factory);
       const cleanups: (() => void)[] = [];
 
@@ -776,7 +759,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
 
     subscribeProductConnectionStatus(callback) {
       const unsubscribe = transport.onConnectionStatusChange(callback);
-      init();
+
       return unsubscribe;
     },
 

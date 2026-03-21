@@ -15,7 +15,7 @@ import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 import { getSyncProvider } from '@polkadot-api/json-rpc-provider-proxy';
 
 import type { HostApi } from '@polkadot/host-api';
-import { hostApi as defaultHostApi, productLogger } from '@polkadot/host-api';
+import { productLogger } from '@polkadot/host-api';
 import type { HexString } from './types.js';
 
 /**
@@ -31,13 +31,9 @@ import type { HexString } from './types.js';
  */
 export function createPapiProvider(
   genesisHash: HexString,
+  hostApi: HostApi,
   __fallback?: JsonRpcProvider,
-  hostApi: HostApi = defaultHostApi,
 ): JsonRpcProvider {
-  if (!hostApi.isCorrectEnvironment()) {
-    throw new Error('PapiProvider can only be used in a product environment');
-  }
-
   // -------------------------------------------------------------------------
   // Follow state tracking
   // -------------------------------------------------------------------------

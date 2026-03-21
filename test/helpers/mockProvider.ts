@@ -12,19 +12,11 @@ export type MockProvider = Provider & {
   _injectMessage(message: unknown): void;
 };
 
-function createMockProvider(
-  _name: string,
-  isCorrectEnv: boolean,
-  sendTo: () => MockProvider | undefined,
-): MockProvider {
+function createMockProvider(sendTo: () => MockProvider | undefined): MockProvider {
   const subscribers = new Set<(message: unknown) => void>();
   let disposed = false;
 
   return {
-    isCorrectEnvironment() {
-      return isCorrectEnv;
-    },
-
     postMessage(message: unknown) {
       if (disposed) return;
       // Deliver asynchronously to mimic real postMessage behavior,
@@ -57,25 +49,15 @@ function createMockProvider(
 /**
  * Create a pair of mock providers connected to each other.
  *
- * - `hostProvider`: simulates the host side (isCorrectEnvironment = true).
- *   Messages posted here are delivered to productProvider's subscribers.
- * - `productProvider`: simulates the product side (isCorrectEnvironment = false).
- *   Messages posted here are delivered to hostProvider's subscribers.
+ * - `hostProvider`: messages posted here are delivered to productProvider's subscribers.
+ * - `productProvider`: messages posted here are delivered to hostProvider's subscribers.
  */
 export function createMockProviderPair(): [MockProvider, MockProvider] {
   let hostProvider: MockProvider;
   let productProvider: MockProvider;
 
-  // Host provider: correct environment = true (it IS the host)
-  hostProvider = createMockProvider('host', true, () => productProvider);
-
-  // Product provider: correct environment = true as well.
-  // Both sides must report isCorrectEnvironment() = true for their
-  // respective transports to function (send/receive messages).
-  // The host transport auto-wires the handshake handler only when
-  // isCorrectEnvironment is true, so we distinguish host from product
-  // by which provider auto-wires the handler (the host one).
-  productProvider = createMockProvider('product', true, () => hostProvider);
+  hostProvider = createMockProvider(() => productProvider);
+  productProvider = createMockProvider(() => hostProvider);
 
   return [hostProvider, productProvider];
 }
@@ -88,19 +70,11 @@ export function createSyncMockProviderPair(): [MockProvider, MockProvider] {
   let hostProvider: MockProvider;
   let productProvider: MockProvider;
 
-  function createSyncProvider(
-    _name: string,
-    isCorrectEnv: boolean,
-    sendTo: () => MockProvider | undefined,
-  ): MockProvider {
+  function createSyncProvider(sendTo: () => MockProvider | undefined): MockProvider {
     const subscribers = new Set<(message: unknown) => void>();
     let disposed = false;
 
     return {
-      isCorrectEnvironment() {
-        return isCorrectEnv;
-      },
-
       postMessage(message: unknown) {
         if (disposed) return;
         const target = sendTo();
@@ -128,8 +102,8 @@ export function createSyncMockProviderPair(): [MockProvider, MockProvider] {
     };
   }
 
-  hostProvider = createSyncProvider('host', true, () => productProvider);
-  productProvider = createSyncProvider('product', true, () => hostProvider);
+  hostProvider = createSyncProvider(() => productProvider);
+  productProvider = createSyncProvider(() => hostProvider);
 
   return [hostProvider, productProvider];
 }

@@ -71,10 +71,6 @@ export function createMessagePortProvider(portOrPromise: MessagePort | Promise<M
   }
 
   return {
-    isCorrectEnvironment() {
-      return true;
-    },
-
     postMessage(message) {
       if (disposed) return;
       withPort(p => {

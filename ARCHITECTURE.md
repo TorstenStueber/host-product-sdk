@@ -219,7 +219,6 @@ The lowest abstraction -- a raw message pipe:
 
 ```typescript
 type Provider = {
-  isCorrectEnvironment(): boolean;
   postMessage(message: Uint8Array | unknown): void;
   subscribe(callback: (message: Uint8Array | unknown) => void): () => void;
   dispose(): void;
@@ -257,9 +256,11 @@ catch-all listener responds immediately to unhandled requests (with `NOT_SUPPORT
 `request()` which rejects with `MethodNotSupportedError`) and unhandled subscriptions (with `_interrupt`). This prevents
 requests from hanging indefinitely when the other side doesn't support a method.
 
-**Handshake**: `transport.isReady()` sends `host_handshake_request` every 50ms, waits up to 10s. The host side
-auto-registers a handler that validates the protocol version. Connection status goes `disconnected` -> `connecting` ->
-`connected`.
+**Handshake**: `createTransport` takes a required `handshake: 'initiate' | 'respond'` option. The `'initiate'` side
+(product) eagerly sends `host_handshake_request` every 50ms, up to 10s timeout. The `'respond'` side (host) auto-wires a
+handler that validates the protocol version and resolves its own `isReady()` when the first handshake succeeds.
+`transport.isReady()` returns a promise that resolves when the handshake completes (on either side). Connection status
+goes `disconnected` -> `connecting` -> `connected`.
 
 **Request/Response**: `transport.request<M>(method, payload)` is generic on the method name. It takes
 `RequestCodecType<M>` (the versioned envelope), generates a unique ID (e.g. `"p:1"`), posts
@@ -374,7 +375,8 @@ wrapper needed. The `sdk.ts` `embed()` method sets `iframe.src` itself and creat
 
 `createProtocolHandler({ provider, supportedCodecs? })`:
 
-1. Creates a Transport with `idPrefix: 'h:'` (always starts with SCALE, auto-detects structured clone)
+1. Creates a Transport with `handshake: 'respond'` and `idPrefix: 'h:'` (always starts with SCALE, auto-detects
+   structured clone)
 2. If `supportedCodecs` provided, auto-registers codec upgrade handler
 3. Returns ProtocolHandler with 41 methods (40 `handle*()` for product-initiated requests/subscriptions, plus one
    host-initiated method: `renderChatCustomMessage`)
@@ -456,16 +458,19 @@ interface to the transport -- the bridge between the protocol layer and the doma
 
 ### 1c.1 Transport (`product/sandboxTransport.ts`)
 
-`createDefaultProductProvider()` detects the environment and dispatches to the appropriate shared provider:
+`createDefaultProductProvider()` detects the environment and returns the appropriate shared provider, or `undefined` if
+not in a supported environment:
 
 - `isIframe()` -> `createWindowProvider(window.top)` from shared
 - `isWebview()` -> `createMessagePortProvider(getWebviewPort())` from shared, where `getWebviewPort()` polls
   `window.__HOST_API_PORT__` for the port injected by the host's webview provider
-- otherwise -> no-op provider with `isCorrectEnvironment() = false`
+- otherwise -> `undefined`
 
-Creates transport with `idPrefix: 'p:'`. The `sandboxTransport` singleton wraps `isReady()` so that after the handshake
-succeeds, it automatically attempts a codec upgrade to structured clone (see 1.10 Codec Negotiation). This happens
-transparently before any real protocol traffic. Exports singletons `sandboxProvider` and `sandboxTransport`.
+Creates transport with `handshake: 'initiate'` and `idPrefix: 'p:'`. The handshake starts eagerly when the transport is
+created. The `sandboxTransport` singleton wraps `isReady()` so that after the handshake succeeds, it automatically
+attempts a codec upgrade to structured clone (see 1.10 Codec Negotiation). This happens transparently before any real
+protocol traffic. The singletons `sandboxProvider`, `sandboxTransport`, and `hostApi` are all `undefined` when not in a
+supported environment.
 
 ### 1c.2 Host API (`product/hostApi.ts`)
 
@@ -482,7 +487,6 @@ unwraps received payloads.
 **Transport proxies**: in addition to protocol methods, `HostApi` exposes transport lifecycle as meaningful accessors so
 domain modules never need a `Transport` reference:
 
-- `isCorrectEnvironment()`: whether the transport is in a supported environment
 - `isReady()`: resolves when handshake and codec negotiation are complete
 - `handleHostSubscription(method, handler)`: registers a handler for the one host-initiated subscription (custom chat
   message rendering)
@@ -576,12 +580,12 @@ callbacks.
 
 ## Part 3: `@polkadot/product`
 
-Domain modules that run inside the iframe. Every module accepts an optional `HostApi` parameter (from
-`@polkadot/host-api`) and defaults to the singleton. No module imports `Transport` directly.
+Domain modules that run inside the iframe. Every module takes a required `HostApi` parameter (from
+`@polkadot/host-api`). No module imports `Transport` directly.
 
 ### 3.1 Accounts (`accounts.ts`)
 
-`createAccountsProvider(hostApi?)`:
+`createAccountsProvider(hostApi)`:
 
 - `getProductAccount(dotNsIdentifier, derivationIndex?)` -> `hostApi.accountGet`
 - `getProductAccountAlias(dotNsIdentifier, derivationIndex?)` -> `hostApi.accountGetAlias`
@@ -593,9 +597,9 @@ Domain modules that run inside the iframe. Every module accepts an optional `Hos
 
 ### 3.2 Chain (`chain.ts`)
 
-The most complex file (~580 lines). `createPapiProvider(genesisHash, fallback?, hostApi?)` returns a standard
-`JsonRpcProvider` compatible with Polkadot API (PAPI). Uses `hostApi.isReady()` and `hostApi.isCorrectEnvironment()` for
-lifecycle, and `productLogger` for diagnostics.
+The most complex file (~580 lines). `createPapiProvider(genesisHash, hostApi, fallback?)` returns a standard
+`JsonRpcProvider` compatible with Polkadot API (PAPI). Uses `hostApi.isReady()` for lifecycle and `productLogger` for
+diagnostics.
 
 When PAPI calls `send('{"method":"chainHead_v1_follow",...}')`: parses JSON-RPC, maps to `hostApi` method, converts
 parameters, converts response back to JSON-RPC. Handles all `chainHead_v1_*`, `chainSpec_v1_*`, `transaction_v1_*`
@@ -604,43 +608,41 @@ methods.
 ### 3.3 Storage (`storage.ts`)
 
 ```typescript
-const storage = createLocalStorage();
+const storage = createLocalStorage(hostApi);
 await storage.writeString('key', 'value');
 await storage.writeJSON('settings', { theme: 'dark' });
 const val = await storage.readString('key');
 ```
 
-`createLocalStorage(hostApi?)` wraps `hostApi.localStorageWrite/Read/Clear` with convenience methods (`readBytes`,
-`writeBytes`, `clear`, `readString`, `writeString`, `readJSON`, `writeJSON`). Also exports a `hostLocalStorage`
-singleton.
+`createLocalStorage(hostApi)` wraps `hostApi.localStorageWrite/Read/Clear` with convenience methods (`readBytes`,
+`writeBytes`, `clear`, `readString`, `writeString`, `readJSON`, `writeJSON`).
 
 ### 3.4 Chat, Statement Store, Preimage
 
 **`chat.ts`**: three exports:
 
-- `createProductChatManager(hostApi?)`: pure client -- `registerRoom`, `registerBot`, `sendMessage`,
-  `subscribeChatList`, `subscribeAction`.
-- `handleCustomMessageRendering(callback, hostApi?)`: standalone function that registers the product-side handler for
+- `createProductChatManager(hostApi)`: pure client -- `registerRoom`, `registerBot`, `sendMessage`, `subscribeChatList`,
+  `subscribeAction`.
+- `handleCustomMessageRendering(callback, hostApi)`: standalone function that registers the product-side handler for
   custom chat message rendering -- the one protocol method where the product is the handler rather than the initiator.
   Uses `hostApi.handleHostSubscription()` so it does not need a `Transport` reference. Separated from the chat manager
   because handler registration is a setup-time concern, not a domain operation.
 - `matchChatCustomRenderers(map)`: utility that dispatches to a specific renderer based on the `messageType` field.
 
-**`statementStore.ts`**: `createStatementStore(hostApi?)`: subscribe to topics, create proofs, submit statements.
+**`statementStore.ts`**: `createStatementStore(hostApi)`: subscribe to topics, create proofs, submit statements.
 
-**`preimage.ts`**: `createPreimageManager(hostApi?)`: lookup subscriptions, submit preimages.
+**`preimage.ts`**: `createPreimageManager(hostApi)`: lookup subscriptions, submit preimages.
 
-All domain modules accept an optional `HostApi` parameter, defaulting to the singleton. None import `Transport`
-directly.
+All domain modules take a required `HostApi` parameter. None import `Transport` directly.
 
 ### 3.5 Extension (`extension.ts`)
 
-`createNonProductExtensionEnableFactory(hostApi?)` creates an `enable` function that returns a polkadot-js compatible
+`createNonProductExtensionEnableFactory(hostApi)` creates an `enable` function that returns a polkadot-js compatible
 `Injected` object for **non-product accounts**. Provides `accounts.get()` (via `hostApi.getNonProductAccounts`),
 `signer.signPayload()`, `signer.signRaw()`, and `signer.createTransaction()` (via
 `hostApi.createTransactionWithNonProductAccount`). Returns `undefined` if the transport is not ready.
 
-`injectSpektrExtension(hostApi?)` uses the factory above to inject the extension into the global polkadot-js registry.
+`injectSpektrExtension(hostApi)` uses the factory above to inject the extension into the global polkadot-js registry.
 Any dApp using `@polkadot/extension-dapp` discovers it as `"spektr"`. Returns `true` if injection succeeded, `false`
 otherwise.
 
@@ -653,18 +655,18 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 ## Part 4: Tests
 
-### 4.1 Unit Tests (15 files, 172 tests)
+### 4.1 Unit Tests (15 files, 169 tests)
 
 **Test helper** (`test/helpers/mockProvider.ts`): creates connected mock Provider pairs (async and sync variants).
 
 **Shared** (6 files):
 
-- `transport.spec.ts` (23 tests): handshake, request/response correlation, subscriptions, multiplexing, connection
+- `transport.spec.ts` (22 tests): handshake, request/response correlation, subscriptions, multiplexing, connection
   status, destroy, codec swap, not-supported catch-all (request rejection, subscription interrupt, handler
   deregistration), auto-detect codec (SCALE decode, structured clone decode, outgoing auto-upgrade)
 - `negotiation.spec.ts` (5 tests): upgrade succeeds, fails gracefully, picks best intersection, requests work after
   upgrade, not-supported fast path (near-instant rejection instead of 1s timeout)
-- `messagePortProvider.spec.ts` (17 tests): sync/async port delivery, message validation (protocol messages, Uint8Array,
+- `messagePortProvider.spec.ts` (16 tests): sync/async port delivery, message validation (protocol messages, Uint8Array,
   rejection of invalid data), postMessage with/without buffer transfer, subscribe/unsubscribe, dispose lifecycle
 - `codec.spec.ts` (6 tests): structured clone round-trips, rejects Uint8Array, nested objects
 - `protocol.spec.ts` (18 tests): all methods present in hostApiProtocol, correct types, error type construction
@@ -680,8 +682,8 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 **Product** (4 files):
 
-- `hostApi.spec.ts` (4 tests): HostApi transport proxy methods: isCorrectEnvironment, isReady, handleHostSubscription
-  registration and unsubscribe
+- `hostApi.spec.ts` (3 tests): HostApi transport proxy methods: isReady, handleHostSubscription registration and
+  unsubscribe
 - `chat.spec.ts` (3 tests): handleCustomMessageRendering: handler registration, render function delivery, unsubscribe
   deregistration
 - `constants.spec.ts` (13 tests): all chains present, hex format

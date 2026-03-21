@@ -12,12 +12,6 @@
 
 export type Provider = {
   /**
-   * Returns `true` when the provider can actually send/receive
-   * messages (e.g. running inside an iframe with a parent window).
-   */
-  isCorrectEnvironment(): boolean;
-
-  /**
    * Send data to the other side.
    *
    * Accepts both `Uint8Array` (binary codecs) and plain objects

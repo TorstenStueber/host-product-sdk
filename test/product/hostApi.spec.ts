@@ -2,11 +2,10 @@
  * HostApi proxy method tests.
  *
  * Verifies that the HostApi facade correctly delegates transport lifecycle
- * methods (isReady, isCorrectEnvironment, handleHostSubscription) to the
- * underlying transport.
+ * methods (isReady, handleHostSubscription) to the underlying transport.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createHostApi, createTransport } from '@polkadot/host-api';
 import type { Transport } from '@polkadot/host-api';
 import { createMockProviderPair } from '../helpers/mockProvider.js';
@@ -24,8 +23,8 @@ describe('HostApi transport proxies', () => {
 
   beforeEach(() => {
     [hostProvider, productProvider] = createMockProviderPair();
-    hostTransport = createTransport({ provider: hostProvider, idPrefix: 'h:' });
-    productTransport = createTransport({ provider: productProvider, idPrefix: 'p:' });
+    hostTransport = createTransport({ provider: hostProvider, handshake: 'respond', idPrefix: 'h:' });
+    productTransport = createTransport({ provider: productProvider, handshake: 'initiate', idPrefix: 'p:' });
   });
 
   afterEach(() => {
@@ -39,11 +38,6 @@ describe('HostApi transport proxies', () => {
     } catch {
       /* */
     }
-  });
-
-  it('isCorrectEnvironment delegates to transport', () => {
-    const hostApi = createHostApi(productTransport);
-    expect(hostApi.isCorrectEnvironment()).toBe(productTransport.isCorrectEnvironment());
   });
 
   it('isReady delegates to transport and resolves after handshake', async () => {

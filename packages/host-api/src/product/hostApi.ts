@@ -104,11 +104,6 @@ export function createHostApi(transport: Transport) {
   return {
     // -- Transport proxies --------------------------------------------------
 
-    /** Whether the transport is in a supported environment (iframe or webview). */
-    isCorrectEnvironment(): boolean {
-      return transport.isCorrectEnvironment();
-    },
-
     /** Resolves when the handshake and codec negotiation are complete. */
     isReady(): Promise<boolean> {
       return transport.isReady();
@@ -357,8 +352,9 @@ export function createHostApi(transport: Transport) {
 
 /**
  * Default HostApi instance bound to the default sandbox transport.
+ * `undefined` when not in a supported environment (not in iframe or webview).
  */
-export const hostApi = createHostApi(sandboxTransport);
+export const hostApi: HostApi | undefined = sandboxTransport ? createHostApi(sandboxTransport) : undefined;
 
 /**
  * Return type of `createHostApi`.

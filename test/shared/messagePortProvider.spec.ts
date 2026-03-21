@@ -248,11 +248,4 @@ describe('createMessagePortProvider', () => {
     // onmessage should be cleared even though we disposed before resolution
     expect(port.onmessage).toBeNull();
   });
-
-  // -- isCorrectEnvironment -----------------------------------------------
-
-  it('always returns true', () => {
-    const provider = createMessagePortProvider(port as unknown as MessagePort);
-    expect(provider.isCorrectEnvironment()).toBe(true);
-  });
 });

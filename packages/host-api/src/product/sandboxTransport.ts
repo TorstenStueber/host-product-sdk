@@ -6,6 +6,7 @@
  *
  * - **iframe**: delegates to the shared `createWindowProvider(window.top)`.
  * - **webview**: delegates to `createMessagePortProvider(getWebviewPort())`.
+ * - **other**: returns `undefined` (unsupported environment).
  *
  * After the handshake, the transport automatically attempts a codec
  * upgrade to structured clone.  If the host supports it both sides swap;
@@ -103,10 +104,10 @@ function getParentWindow(): Window {
  * Create the default product-side provider.
  *
  * - **iframe**: reuses the shared `createWindowProvider` targeting `window.top`.
- * - **webview**: uses `createProductWebviewProvider` (polls for a MessagePort).
- * - **other**: returns a no-op provider (`isCorrectEnvironment` = false).
+ * - **webview**: uses `createMessagePortProvider` (polls for a MessagePort).
+ * - **other**: returns `undefined` (unsupported environment).
  */
-export function createDefaultProductProvider(): Provider {
+export function createDefaultProductProvider(): Provider | undefined {
   if (isIframe()) {
     return createWindowProvider(getParentWindow());
   }
@@ -115,13 +116,7 @@ export function createDefaultProductProvider(): Provider {
     return createMessagePortProvider(getWebviewPort());
   }
 
-  // Not in a supported environment — return a no-op provider.
-  return {
-    isCorrectEnvironment: () => false,
-    postMessage: () => {},
-    subscribe: () => () => {},
-    dispose: () => {},
-  };
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -130,48 +125,49 @@ export function createDefaultProductProvider(): Provider {
 
 /**
  * Default product-side provider singleton.
+ * `undefined` when not in a supported environment (not in iframe or webview).
  */
-export const sandboxProvider: Provider = createDefaultProductProvider();
+export const sandboxProvider: Provider | undefined = createDefaultProductProvider();
 
 /**
  * Default product-side transport singleton.
+ * `undefined` when not in a supported environment.
  *
- * Starts with the SCALE codec adapter for backwards compatibility.
- * After handshake, automatically attempts a codec upgrade to
- * structured clone. If the host supports it, both sides swap;
+ * When defined, starts with the SCALE codec adapter for backwards
+ * compatibility.  After handshake, automatically attempts a codec upgrade
+ * to structured clone.  If the host supports it, both sides swap;
  * otherwise the connection stays on SCALE.
  */
-export const sandboxTransport: Transport = wrapWithAutoCodecUpgrade(
-  createTransport({
-    provider: sandboxProvider,
-    idPrefix: 'p:',
-  }),
-);
+export const sandboxTransport: Transport | undefined = sandboxProvider
+  ? wrapWithAutoCodecUpgrade(
+      createTransport({
+        provider: sandboxProvider,
+        handshake: 'initiate',
+        idPrefix: 'p:',
+      }),
+    )
+  : undefined;
 
 /**
- * Wraps a transport so that the first successful `isReady()` call
- * automatically triggers a codec upgrade attempt before resolving.
+ * Wraps a transport so that after the handshake succeeds, a codec upgrade
+ * to structured clone is automatically attempted before `isReady()` resolves.
  */
 function wrapWithAutoCodecUpgrade(transport: Transport): Transport {
-  let upgradePromise: Promise<boolean> | undefined;
+  const readyPromise = transport.isReady().then(async ready => {
+    if (!ready) return false;
+
+    await requestCodecUpgrade(transport, {
+      scale: scaleCodecAdapter,
+      structured_clone: structuredCloneCodecAdapter,
+    });
+
+    return true;
+  });
 
   return {
     ...transport,
     isReady(): Promise<boolean> {
-      if (upgradePromise) return upgradePromise;
-
-      upgradePromise = transport.isReady().then(async ready => {
-        if (!ready) return false;
-
-        await requestCodecUpgrade(transport, {
-          scale: scaleCodecAdapter,
-          structured_clone: structuredCloneCodecAdapter,
-        });
-
-        return true;
-      });
-
-      return upgradePromise;
+      return readyPromise;
     },
   };
 }
