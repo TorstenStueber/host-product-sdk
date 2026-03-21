@@ -11,6 +11,13 @@ import { test, expect } from '@playwright/test';
 import type { Page, Frame } from '@playwright/test';
 
 // ---------------------------------------------------------------------------
+// Types for protocol envelope assertions
+// ---------------------------------------------------------------------------
+
+/** A versioned Result envelope as it comes back from transport.request(). */
+type ResultEnvelope = { tag: string; value: { success: boolean; value: unknown } };
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -83,7 +90,7 @@ for (const codec of codecs) {
       const frame = await getProductFrame(page);
       const result = (await runProductTest(frame, 'accountGet')) as Record<string, unknown>;
       // Should be success with an account object
-      const envelope = result as { tag: string; value: { tag: string; value: unknown } };
+      const envelope = result as ResultEnvelope;
       expect(envelope.tag).toBe('v1');
       expect(envelope.value.success).toBe(true);
 
@@ -96,7 +103,7 @@ for (const codec of codecs) {
       const frame = await getProductFrame(page);
       const result = (await runProductTest(frame, 'getNonProductAccounts')) as Record<string, unknown>;
 
-      const envelope = result as { tag: string; value: { tag: string; value: unknown } };
+      const envelope = result as ResultEnvelope;
       expect(envelope.tag).toBe('v1');
       expect(envelope.value.success).toBe(true);
 
@@ -110,11 +117,11 @@ for (const codec of codecs) {
       const frame = await getProductFrame(page);
       const result = (await runProductTest(frame, 'signPayload')) as Record<string, unknown>;
 
-      const envelope = result as { tag: string; value: { tag: string; value: unknown } };
+      const envelope = result as ResultEnvelope;
       expect(envelope.tag).toBe('v1');
       expect(envelope.value.success).toBe(true);
 
-      const sigResult = envelope.value.value as { signature: string; signedTransaction?: string | null };
+      const sigResult = envelope.value.value as { signature: string; signedTransaction?: string };
       expect(sigResult.signature).toBe('0x' + 'ab'.repeat(64));
       expect(sigResult.signedTransaction).toBeFalsy();
 
@@ -127,7 +134,7 @@ for (const codec of codecs) {
       const frame = await getProductFrame(page);
       const result = (await runProductTest(frame, 'signRaw')) as Record<string, unknown>;
 
-      const envelope = result as { tag: string; value: { tag: string; value: unknown } };
+      const envelope = result as ResultEnvelope;
       expect(envelope.tag).toBe('v1');
       expect(envelope.value.success).toBe(true);
 
@@ -143,8 +150,8 @@ for (const codec of codecs) {
       const result = (await runProductTest(frame, 'localStorage')) as Record<string, unknown>;
 
       const { readResult, readAfterClear } = result as {
-        readResult: { tag: string; value: { tag: string; value: unknown } };
-        readAfterClear: { tag: string; value: { tag: string; value: unknown } };
+        readResult: ResultEnvelope;
+        readAfterClear: ResultEnvelope;
       };
 
       // Read after write should return the value
@@ -152,7 +159,7 @@ for (const codec of codecs) {
       expect(readResult.value.success).toBe(true);
       expect(readResult.value.value).not.toBeNull();
 
-      // Read after clear should return null/undefined
+      // Read after clear should return undefined
       expect(readAfterClear.tag).toBe('v1');
       expect(readAfterClear.value.success).toBe(true);
       expect(readAfterClear.value.value).toBeFalsy();
@@ -174,7 +181,7 @@ for (const codec of codecs) {
       const frame = await getProductFrame(page);
       const result = (await runProductTest(frame, 'navigateTo')) as Record<string, unknown>;
 
-      const envelope = result as { tag: string; value: { tag: string; value: unknown } };
+      const envelope = result as ResultEnvelope;
       expect(envelope.tag).toBe('v1');
       expect(envelope.value.success).toBe(true);
     });
@@ -183,7 +190,7 @@ for (const codec of codecs) {
       const frame = await getProductFrame(page);
       const result = (await runProductTest(frame, 'devicePermission')) as Record<string, unknown>;
 
-      const envelope = result as { tag: string; value: { tag: string; value: unknown } };
+      const envelope = result as ResultEnvelope;
       expect(envelope.tag).toBe('v1');
       expect(envelope.value.success).toBe(true);
       expect(envelope.value.value).toBe(false);
@@ -195,7 +202,7 @@ for (const codec of codecs) {
       const frame = await getProductFrame(page);
       const result = (await runProductTest(frame, 'signPayloadRejected')) as Record<string, unknown>;
 
-      const envelope = result as { tag: string; value: { success: boolean; value: unknown } };
+      const envelope = result as ResultEnvelope;
       expect(envelope.tag).toBe('v1');
       expect(envelope.value.success).toBe(false);
 
@@ -207,7 +214,7 @@ for (const codec of codecs) {
       const frame = await getProductFrame(page);
       const result = (await runProductTest(frame, 'createTransactionError')) as Record<string, unknown>;
 
-      const envelope = result as { tag: string; value: { success: boolean; value: unknown } };
+      const envelope = result as ResultEnvelope;
       expect(envelope.tag).toBe('v1');
       expect(envelope.value.success).toBe(false);
 
@@ -220,7 +227,7 @@ for (const codec of codecs) {
       const frame = await getProductFrame(page);
       const result = (await runProductTest(frame, 'accountGetAliasError')) as Record<string, unknown>;
 
-      const envelope = result as { tag: string; value: { success: boolean; value: unknown } };
+      const envelope = result as ResultEnvelope;
       expect(envelope.tag).toBe('v1');
       expect(envelope.value.success).toBe(false);
 
@@ -233,7 +240,7 @@ for (const codec of codecs) {
       const frame = await getProductFrame(page);
       const result = (await runProductTest(frame, 'navigateToBlocked')) as Record<string, unknown>;
 
-      const envelope = result as { tag: string; value: { success: boolean; value: unknown } };
+      const envelope = result as ResultEnvelope;
       expect(envelope.tag).toBe('v1');
       expect(envelope.value.success).toBe(false);
 
@@ -245,7 +252,7 @@ for (const codec of codecs) {
       const frame = await getProductFrame(page);
       const result = (await runProductTest(frame, 'storageWriteFull')) as Record<string, unknown>;
 
-      const envelope = result as { tag: string; value: { success: boolean; value: unknown } };
+      const envelope = result as ResultEnvelope;
       expect(envelope.tag).toBe('v1');
       expect(envelope.value.success).toBe(false);
 

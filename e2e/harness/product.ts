@@ -18,18 +18,14 @@ import {
   createDefaultLogger,
 } from '@polkadot/host-api';
 
-declare global {
-  interface Window {
-    __e2e: {
-      ready: boolean;
-      transport: Transport | null;
-      results: Record<string, unknown>;
-      errors: Record<string, unknown>;
-      connectionStatuses: string[];
-      run: (testName: string) => Promise<unknown>;
-    };
-  }
-}
+type ProductE2E = {
+  ready: boolean;
+  transport: Transport | undefined;
+  results: Record<string, unknown>;
+  errors: Record<string, unknown>;
+  connectionStatuses: string[];
+  run: (testName: string) => Promise<unknown>;
+};
 
 const codecParam = new URLSearchParams(location.search).get('codec') ?? 'structured_clone';
 
@@ -93,15 +89,15 @@ const transport = createTransport({
   provider,
 });
 
-const e2e: Window['__e2e'] = {
+const e2e: ProductE2E = {
   ready: false,
   transport,
   results: {},
   errors: {},
   connectionStatuses: [],
-  run: () => Promise.resolve(null),
+  run: () => Promise.resolve(undefined),
 };
-window.__e2e = e2e;
+(window as unknown as Record<string, unknown>).__e2e = e2e;
 
 // -- Test runners (called by Playwright) -------------------------------------
 
@@ -116,7 +112,7 @@ async function waitReady(): Promise<boolean> {
   return ready;
 }
 
-async function testFeatureSupported(genesisHash: string): Promise<unknown> {
+async function testFeatureSupported(genesisHash: `0x${string}`): Promise<unknown> {
   const result = await transport.request('host_feature_supported', {
     tag: 'v1',
     value: { tag: 'Chain', value: genesisHash },
@@ -252,7 +248,7 @@ async function testCreateTransactionError(): Promise<unknown> {
       {
         tag: 'v1',
         value: {
-          signer: null,
+          signer: undefined,
           callData: '0xcafe',
           extensions: [],
           txExtVersion: 0,

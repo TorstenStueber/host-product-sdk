@@ -20,18 +20,14 @@ import {
 } from '@polkadot/host-api';
 import type { CodecAdapterMap } from '@polkadot/host-api';
 
-declare global {
-  interface Window {
-    __e2e: {
-      ready: boolean;
-      container: ProtocolHandler | null;
-      signPayloadCalls: unknown[];
-      signRawCalls: unknown[];
-      storageBacking: Record<string, string>;
-      connectionStatuses: string[];
-    };
-  }
-}
+type HostE2E = {
+  ready: boolean;
+  container: ProtocolHandler | undefined;
+  signPayloadCalls: unknown[];
+  signRawCalls: unknown[];
+  storageBacking: Record<string, string>;
+  connectionStatuses: string[];
+};
 
 const codecParam = new URLSearchParams(location.search).get('codec') ?? 'structured_clone';
 
@@ -42,15 +38,15 @@ const supportedCodecs: CodecAdapterMap | undefined =
     ? { scale: scaleCodecAdapter, structured_clone: structuredCloneCodecAdapter }
     : undefined;
 
-const e2e: Window['__e2e'] = {
+const e2e: HostE2E = {
   ready: false,
-  container: null,
+  container: undefined,
   signPayloadCalls: [],
   signRawCalls: [],
   storageBacking: {},
   connectionStatuses: [],
 };
-window.__e2e = e2e;
+(window as unknown as Record<string, unknown>).__e2e = e2e;
 
 const iframe = document.getElementById('product-frame') as HTMLIFrameElement;
 iframe.src = `/product.html?codec=${codecParam}`;
@@ -116,7 +112,7 @@ container.handleLocalStorageClear(key => {
 });
 
 // --- Accounts ---
-container.handleAccountGet(params => {
+container.handleAccountGet(_params => {
   // Return a mock account with a deterministic public key
   const pk = new Uint8Array(32);
   pk[0] = 0x42;
@@ -152,7 +148,7 @@ container.handleSignPayload(params => {
   }
   e2e.signPayloadCalls.push(params);
   return okAsync({
-    signature: '0x' + 'ab'.repeat(64),
+    signature: ('0x' + 'ab'.repeat(64)) as `0x${string}`,
     signedTransaction: undefined,
   });
 });
@@ -160,7 +156,7 @@ container.handleSignPayload(params => {
 container.handleSignRaw(params => {
   e2e.signRawCalls.push(params);
   return okAsync({
-    signature: '0x' + 'cd'.repeat(64),
+    signature: ('0x' + 'cd'.repeat(64)) as `0x${string}`,
     signedTransaction: undefined,
   });
 });
