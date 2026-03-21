@@ -5,27 +5,27 @@ import { GenericErr } from './commonCodecs.js';
 // -- Primitives ---------------------------------------------------------------
 
 export const Topic = Bytes(32);
-export const Channel = Bytes(32);
-export const DecryptionKey = Bytes(32);
+const Channel = Bytes(32);
+const DecryptionKey = Bytes(32);
 
 // -- Statement proofs ---------------------------------------------------------
 
-export const Sr25519StatementProof = Struct({
+const Sr25519StatementProof = Struct({
   signature: Bytes(64),
   signer: Bytes(32),
 });
 
-export const Ed25519StatementProof = Struct({
+const Ed25519StatementProof = Struct({
   signature: Bytes(64),
   signer: Bytes(32),
 });
 
-export const EcdsaStatementProof = Struct({
+const EcdsaStatementProof = Struct({
   signature: Bytes(65),
   signer: Bytes(33),
 });
 
-export const OnChainStatementProof = Struct({
+const OnChainStatementProof = Struct({
   who: Bytes(32),
   blockHash: Bytes(32),
   event: u64,
@@ -80,4 +80,3 @@ export type OnChainStatementProofType = CodecType<typeof OnChainStatementProof>;
 export type StatementProofType = CodecType<typeof StatementProof>;
 export type StatementType = CodecType<typeof Statement>;
 export type SignedStatementType = CodecType<typeof SignedStatement>;
-export type StatementProofErrType = CodecType<typeof StatementProofErr>;

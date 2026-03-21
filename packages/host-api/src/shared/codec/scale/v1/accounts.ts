@@ -4,13 +4,12 @@ import { GenericErr } from './commonCodecs.js';
 
 // -- Primitives ---------------------------------------------------------------
 
-export const AccountId = Bytes(32);
-export const PublicKey = Bytes();
-export const DotNsIdentifier = str;
-export const DerivationIndex = u32;
+const AccountId = Bytes(32);
+const PublicKey = Bytes();
+const DotNsIdentifier = str;
+const DerivationIndex = u32;
 export const ProductAccountId = Tuple(DotNsIdentifier, DerivationIndex);
 export const RingVrfProof = Bytes();
-export const RingVrgAlias = Bytes();
 
 // -- Account ------------------------------------------------------------------
 
@@ -26,7 +25,7 @@ export const ContextualAlias = Struct({
   alias: Bytes(), // RingVrfAlias
 });
 
-export const RingLocationHint = Struct({
+const RingLocationHint = Struct({
   palletInstance: Option(u32),
 });
 
@@ -69,5 +68,3 @@ export type ContextualAliasType = CodecType<typeof ContextualAlias>;
 export type RingLocationHintType = CodecType<typeof RingLocationHint>;
 export type RingLocationType = CodecType<typeof RingLocation>;
 export type AccountConnectionStatusType = CodecType<typeof AccountConnectionStatus>;
-export type RequestCredentialsErrType = CodecType<typeof RequestCredentialsErr>;
-export type CreateProofErrType = CodecType<typeof CreateProofErr>;

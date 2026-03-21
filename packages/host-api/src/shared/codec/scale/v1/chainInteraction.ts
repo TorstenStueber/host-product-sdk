@@ -6,9 +6,9 @@ import { Option, Struct, Tuple, Vector, _void, str, u32 } from 'scale-ts';
 export const BlockHash = Hex();
 export const OperationId = str;
 
-export const RuntimeApi = Tuple(str, u32);
+const RuntimeApi = Tuple(str, u32);
 
-export const RuntimeSpec = Struct({
+const RuntimeSpec = Struct({
   specName: str,
   implName: str,
   specVersion: u32,
@@ -24,7 +24,7 @@ export const RuntimeType = Enum({
 
 // -- Storage query types ------------------------------------------------------
 
-export const StorageQueryType = Status(
+const StorageQueryType = Status(
   'Value',
   'Hash',
   'ClosestDescendantMerkleValue',
@@ -37,7 +37,7 @@ export const StorageQueryItem = Struct({
   type: StorageQueryType,
 });
 
-export const StorageResultItem = Struct({
+const StorageResultItem = Struct({
   key: Hex(),
   value: Option(Hex()),
   hash: Option(Hex()),

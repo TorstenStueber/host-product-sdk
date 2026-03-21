@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { okAsync, errAsync } from 'neverthrow';
+import { okAsync, errAsync } from '@polkadot/host-api';
 
 // We test the handler logic directly using okAsync/errAsync,
 // since the actual wiring requires a full container + transport setup.

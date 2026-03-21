@@ -12,16 +12,6 @@ import type { ConnectionStatus, HexString, Subscription, Transport } from '@polk
 export type { ConnectionStatus, HexString, Subscription, Transport };
 
 // ---------------------------------------------------------------------------
-// Versioned envelope
-// ---------------------------------------------------------------------------
-
-/**
- * A versioned tagged envelope used across all protocol methods.
- * The `tag` is typically `'v1'`, and `value` carries the actual payload.
- */
-export type Versioned<T> = { tag: string; value: T };
-
-// ---------------------------------------------------------------------------
 // Accounts
 // ---------------------------------------------------------------------------
 
@@ -254,9 +244,3 @@ export type SignedStatement = {
 // ---------------------------------------------------------------------------
 
 export type Feature = { tag: 'Chain'; value: HexString };
-
-// ---------------------------------------------------------------------------
-// HostApi type
-// ---------------------------------------------------------------------------
-
-export type { HostApi } from '@polkadot/host-api';

@@ -18,6 +18,5 @@ export const StorageValue = Bytes();
 
 import type { CodecType } from 'scale-ts';
 
-export type StorageErrType = CodecType<typeof StorageErr>;
 export type StorageKeyType = CodecType<typeof StorageKey>;
 export type StorageValueType = CodecType<typeof StorageValue>;

@@ -47,7 +47,7 @@ export const HANDSHAKE_TIMEOUT = 10_000;
  * that has no registered handler. The sender detects this and rejects
  * the promise with a `MethodNotSupported` error.
  */
-export const NOT_SUPPORTED_MARKER = { _notSupported: true } as const;
+const NOT_SUPPORTED_MARKER = { _notSupported: true } as const;
 
 /** Error thrown when a request targets a method with no registered handler. */
 export class MethodNotSupportedError extends Error {

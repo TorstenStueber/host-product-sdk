@@ -27,7 +27,7 @@ export const ChatRoomRequest = Struct({
   icon: str,
 });
 
-export const ChatRoomRegistrationStatus = Status('New', 'Exists');
+const ChatRoomRegistrationStatus = Status('New', 'Exists');
 export const ChatRoomRegistrationResult = Struct({
   status: ChatRoomRegistrationStatus,
 });
@@ -38,14 +38,14 @@ export const ChatBotRequest = Struct({
   icon: str,
 });
 
-export const ChatBotRegistrationStatus = Status('New', 'Exists');
+const ChatBotRegistrationStatus = Status('New', 'Exists');
 export const ChatBotRegistrationResult = Struct({
   status: ChatBotRegistrationStatus,
 });
 
 // -- Room participation -------------------------------------------------------
 
-export const ChatRoomParticipation = Status('RoomHost', 'Bot');
+const ChatRoomParticipation = Status('RoomHost', 'Bot');
 
 export const ChatRoom = Struct({
   roomId: str,
@@ -54,27 +54,27 @@ export const ChatRoom = Struct({
 
 // -- Message content types ----------------------------------------------------
 
-export const ChatAction = Struct({
+const ChatAction = Struct({
   actionId: str,
   title: str,
 });
 
-export const ChatActionLayout = Status('Column', 'Grid');
+const ChatActionLayout = Status('Column', 'Grid');
 
-export const ChatActions = Struct({
+const ChatActions = Struct({
   text: Option(str),
   actions: Vector(ChatAction),
   layout: ChatActionLayout,
 });
 
-export const ChatMedia = Struct({ url: str });
+const ChatMedia = Struct({ url: str });
 
-export const ChatRichText = Struct({
+const ChatRichText = Struct({
   text: Option(str),
   media: Vector(ChatMedia),
 });
 
-export const ChatFile = Struct({
+const ChatFile = Struct({
   url: str,
   fileName: str,
   mimeType: str,
@@ -82,12 +82,12 @@ export const ChatFile = Struct({
   text: Option(str),
 });
 
-export const ChatReaction = Struct({
+const ChatReaction = Struct({
   messageId: str,
   emoji: str,
 });
 
-export const ChatCustomMessage = Struct({
+const ChatCustomMessage = Struct({
   messageType: str,
   payload: Bytes(),
 });
@@ -108,18 +108,18 @@ export const ChatPostMessageResult = Struct({
 
 // -- Action payloads ----------------------------------------------------------
 
-export const ActionTrigger = Struct({
+const ActionTrigger = Struct({
   messageId: str,
   actionId: str,
   payload: Option(Bytes()),
 });
 
-export const ChatCommand = Struct({
+const ChatCommand = Struct({
   command: str,
   payload: str,
 });
 
-export const ChatActionPayload = Enum({
+const ChatActionPayload = Enum({
   MessagePosted: ChatMessageContent,
   ActionTriggered: ActionTrigger,
   Command: ChatCommand,
@@ -135,9 +135,6 @@ export const ReceivedChatAction = Struct({
 
 import type { CodecType } from 'scale-ts';
 
-export type ChatRoomRegistrationErrType = CodecType<typeof ChatRoomRegistrationErr>;
-export type ChatBotRegistrationErrType = CodecType<typeof ChatBotRegistrationErr>;
-export type ChatMessagePostingErrType = CodecType<typeof ChatMessagePostingErr>;
 export type ChatRoomRequestType = CodecType<typeof ChatRoomRequest>;
 export type ChatRoomRegistrationStatusType = CodecType<typeof ChatRoomRegistrationStatus>;
 export type ChatRoomRegistrationResultType = CodecType<typeof ChatRoomRegistrationResult>;

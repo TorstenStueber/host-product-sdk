@@ -18,7 +18,7 @@ export const SigningResult = Struct({
   signedTransaction: Option(Hex()),
 });
 
-export const RawPayload = Enum({
+const RawPayload = Enum({
   Bytes: Bytes(),
   Payload: str,
 });
@@ -51,7 +51,6 @@ export const SigningPayload = Struct({
 
 import type { CodecType } from 'scale-ts';
 
-export type SigningErrType = CodecType<typeof SigningErr>;
 export type SigningResultType = CodecType<typeof SigningResult>;
 export type RawPayloadType = CodecType<typeof RawPayload>;
 export type SigningRawPayloadType = CodecType<typeof SigningRawPayload>;

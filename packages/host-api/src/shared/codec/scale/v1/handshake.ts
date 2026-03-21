@@ -9,7 +9,3 @@ export const HandshakeErr = Enum({
 });
 
 // -- Derived types ------------------------------------------------------------
-
-import type { CodecType } from 'scale-ts';
-
-export type HandshakeErrType = CodecType<typeof HandshakeErr>;

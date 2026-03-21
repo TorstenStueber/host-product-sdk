@@ -14,20 +14,20 @@ export const CreateTransactionErr = Enum({
 
 // -- Tx Payload types ---------------------------------------------------------
 
-export const TxPayloadExtension = Struct({
+const TxPayloadExtension = Struct({
   id: str,
   extra: Hex(),
   additionalSigned: Hex(),
 });
 
-export const TxPayloadContext = Struct({
+const TxPayloadContext = Struct({
   metadata: Hex(),
   tokenSymbol: str,
   tokenDecimals: u32,
   bestBlockHeight: u32,
 });
 
-export const TxPayloadV1 = Struct({
+const TxPayloadV1 = Struct({
   signer: Option(str),
   callData: Hex(),
   extensions: Vector(TxPayloadExtension),
@@ -43,7 +43,6 @@ export const VersionedTxPayload = Enum({
 
 import type { CodecType } from 'scale-ts';
 
-export type CreateTransactionErrType = CodecType<typeof CreateTransactionErr>;
 export type TxPayloadExtensionType = CodecType<typeof TxPayloadExtension>;
 export type TxPayloadContextType = CodecType<typeof TxPayloadContext>;
 export type TxPayloadV1Type = CodecType<typeof TxPayloadV1>;

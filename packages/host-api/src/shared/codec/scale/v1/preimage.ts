@@ -19,4 +19,3 @@ import type { CodecType } from 'scale-ts';
 
 export type PreimageKeyType = CodecType<typeof PreimageKey>;
 export type PreimageValueType = CodecType<typeof PreimageValue>;
-export type PreimageSubmitErrType = CodecType<typeof PreimageSubmitErr>;

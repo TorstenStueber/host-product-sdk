@@ -10,7 +10,3 @@ export const NavigateToErr = Enum({
 });
 
 // -- Derived types ------------------------------------------------------------
-
-import type { CodecType } from 'scale-ts';
-
-export type NavigateToErrType = CodecType<typeof NavigateToErr>;

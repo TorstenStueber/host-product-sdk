@@ -2,14 +2,14 @@ import { Enum, OptionBool, Status, lazy } from '../primitives.js';
 import type { Codec, CodecType } from 'scale-ts';
 import { Option, Struct, Tuple, Vector, _void, bool, compact, str } from 'scale-ts';
 
-export const Size = compact;
-export const Dimensions = Tuple(Size, Size, Option(Size), Option(Size));
+const Size = compact;
+const Dimensions = Tuple(Size, Size, Option(Size), Option(Size));
 
-export const TypographyStyle = Status('titleXL', 'headline', 'bodyM', 'bodyS', 'caption');
+const TypographyStyle = Status('titleXL', 'headline', 'bodyM', 'bodyS', 'caption');
 
-export const ButtonVariant = Status('primary', 'secondary', 'text');
+const ButtonVariant = Status('primary', 'secondary', 'text');
 
-export const ColorToken = Status(
+const ColorToken = Status(
   'textPrimary',
   'textSecondary',
   'textTertiary',
@@ -21,7 +21,7 @@ export const ColorToken = Status(
   'warning',
 );
 
-export const ContentAlignment = Status(
+const ContentAlignment = Status(
   'topStart',
   'topCenter',
   'topEnd',
@@ -33,24 +33,24 @@ export const ContentAlignment = Status(
   'bottomEnd',
 );
 
-export const HorizontalAlignment = Status('start', 'center', 'end');
+const HorizontalAlignment = Status('start', 'center', 'end');
 
-export const VerticalAlignment = Status('top', 'center', 'bottom');
+const VerticalAlignment = Status('top', 'center', 'bottom');
 
-export const Arrangement = Status('start', 'end', 'center', 'spaceBetween', 'spaceAround', 'spaceEvenly');
+const Arrangement = Status('start', 'end', 'center', 'spaceBetween', 'spaceAround', 'spaceEvenly');
 
-export const Shape = Enum({
+const Shape = Enum({
   Rounded: Size,
   Circle: _void,
 });
 
-export const BorderStyle = Struct({
+const BorderStyle = Struct({
   width: Size,
   color: ColorToken,
   shape: Option(Shape),
 });
 
-export const Modifier = Enum({
+const Modifier = Enum({
   margin: Dimensions,
   padding: Dimensions,
   background: Struct({
@@ -79,26 +79,26 @@ function Component<Props extends Codec<any>>(props: Props) {
   });
 }
 
-export const BoxProps = Struct({
+const BoxProps = Struct({
   contentAlignment: Option(ContentAlignment),
 });
 
-export const ColumnProps = Struct({
+const ColumnProps = Struct({
   horizontalAlignment: Option(HorizontalAlignment),
   verticalArrangement: Option(Arrangement),
 });
 
-export const RowProps = Struct({
+const RowProps = Struct({
   verticalAlignment: Option(VerticalAlignment),
   horizontalArrangement: Option(Arrangement),
 });
 
-export const TextProps = Struct({
+const TextProps = Struct({
   style: Option(TypographyStyle),
   color: Option(ColorToken),
 });
 
-export const ButtonProps = Struct({
+const ButtonProps = Struct({
   text: str,
   variant: Option(ButtonVariant),
   enabled: OptionBool,
@@ -106,7 +106,7 @@ export const ButtonProps = Struct({
   clickAction: Option(str),
 });
 
-export const TextFieldProps = Struct({
+const TextFieldProps = Struct({
   text: str,
   placeholder: Option(str),
   label: Option(str),

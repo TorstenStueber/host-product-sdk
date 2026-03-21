@@ -13,12 +13,14 @@
     "test:e2e": "npx playwright test",
     "lint": "nx run-many -t lint",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "knip": "knip"
   },
   "devDependencies": {
     "@nx/js": "22.5.3",
     "@playwright/test": "^1.58.2",
     "@types/node": "25.2.0",
+    "knip": "^6.0.1",
     "nx": "22.5.3",
     "playwright": "^1.58.2",
     "prettier": "^3.8.1",
