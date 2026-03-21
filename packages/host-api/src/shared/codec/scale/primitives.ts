@@ -9,7 +9,7 @@
  */
 
 import type { Codec } from 'scale-ts';
-import { Bytes, Enum, Option, createCodec, enhanceCodec, u8 } from 'scale-ts';
+import { Bytes, Enum, createCodec, enhanceCodec, u8 } from 'scale-ts';
 
 // Re-export Enum from scale-ts for use by protocol codec definitions.
 export { Enum };
@@ -87,21 +87,6 @@ export function Hex(length?: number): Codec<HexString> {
     hexToBytes as unknown as (v: HexString) => Uint8Array,
     bytesToHex,
   ) as unknown as Codec<HexString>;
-}
-
-// ---------------------------------------------------------------------------
-// Nullable
-// ---------------------------------------------------------------------------
-
-/**
- * Like `Option` but uses `null` instead of `undefined` for the absent case.
- */
-export function Nullable<T>(inner: Codec<T>): Codec<T | null> {
-  return enhanceCodec(
-    Option(inner),
-    (v: T | null) => (v === null ? undefined : v) as T | undefined,
-    (v: T | undefined) => (v === undefined ? null : v) as T | null,
-  ) as unknown as Codec<T | null>;
 }
 
 // ---------------------------------------------------------------------------

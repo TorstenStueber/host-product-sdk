@@ -40,7 +40,7 @@ export type ChainConnectionManager = ReturnType<typeof createChainConnectionMana
 
 let instanceCounter = 0;
 
-export function createChainConnectionManager(factory: (genesisHash: HexString) => JsonRpcProvider | null) {
+export function createChainConnectionManager(factory: (genesisHash: HexString) => JsonRpcProvider | undefined) {
   const chains = new Map<HexString, ChainEntry>();
   const instanceId = instanceCounter++;
   let nextId = 0;
@@ -49,7 +49,7 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
     return `ccm_${instanceId}_${nextId++}`;
   }
 
-  function getOrCreateChain(genesisHash: HexString): ChainEntry | null {
+  function getOrCreateChain(genesisHash: HexString): ChainEntry | undefined {
     const existing = chains.get(genesisHash);
     if (existing) {
       existing.refCount++;
@@ -57,13 +57,13 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
     }
 
     const provider = factory(genesisHash);
-    if (!provider) return null;
+    if (!provider) return undefined;
 
     const pendingRequests = new Map<string, PendingRequest>();
     const followSubscriptions = new Map<string, FollowSubscription>();
 
     const entry: ChainEntry = {
-      connection: null!,
+      connection: undefined!,
       pendingRequests,
       followSubscriptions,
       refCount: 1,
@@ -185,14 +185,14 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
     }
   }
 
-  function getChainFollowSubId(genesisHash: HexString): string | null {
+  function getChainFollowSubId(genesisHash: HexString): string | undefined {
     const entry = chains.get(genesisHash);
-    if (!entry) return null;
+    if (!entry) return undefined;
 
     for (const follow of entry.followSubscriptions.values()) {
       if (follow.chainSubId) return follow.chainSubId;
     }
-    return null;
+    return undefined;
   }
 
   function releaseChain(genesisHash: HexString): void {
@@ -290,9 +290,9 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
             operationId: event.operationId as string,
             items: (event.items as Record<string, unknown>[]).map(item => ({
               key: item.key as HexString,
-              value: (item.value as HexString) ?? null,
-              hash: (item.hash as HexString) ?? null,
-              closestDescendantMerkleValue: (item.closestDescendantMerkleValue as HexString) ?? null,
+              value: (item.value as HexString) ?? undefined,
+              hash: (item.hash as HexString) ?? undefined,
+              closestDescendantMerkleValue: (item.closestDescendantMerkleValue as HexString) ?? undefined,
             })),
           },
         };

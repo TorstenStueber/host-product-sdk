@@ -1,4 +1,4 @@
-import { Enum, Hex, Nullable, Status } from '../primitives.js';
+import { Enum, Hex, Status } from '../primitives.js';
 import { Option, Struct, Tuple, Vector, _void, str, u32 } from 'scale-ts';
 
 // -- Primitives ---------------------------------------------------------------
@@ -39,9 +39,9 @@ export const StorageQueryItem = Struct({
 
 export const StorageResultItem = Struct({
   key: Hex(),
-  value: Nullable(Hex()),
-  hash: Nullable(Hex()),
-  closestDescendantMerkleValue: Nullable(Hex()),
+  value: Option(Hex()),
+  hash: Option(Hex()),
+  closestDescendantMerkleValue: Option(Hex()),
 });
 
 // -- Operation result ---------------------------------------------------------

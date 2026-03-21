@@ -56,7 +56,7 @@ export function wireAccountHandlers(container: ProtocolHandler, config: Handlers
       return okAsync([
         {
           publicKey: session.rootPublicKey,
-          name: session.displayName ?? undefined,
+          name: session.displayName,
         },
       ]);
     }),

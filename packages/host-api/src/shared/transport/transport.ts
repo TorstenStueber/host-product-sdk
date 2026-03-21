@@ -211,7 +211,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
 
   const handshakeAbortController = new AbortController();
 
-  let handshakePromise: Promise<boolean> | null = null;
+  let handshakePromise: Promise<boolean> | undefined;
   let connectionStatusResolved = false;
   let connectionStatus: ConnectionStatus = 'disconnected';
   let disposed = false;
@@ -329,7 +329,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
       const timedOutRequest = Promise.race([performHandshake(), delay(HANDSHAKE_TIMEOUT).then(() => false)]);
 
       handshakePromise = timedOutRequest.then(result => {
-        handshakePromise = null;
+        handshakePromise = undefined;
         connectionStatusResolved = true;
         changeConnectionStatus(result ? 'connected' : 'disconnected');
         return result;

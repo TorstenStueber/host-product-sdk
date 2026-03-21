@@ -14,7 +14,7 @@
  * `_void` in the MessagePayload enum.
  */
 
-import { Enum, Hex, Nullable } from './primitives.js';
+import { Enum, Hex } from './primitives.js';
 import type { Codec, StringRecord } from 'scale-ts';
 import { Bytes, Option, Result, Struct, Tuple, Vector, bool, str, u8, _void } from 'scale-ts';
 
@@ -204,7 +204,7 @@ export const hostApiProtocol = {
   // Preimage
   remote_preimage_lookup_subscribe: {
     _start: Enum({ v1: PreimageKey }),
-    _receive: Enum({ v1: Nullable(PreimageValue) }),
+    _receive: Enum({ v1: Option(PreimageValue) }),
   },
   remote_preimage_submit: {
     _request: Enum({ v1: PreimageValue }),
@@ -228,7 +228,7 @@ export const hostApiProtocol = {
   },
   remote_chain_head_header: {
     _request: Enum({ v1: Struct({ genesisHash: GenesisHash, followSubscriptionId: str, hash: BlockHash }) }),
-    _response: Enum({ v1: Result(Nullable(Hex()), GenericErr) }),
+    _response: Enum({ v1: Result(Option(Hex()), GenericErr) }),
   },
   remote_chain_head_body: {
     _request: Enum({ v1: Struct({ genesisHash: GenesisHash, followSubscriptionId: str, hash: BlockHash }) }),
@@ -241,7 +241,7 @@ export const hostApiProtocol = {
         followSubscriptionId: str,
         hash: BlockHash,
         items: Vector(StorageQueryItem),
-        childTrie: Nullable(Hex()),
+        childTrie: Option(Hex()),
       }),
     }),
     _response: Enum({ v1: Result(OperationStartedResult, GenericErr) }),
@@ -284,7 +284,7 @@ export const hostApiProtocol = {
   },
   remote_chain_transaction_broadcast: {
     _request: Enum({ v1: Struct({ genesisHash: GenesisHash, transaction: Hex() }) }),
-    _response: Enum({ v1: Result(Nullable(str), GenericErr) }),
+    _response: Enum({ v1: Result(Option(str), GenericErr) }),
   },
   remote_chain_transaction_stop: {
     _request: Enum({ v1: Struct({ genesisHash: GenesisHash, operationId: str }) }),

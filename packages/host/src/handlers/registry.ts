@@ -51,8 +51,8 @@ export type HandlersConfig = {
   storagePrefix?: string;
 
   // -- Session access -------------------------------------------------------
-  /** Returns the current user session, or null if not authenticated. */
-  getSession?: () => UserSessionInfo | null;
+  /** Returns the current user session, or undefined if not authenticated. */
+  getSession?: () => UserSessionInfo | undefined;
 
   /** Subscribe to auth state changes. Callback receives the auth status string. */
   subscribeAuthState?: (callback: (state: string) => void) => () => void;
@@ -98,8 +98,8 @@ export type HandlersConfig = {
     | Promise<ResponseOk<'host_create_transaction_with_non_product_account', 'v1'>>;
 
   // -- Chain connection -----------------------------------------------------
-  /** Factory that returns a JSON-RPC provider for a given genesis hash, or null if unsupported. */
-  chainProvider?: (genesisHash: HexString) => JsonRpcProvider | null;
+  /** Factory that returns a JSON-RPC provider for a given genesis hash, or undefined if unsupported. */
+  chainProvider?: (genesisHash: HexString) => JsonRpcProvider | undefined;
 };
 
 // ---------------------------------------------------------------------------

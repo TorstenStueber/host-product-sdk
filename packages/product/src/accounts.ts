@@ -122,7 +122,7 @@ function createSignerForAccount(hostApi: HostApi, account: ProductAccount) {
       metadataHash?: string | undefined;
       mode?: number;
       withSignedTransaction?: boolean;
-    }): Promise<{ id: number; signature: HexString; signedTransaction: HexString | null }> {
+    }): Promise<{ id: number; signature: HexString; signedTransaction: HexString | undefined }> {
       const codecPayload = {
         ...payload,
         blockHash: payload.blockHash as HexString,
@@ -133,11 +133,11 @@ function createSignerForAccount(hostApi: HostApi, account: ProductAccount) {
         method: payload.method as HexString,
         specVersion: payload.specVersion as HexString,
         transactionVersion: payload.transactionVersion as HexString,
-        metadataHash: (payload.metadataHash as HexString | undefined) ?? undefined,
+        metadataHash: payload.metadataHash as HexString | undefined,
         tip: payload.tip as HexString,
-        assetId: (payload.assetId as HexString | undefined) ?? undefined,
-        mode: payload.mode ?? undefined,
-        withSignedTransaction: payload.withSignedTransaction ?? undefined,
+        assetId: payload.assetId as HexString | undefined,
+        mode: payload.mode,
+        withSignedTransaction: payload.withSignedTransaction,
       };
 
       const response = await hostApi.signPayload(codecPayload);
@@ -147,7 +147,7 @@ function createSignerForAccount(hostApi: HostApi, account: ProductAccount) {
           return {
             id: 0,
             signature: result.signature,
-            signedTransaction: result.signedTransaction ?? null,
+            signedTransaction: result.signedTransaction,
           };
         },
         error => {
@@ -160,7 +160,7 @@ function createSignerForAccount(hostApi: HostApi, account: ProductAccount) {
       address: string;
       data: string;
       type: 'bytes' | 'payload';
-    }): Promise<{ id: number; signature: HexString; signedTransaction: HexString | null }> {
+    }): Promise<{ id: number; signature: HexString; signedTransaction: HexString | undefined }> {
       const payload = {
         address: raw.address,
         data:
@@ -176,7 +176,7 @@ function createSignerForAccount(hostApi: HostApi, account: ProductAccount) {
           return {
             id: 0,
             signature: result.signature,
-            signedTransaction: result.signedTransaction ?? null,
+            signedTransaction: result.signedTransaction,
           };
         },
         error => {

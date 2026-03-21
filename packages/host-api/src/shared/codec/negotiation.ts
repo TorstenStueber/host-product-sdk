@@ -68,15 +68,15 @@ export type CodecAdapterMap = Partial<Record<CodecFormat, CodecAdapter>>;
  *
  * @param transport - The product-side transport (must be connected).
  * @param adapters - Map of format → CodecAdapter the product supports.
- * @returns The format that was selected, or `null` if the upgrade
+ * @returns The format that was selected, or `undefined` if the upgrade
  *   failed and the transport stays on the current codec.
  */
 export async function requestCodecUpgrade(
   transport: Transport,
   adapters: CodecAdapterMap,
-): Promise<CodecFormat | null> {
+): Promise<CodecFormat | undefined> {
   const supportedFormats = Object.keys(adapters) as CodecFormat[];
-  if (supportedFormats.length === 0) return null;
+  if (supportedFormats.length === 0) return undefined;
 
   const request: CodecUpgradeRequest = { supportedFormats };
 
@@ -90,14 +90,14 @@ export async function requestCodecUpgrade(
 
     const selectedFormat = response.value.selectedFormat as CodecFormat | undefined;
 
-    if (!selectedFormat || !adapters[selectedFormat]) return null;
+    if (!selectedFormat || !adapters[selectedFormat]) return undefined;
 
     // Swap the codec adapter on the product side.
     transport.swapCodecAdapter(adapters[selectedFormat]!);
     return selectedFormat;
   } catch {
     // MethodNotSupportedError, timeout, or abort — stay on current codec.
-    return null;
+    return undefined;
   }
 }
 

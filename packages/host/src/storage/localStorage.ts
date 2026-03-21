@@ -10,9 +10,9 @@ export function createLocalStorageAdapter(prefix: string): StorageAdapter {
   const withPrefix = (key: string) => `${prefix}${key}`;
 
   return {
-    async read(key: string): Promise<Uint8Array | null> {
+    async read(key: string): Promise<Uint8Array | undefined> {
       const raw = localStorage.getItem(withPrefix(key));
-      if (raw === null) return null;
+      if (raw === null) return undefined;
       return Uint8Array.from(atob(raw), c => c.charCodeAt(0));
     },
 

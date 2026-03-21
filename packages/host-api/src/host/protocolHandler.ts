@@ -614,7 +614,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
           genesisHash: HexString;
           hash: HexString;
           items: { key: HexString; type: string }[];
-          childTrie: HexString | null;
+          childTrie: HexString | undefined;
         };
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
@@ -732,7 +732,7 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
         try {
           const result = await manager.sendRequest(genesisHash, 'transaction_v1_broadcast', [transaction]);
           manager.releaseChain(genesisHash);
-          return wrapOk(version, (result as string) ?? null);
+          return wrapOk(version, (result as string) ?? undefined);
         } catch (e) {
           manager.releaseChain(genesisHash);
           throw e;

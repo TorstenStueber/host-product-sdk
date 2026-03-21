@@ -13,10 +13,10 @@ describe('createMemoryStorageAdapter', () => {
   // Basic CRUD
   // -----------------------------------------------------------------------
 
-  it('read returns null for missing keys', async () => {
+  it('read returns undefined for missing keys', async () => {
     const store = createMemoryStorageAdapter();
     const result = await store.read('nonexistent');
-    expect(result).toBeNull();
+    expect(result).toBeUndefined();
   });
 
   it('write then read returns the correct value', async () => {
@@ -44,10 +44,10 @@ describe('createMemoryStorageAdapter', () => {
     const store = createMemoryStorageAdapter();
 
     await store.write('key', new Uint8Array([1, 2, 3]));
-    expect(await store.read('key')).not.toBeNull();
+    expect(await store.read('key')).not.toBeUndefined();
 
     await store.clear('key');
-    expect(await store.read('key')).toBeNull();
+    expect(await store.read('key')).toBeUndefined();
   });
 
   it('clear on nonexistent key does not throw', async () => {
@@ -80,7 +80,7 @@ describe('createMemoryStorageAdapter', () => {
     await store.clear('remove');
 
     expect(await store.read('keep')).toEqual(new Uint8Array([100]));
-    expect(await store.read('remove')).toBeNull();
+    expect(await store.read('remove')).toBeUndefined();
   });
 
   // -----------------------------------------------------------------------
@@ -123,7 +123,7 @@ describe('createMemoryStorageAdapter', () => {
     const result = await store.read('empty');
 
     expect(result).toEqual(new Uint8Array([]));
-    expect(result).not.toBeNull();
+    expect(result).not.toBeUndefined();
   });
 
   it('stores large Uint8Array', async () => {

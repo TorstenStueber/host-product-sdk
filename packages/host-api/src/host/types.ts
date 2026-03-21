@@ -119,7 +119,7 @@ export type ProtocolHandler = {
   handleChainTransactionStop(handler: RequestHandler<'remote_chain_transaction_stop'>): () => void;
 
   // -- High-level chain connection (wraps all chain_* methods) ---------------
-  handleChainConnection(factory: (genesisHash: HexString) => JsonRpcProvider | null): () => void;
+  handleChainConnection(factory: (genesisHash: HexString) => JsonRpcProvider | undefined): () => void;
 
   // -- Transport lifecycle ---------------------------------------------------
   readonly transport: Transport;

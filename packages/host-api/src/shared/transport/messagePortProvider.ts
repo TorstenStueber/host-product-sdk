@@ -42,7 +42,7 @@ export function createMessagePortProvider(
   logger?: Logger,
 ): Provider {
   let disposed = false;
-  let port: MessagePort | null = null;
+  let port: MessagePort | undefined;
   const subscribers = new Set<(message: Uint8Array | unknown) => void>();
 
   const messageHandler = (event: MessageEvent): void => {

@@ -156,7 +156,7 @@ export const sandboxTransport: Transport = wrapWithAutoCodecUpgrade(
  * automatically triggers a codec upgrade attempt before resolving.
  */
 function wrapWithAutoCodecUpgrade(transport: Transport): Transport {
-  let upgradePromise: Promise<boolean> | null = null;
+  let upgradePromise: Promise<boolean> | undefined;
 
   return {
     ...transport,

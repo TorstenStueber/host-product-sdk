@@ -6,7 +6,7 @@
  */
 
 export type StorageAdapter = {
-  read(key: string): Promise<Uint8Array | null>;
+  read(key: string): Promise<Uint8Array | undefined>;
   write(key: string, value: Uint8Array): Promise<void>;
   clear(key: string): Promise<void>;
 };

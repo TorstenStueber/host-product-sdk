@@ -26,7 +26,7 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
 
       getSession() {
         const session = auth.getSession();
-        if (!session) return null;
+        if (!session) return undefined;
         return {
           rootPublicKey: session.rootPublicKey,
           displayName: session.displayName,
@@ -108,11 +108,11 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
       return product;
     },
 
-    setSession(session: UserSession, identity?: Identity | null) {
+    setSession(session: UserSession, identity?: Identity) {
       auth.setState({
         status: 'authenticated',
         session,
-        identity: identity ?? null,
+        identity,
       });
     },
 

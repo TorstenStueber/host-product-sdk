@@ -25,8 +25,8 @@ describe('createAuthManager', () => {
     expect(state.status).toBe('idle');
   });
 
-  it('getSession returns null when idle', () => {
-    expect(auth.getSession()).toBeNull();
+  it('getSession returns undefined when idle', () => {
+    expect(auth.getSession()).toBeUndefined();
   });
 
   // -----------------------------------------------------------------------
@@ -87,11 +87,11 @@ describe('createAuthManager', () => {
     auth.setState({
       status: 'authenticated',
       session,
-      identity: null,
+      identity: undefined,
     });
 
     const retrieved = auth.getSession();
-    expect(retrieved).not.toBeNull();
+    expect(retrieved).not.toBeUndefined();
     expect(retrieved!.displayName).toBe('Bob');
     expect(retrieved!.rootPublicKey).toEqual(new Uint8Array([1, 2, 3]));
   });
@@ -110,13 +110,13 @@ describe('createAuthManager', () => {
     auth.setState({
       status: 'authenticated',
       session: { rootPublicKey: new Uint8Array(32) },
-      identity: null,
+      identity: undefined,
     });
 
     auth.setState({ status: 'idle' });
 
     expect(auth.getState().status).toBe('idle');
-    expect(auth.getSession()).toBeNull();
+    expect(auth.getSession()).toBeUndefined();
   });
 
   // -----------------------------------------------------------------------
@@ -132,7 +132,7 @@ describe('createAuthManager', () => {
     auth.setState({
       status: 'authenticated',
       session: { rootPublicKey: new Uint8Array(32) },
-      identity: null,
+      identity: undefined,
     });
 
     expect(states).toEqual(['pairing', 'attesting', 'authenticated']);

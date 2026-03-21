@@ -1,5 +1,5 @@
-import { Enum, Hex, Nullable } from '../primitives.js';
-import { Struct, Vector, _void, str, u32, u8 } from 'scale-ts';
+import { Enum, Hex } from '../primitives.js';
+import { Option, Struct, Vector, _void, str, u32, u8 } from 'scale-ts';
 import { GenericErr } from './commonCodecs.js';
 
 // -- Errors -------------------------------------------------------------------
@@ -28,7 +28,7 @@ export const TxPayloadContext = Struct({
 });
 
 export const TxPayloadV1 = Struct({
-  signer: Nullable(str),
+  signer: Option(str),
   callData: Hex(),
   extensions: Vector(TxPayloadExtension),
   txExtVersion: u8,

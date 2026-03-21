@@ -7,14 +7,14 @@
 
 export type IdentityProvider = {
   /** Resolve a user's identity from their public key. */
-  getIdentity(accountIdHex: string): Promise<ResolvedIdentity | null>;
+  getIdentity(accountIdHex: string): Promise<ResolvedIdentity | undefined>;
 };
 
 export type ResolvedIdentity = {
   /** Short username (e.g., the lite/anonymous username). */
   liteUsername: string;
   /** Full display name if available. */
-  fullUsername: string | null;
+  fullUsername: string | undefined;
   /** Optional avatar URL. */
   avatarUrl?: string;
   /** Chain-specific identity fields. */

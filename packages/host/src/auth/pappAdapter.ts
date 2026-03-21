@@ -33,11 +33,11 @@ export type AttestationStatus =
   | { step: 'finished' };
 
 export type PappAdapter = {
-  authenticate(): Promise<UserSession | null>;
+  authenticate(): Promise<UserSession | undefined>;
   abortAuthentication(): void;
   disconnect(session: UserSession): Promise<void>;
   getStoredSessions(): UserSession[];
-  resolveIdentity(publicKey: Uint8Array): Promise<Identity | null>;
+  resolveIdentity(publicKey: Uint8Array): Promise<Identity | undefined>;
   subscribePairingStatus(callback: (status: PairingStatus) => void): () => void;
   subscribeAttestationStatus(callback: (status: AttestationStatus) => void): () => void;
   dispose(): void;
@@ -56,7 +56,7 @@ export function createPappAdapterStub(_config: PappAdapterConfig): PappAdapter {
   return {
     async authenticate() {
       // TODO: Implement QR-code-based pairing flow
-      return null;
+      return undefined;
     },
 
     abortAuthentication() {
@@ -73,7 +73,7 @@ export function createPappAdapterStub(_config: PappAdapterConfig): PappAdapter {
 
     async resolveIdentity(_publicKey) {
       // TODO: Implement identity resolution via statement store
-      return null;
+      return undefined;
     },
 
     subscribePairingStatus(callback) {

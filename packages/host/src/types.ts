@@ -30,7 +30,7 @@ export type HostSdkConfig = {
 
   // -- Chain connection -----------------------------------------------------
   /** Factory that returns a JSON-RPC provider for a given genesis hash. */
-  chainProvider?: (genesisHash: HexString) => JsonRpcProvider | null;
+  chainProvider?: (genesisHash: HexString) => JsonRpcProvider | undefined;
 
   // -- Signing callbacks ----------------------------------------------------
   /** Handle signing a structured payload. */
@@ -102,7 +102,7 @@ export type HostSdk = {
    * Set the authenticated session.
    * This is a convenience for hosts that manage auth externally.
    */
-  setSession(session: UserSession, identity?: Identity | null): void;
+  setSession(session: UserSession, identity?: Identity): void;
 
   /**
    * Clear the authenticated session.

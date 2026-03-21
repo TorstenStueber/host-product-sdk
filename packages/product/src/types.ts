@@ -101,7 +101,7 @@ export type TxPayloadContext = {
 };
 
 export type TxPayloadV1 = {
-  signer: string | null;
+  signer: string | undefined;
   callData: HexString;
   extensions: TxPayloadExtension[];
   txExtVersion: number;

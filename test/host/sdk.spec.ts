@@ -17,7 +17,7 @@ describe('Host SDK (auth manager integration)', () => {
       const auth = createAuthManager();
 
       expect(auth.getState().status).toBe('idle');
-      expect(auth.getSession()).toBeNull();
+      expect(auth.getSession()).toBeUndefined();
       expect(typeof auth.subscribe).toBe('function');
       expect(typeof auth.setState).toBe('function');
       expect(typeof auth.subscribeAuthStatus).toBe('function');
@@ -35,11 +35,11 @@ describe('Host SDK (auth manager integration)', () => {
       auth.setState({
         status: 'authenticated',
         session,
-        identity: { liteUsername: 'testuser', fullUsername: null },
+        identity: { liteUsername: 'testuser', fullUsername: undefined },
       });
 
       const retrieved = auth.getSession();
-      expect(retrieved).not.toBeNull();
+      expect(retrieved).not.toBeUndefined();
       expect(retrieved!.displayName).toBe('Test User');
     });
 
@@ -49,14 +49,14 @@ describe('Host SDK (auth manager integration)', () => {
       auth.setState({
         status: 'authenticated',
         session: { rootPublicKey: new Uint8Array(32) },
-        identity: null,
+        identity: undefined,
       });
 
-      expect(auth.getSession()).not.toBeNull();
+      expect(auth.getSession()).not.toBeUndefined();
 
       auth.setState({ status: 'idle' });
 
-      expect(auth.getSession()).toBeNull();
+      expect(auth.getSession()).toBeUndefined();
       expect(auth.getState().status).toBe('idle');
     });
 
@@ -70,7 +70,7 @@ describe('Host SDK (auth manager integration)', () => {
       auth.setState({
         status: 'authenticated',
         session: { rootPublicKey: new Uint8Array(32) },
-        identity: null,
+        identity: undefined,
       });
 
       expect(states).toEqual(['pairing', 'authenticated']);

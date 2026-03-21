@@ -50,7 +50,7 @@ function createChainCode(code: string): Uint8Array {
 
 type PublicSoftFn = (publicKey: Uint8Array, chainCode: Uint8Array) => Uint8Array;
 
-let _publicSoft: PublicSoftFn | null = null;
+let _publicSoft: PublicSoftFn | undefined;
 
 /**
  * Inject the HDKD.publicSoft function.

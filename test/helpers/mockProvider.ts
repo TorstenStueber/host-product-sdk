@@ -13,7 +13,7 @@ export type MockProvider = Provider & {
   _injectMessage(message: unknown): void;
 };
 
-function createMockProvider(name: string, isCorrectEnv: boolean, sendTo: () => MockProvider | null): MockProvider {
+function createMockProvider(name: string, isCorrectEnv: boolean, sendTo: () => MockProvider | undefined): MockProvider {
   const logger: Logger = createDefaultLogger(name);
   const subscribers = new Set<(message: unknown) => void>();
   let disposed = false;
@@ -88,7 +88,11 @@ export function createSyncMockProviderPair(): [MockProvider, MockProvider] {
   let hostProvider: MockProvider;
   let productProvider: MockProvider;
 
-  function createSyncProvider(name: string, isCorrectEnv: boolean, sendTo: () => MockProvider | null): MockProvider {
+  function createSyncProvider(
+    name: string,
+    isCorrectEnv: boolean,
+    sendTo: () => MockProvider | undefined,
+  ): MockProvider {
     const logger: Logger = createDefaultLogger(name);
     const subscribers = new Set<(message: unknown) => void>();
     let disposed = false;

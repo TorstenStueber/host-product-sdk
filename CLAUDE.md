@@ -9,6 +9,9 @@
   thenables.
 - **Use `() => void` instead of `VoidFunction`.** Do not use the built-in `VoidFunction` type alias anywhere — write
   `() => void` inline instead.
+- **Prefer `undefined` over `null`.** Use `undefined` for absent values. Only use `null` when forced by an external API
+  (DOM methods like `localStorage.getItem()`, `contentWindow`, JSON-RPC spec, etc.). Never introduce `null` in our own
+  types, return values, or state variables.
 
 ## Formatting
 

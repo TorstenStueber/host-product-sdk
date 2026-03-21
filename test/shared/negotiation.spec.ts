@@ -78,8 +78,8 @@ describe('Codec negotiation', () => {
       structured_clone: structuredCloneCodecAdapter,
     });
 
-    // Should return null (upgrade failed, staying on current).
-    expect(result).toBeNull();
+    // Should return undefined (upgrade failed, staying on current).
+    expect(result).toBeUndefined();
 
     hostTransport.destroy();
     productTransport.destroy();
@@ -147,7 +147,7 @@ describe('Codec negotiation', () => {
     productTransport.destroy();
   });
 
-  it('product gets null immediately (not after timeout) when host has not-supported catch-all', async () => {
+  it('product gets undefined immediately (not after timeout) when host has not-supported catch-all', async () => {
     const { hostTransport, productTransport } = setupTransports();
 
     // Do NOT register handleCodecUpgrade — the not-supported catch-all
@@ -168,8 +168,8 @@ describe('Codec negotiation', () => {
 
     const elapsed = performance.now() - start;
 
-    // Should return null (upgrade failed).
-    expect(result).toBeNull();
+    // Should return undefined (upgrade failed).
+    expect(result).toBeUndefined();
 
     // Should resolve near-instantly, well under the 1s UPGRADE_TIMEOUT.
     expect(elapsed).toBeLessThan(200);

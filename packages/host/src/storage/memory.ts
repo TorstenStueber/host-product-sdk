@@ -10,8 +10,8 @@ export function createMemoryStorageAdapter(initial?: Record<string, Uint8Array>)
   const storage = new Map<string, Uint8Array>(initial ? Object.entries(initial) : []);
 
   return {
-    async read(key: string): Promise<Uint8Array | null> {
-      return storage.get(key) ?? null;
+    async read(key: string): Promise<Uint8Array | undefined> {
+      return storage.get(key);
     },
 
     async write(key: string, value: Uint8Array): Promise<void> {

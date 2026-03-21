@@ -33,7 +33,7 @@ type TokenBucketState = {
   remainingTokens: number;
   lastRefillTimestamp: number;
   queue: QueuedTask<unknown>[];
-  timerId: ReturnType<typeof setTimeout> | null;
+  timerId: ReturnType<typeof setTimeout> | undefined;
 };
 
 export type RateLimiter = {
@@ -50,7 +50,7 @@ function createQueueStrategy(config: CreateRateLimiterConfig): RateLimiter {
     remainingTokens: config.maxRequestsPerInterval,
     lastRefillTimestamp: Date.now(),
     queue: [],
-    timerId: null,
+    timerId: undefined,
   };
 
   function refillTokens(): void {
@@ -64,7 +64,7 @@ function createQueueStrategy(config: CreateRateLimiterConfig): RateLimiter {
   }
 
   function processQueue(): void {
-    state.timerId = null;
+    state.timerId = undefined;
     refillTokens();
 
     while (state.remainingTokens > 0 && state.queue.length > 0) {
@@ -89,7 +89,7 @@ function createQueueStrategy(config: CreateRateLimiterConfig): RateLimiter {
   }
 
   function ensureProcessingScheduled(): void {
-    if (state.timerId !== null) return;
+    if (state.timerId !== undefined) return;
     state.timerId = setTimeout(processQueue, Math.floor(config.intervalMs / 2));
   }
 
@@ -124,9 +124,9 @@ function createQueueStrategy(config: CreateRateLimiterConfig): RateLimiter {
   }
 
   function destroy(): void {
-    if (state.timerId !== null) {
+    if (state.timerId !== undefined) {
       clearTimeout(state.timerId);
-      state.timerId = null;
+      state.timerId = undefined;
     }
     while (state.queue.length > 0) {
       const task = state.queue.shift()!;

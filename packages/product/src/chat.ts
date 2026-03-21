@@ -172,7 +172,7 @@ export function handleCustomMessageRendering(
         subscribeActions(actionCallback: (actionId: string, payload: Uint8Array | undefined) => void) {
           const actionsSubscription = hostApi.chatActionSubscribe(undefined, action => {
             if (action.payload.tag === 'ActionTriggered' && action.payload.value.messageId === messageId) {
-              actionCallback(action.payload.value.actionId, action.payload.value.payload ?? undefined);
+              actionCallback(action.payload.value.actionId, action.payload.value.payload);
             }
           });
 

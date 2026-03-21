@@ -84,7 +84,7 @@ describe('handleCustomMessageRendering', () => {
     const hostApi = createHostApi(productTransport);
     await hostApi.isReady();
 
-    let renderFn: ((node: unknown) => void) | null = null;
+    let renderFn: ((node: unknown) => void) | undefined;
 
     handleCustomMessageRendering((_params, render) => {
       renderFn = render;

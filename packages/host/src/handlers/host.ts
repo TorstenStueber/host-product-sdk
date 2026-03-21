@@ -22,7 +22,7 @@ export function wireHostHandlers(container: ProtocolHandler, config: HandlersCon
       // Check chain support via chainProvider factory
       if (feature.tag === 'Chain' && config.chainProvider) {
         const provider = config.chainProvider(feature.value);
-        const supported = provider !== null;
+        const supported = provider !== undefined;
         // Do not hold the provider open; the connection manager will create it when needed
         return okAsync(supported);
       }

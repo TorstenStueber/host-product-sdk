@@ -46,7 +46,7 @@ interface SignerPayloadRaw {
 interface SignerResult {
   id: number;
   signature: string;
-  signedTransaction?: string | null;
+  signedTransaction?: string;
 }
 
 import { SpektrExtensionName } from './constants.js';
@@ -93,13 +93,13 @@ interface Injected {
  * Create an `enable` function that returns an `Injected` object for
  * non-product accounts.
  *
- * Returns `null` if the transport is not ready (e.g. handshake failed).
+ * Returns `undefined` if the transport is not ready (e.g. handshake failed).
  */
 export async function createNonProductExtensionEnableFactory(
   hostApi: HostApi = defaultHostApi,
-): Promise<((_origin: string) => Promise<Injected>) | null> {
+): Promise<((_origin: string) => Promise<Injected>) | undefined> {
   const ready = await hostApi.isReady();
-  if (!ready) return null;
+  if (!ready) return undefined;
 
   const accountId = AccountId();
 
@@ -110,7 +110,7 @@ export async function createNonProductExtensionEnableFactory(
       return response.match(
         response => {
           return response.map<InjectedAccount>(account => ({
-            name: account.name ?? undefined,
+            name: account.name,
             address: accountId.dec(account.publicKey),
             type: 'sr25519',
           }));
@@ -226,7 +226,7 @@ export async function createNonProductExtensionEnableFactory(
  * This makes the non-product accounts available to any dApp that uses
  * `@polkadot/extension-dapp`'s `web3Enable()` / `web3Accounts()`.
  *
- * @param transport - The transport to use. Pass `null` to skip injection.
+ * @param transport - The transport to use. Pass `undefined` to skip injection.
  * @returns `true` if injection succeeded, `false` otherwise.
  */
 export async function injectSpektrExtension(hostApi: HostApi = defaultHostApi): Promise<boolean> {

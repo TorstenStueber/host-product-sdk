@@ -22,7 +22,7 @@ export type UserSession = {
 
 export type Identity = {
   liteUsername: string;
-  fullUsername: string | null;
+  fullUsername: string | undefined;
   /** Additional identity fields are adapter-specific. */
   [key: string]: unknown;
 };
@@ -31,7 +31,7 @@ export type AuthState =
   | { status: 'idle' }
   | { status: 'pairing'; payload: string }
   | { status: 'attesting'; username?: string }
-  | { status: 'authenticated'; session: UserSession; identity: Identity | null }
+  | { status: 'authenticated'; session: UserSession; identity: Identity | undefined }
   | { status: 'error'; message: string };
 
 type AuthListener = (state: AuthState) => void;
@@ -44,7 +44,7 @@ export type AuthManager = {
   getState(): AuthState;
   setState(state: AuthState): void;
   subscribe(listener: AuthListener): () => void;
-  getSession(): UserSession | null;
+  getSession(): UserSession | undefined;
   subscribeAuthStatus(callback: (status: string) => void): () => void;
   dispose(): void;
 };
@@ -69,8 +69,8 @@ export function createAuthManager(): AuthManager {
     return () => listeners.delete(listener);
   }
 
-  function getSession(): UserSession | null {
-    return currentState.status === 'authenticated' ? currentState.session : null;
+  function getSession(): UserSession | undefined {
+    return currentState.status === 'authenticated' ? currentState.session : undefined;
   }
 
   function subscribeAuthStatus(callback: (status: string) => void): () => void {

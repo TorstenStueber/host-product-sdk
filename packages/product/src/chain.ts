@@ -286,12 +286,13 @@ export function createPapiProvider(
 
         // -- chainHead_v1_storage -------------------------------------------
         case 'chainHead_v1_storage': {
-          const [followSubId, hash, items, childTrie] = params as [
+          const [followSubId, hash, items, childTrieRaw] = params as [
             string,
             HexString,
             { key: HexString; type: string }[],
             HexString | null,
           ];
+          const childTrie = childTrieRaw ?? undefined;
           const typedItems = items.map(item => ({
             key: item.key,
             type: convertStorageTypeToTyped(item.type),
@@ -417,7 +418,7 @@ export function createPapiProvider(
           hostApi.chainTransactionBroadcast({ genesisHash, transaction }).match(
             result => {
               const opId = result;
-              if (opId !== null) {
+              if (opId !== undefined) {
                 activeBroadcasts.add(opId);
               }
               sendJsonRpcResponse(id, opId);
