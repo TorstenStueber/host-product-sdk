@@ -86,13 +86,12 @@ Works for all iframes regardless of origin.
 ### 1.4 SCALE Codec Primitives (`codec/scale/primitives.ts`)
 
 Thin wrappers over `scale-ts` for Polkadot-specific needs. Previously provided by the external `@novasamatech/scale`
-package -- inlined to remove the dependency (~140 lines):
+package -- inlined to remove the dependency (~130 lines):
 
 | Function            | What it does                                                |
 | ------------------- | ----------------------------------------------------------- |
 | `Enum(inner)`       | Re-exported from scale-ts. Tagged union codec               |
 | `Hex(length?)`      | SCALE codec for `0x`-prefixed hex strings                   |
-| `Nullable(inner)`   | Like `Option` but uses `null` instead of `undefined`        |
 | `Status(...labels)` | Enum without values -- maps string labels to u8 indices     |
 | `lazy(fn)`          | Deferred codec for recursive types                          |
 | `OptionBool`        | Optimized `Option(bool)` encoding (0=none, 1=false, 2=true) |
@@ -210,9 +209,9 @@ export type { SigningResultType as SigningResult } from '../codec/scale/v1/sign.
 
 Error types are plain `{tag, value}` discriminated unions (see 1.12 Error Representation).
 
-Optional values use `undefined` (not `null`) because SCALE's `Option` codec maps absent values to `undefined`. The
-exception is `Nullable` (our custom primitive) which uses `null` -- used for fields like `TxPayloadV1.signer` where the
-original wire format requires `null` semantics.
+Optional values use `undefined` (not `null`) because SCALE's `Option` codec maps absent values to `undefined`. All
+optional fields (e.g. `TxPayloadV1.signer`, `SigningResult.signedTransaction`) use `Option` directly -- there is no
+`Nullable` wrapper. The codebase avoids `null` except where external APIs force it (DOM, JSON-RPC).
 
 ### 1.8 Provider (`transport/provider.ts`)
 
@@ -291,8 +290,8 @@ listener unsubscribes, `_stop` is sent.
 Post-handshake codec upgrade flow.
 
 **Product side** -- `requestCodecUpgrade(transport, adapters)`: after handshake, sends `host_codec_upgrade` with
-supported formats, waits 1s for response, swaps its outgoing codec if host agrees. Returns selected format or `null`.
-The `host_codec_upgrade` method has proper SCALE codecs in the protocol registry
+supported formats, waits 1s for response, swaps its outgoing codec if host agrees. Returns selected format or
+`undefined`. The `host_codec_upgrade` method has proper SCALE codecs in the protocol registry
 (`Struct({ supportedFormats: Vector(str) })` for the request, `Struct({ selectedFormat: str })` for the response), so
 `transport.request` is called with full type safety.
 
@@ -303,9 +302,9 @@ codec too. Uses low-level `listenMessages`/`postMessage` (not `handleRequest`) f
 swap-then-respond sequence.
 
 **Race condition safety** -- because the host swaps before responding, the response arrives as structured clone. Even if
-the product's 1s timeout has already fired (so `requestCodecUpgrade` returned `null`), the product's `decodeIncoming`
-detects the structured clone response and auto-upgrades the outgoing codec. Both sides converge on structured clone
-regardless of timing.
+the product's 1s timeout has already fired (so `requestCodecUpgrade` returned `undefined`), the product's
+`decodeIncoming` detects the structured clone response and auto-upgrades the outgoing codec. Both sides converge on
+structured clone regardless of timing.
 
 **Automatic upgrade** -- the product-side `sandboxTransport` singleton wraps `isReady()` so that after the handshake
 succeeds, it automatically calls `requestCodecUpgrade` with both `scale` and `structured_clone` adapters. Since every
@@ -314,7 +313,7 @@ before any real protocol traffic.
 
 **Backward compatibility**: old hosts running `triangle-js-sdks` don't have the not-supported catch-all, so the
 product's request hangs until the 1s timeout. With our code, the not-supported catch-all responds immediately with
-`MethodNotSupportedError`, so the product gets `null` near-instantly.
+`MethodNotSupportedError`, so the product gets `undefined` near-instantly.
 
 ### 1.11 Main Entry Point (`index.ts`)
 
@@ -638,7 +637,7 @@ directly.
 `createNonProductExtensionEnableFactory(hostApi?)` creates an `enable` function that returns a polkadot-js compatible
 `Injected` object for **non-product accounts**. Provides `accounts.get()` (via `hostApi.getNonProductAccounts`),
 `signer.signPayload()`, `signer.signRaw()`, and `signer.createTransaction()` (via
-`hostApi.createTransactionWithNonProductAccount`). Returns `null` if the transport is not ready.
+`hostApi.createTransactionWithNonProductAccount`). Returns `undefined` if the transport is not ready.
 
 `injectSpektrExtension(hostApi?)` uses the factory above to inject the extension into the global polkadot-js registry.
 Any dApp using `@polkadot/extension-dapp` discovers it as `"spektr"`. Returns `true` if injection succeeded, `false`
