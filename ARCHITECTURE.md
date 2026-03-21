@@ -21,7 +21,7 @@ Three npm packages:
 
 | Package | Published | Purpose |
 |---|---|---|
-| `@polkadot/host-api` | No (workspace-only) | Protocol types, codecs, transport, host container, product facade |
+| `@polkadot/host-api` | No (workspace-only) | Protocol types, codecs, transport, host protocol handler, product facade |
 | `@polkadot/host` | Yes | Handlers, auth, storage, SDK entry point |
 | `@polkadot/product` | Yes | Domain modules: accounts, chain, chat, storage, etc. |
 
@@ -78,7 +78,7 @@ export const structuredCloneCodecAdapter: CodecAdapter = {
 
 ### 1.4 SCALE Codec Primitives (`codec/scale/primitives.ts`)
 
-Thin wrappers over `scale-ts` for Polkadot-specific needs. Previously provided by the external `@novasamatech/scale` package -- inlined to remove the dependency (~170 lines):
+Thin wrappers over `scale-ts` for Polkadot-specific needs. Previously provided by the external `@novasamatech/scale` package -- inlined to remove the dependency (~140 lines):
 
 | Function | What it does |
 |---|---|
@@ -95,7 +95,7 @@ Also exports `HexString` type (`` `0x${string}` ``) and `toHexString()` validato
 
 ### 1.5 SCALE V1 Codecs (`codec/scale/v1/`)
 
-15 files defining the building-block SCALE codecs for the protocol. These are exact ports from the old `@novasamatech/host-api`. Each file defines domain-specific codecs (structs, enums, error types) and exports `CodecType<>`-derived TypeScript types. The per-method request/response/start/receive codecs are not exported separately -- they are composed inline in `hostApiProtocol` (see 1.6).
+16 files defining the building-block SCALE codecs for the protocol. These are exact ports from the old `@novasamatech/host-api`. Each file defines domain-specific codecs (structs, enums, error types) and exports `CodecType<>`-derived TypeScript types. The per-method request/response/start/receive codecs are not exported separately -- they are composed inline in `hostApiProtocol` (see 1.6).
 
 **`commonCodecs.ts`** -- `GenesisHash = Hex()`, `GenericErr = Struct({ reason: str })`.
 
@@ -127,7 +127,7 @@ export const hostApiProtocol = {
     _start: Enum({ v1: _void }),
     _receive: Enum({ v1: AccountConnectionStatus }),
   },
-  // ...44 methods total (including host_codec_upgrade, our extension)
+  // ...45 methods total (including host_codec_upgrade, our extension)
 } as const;
 ```
 
@@ -141,7 +141,7 @@ Each entry's exact codec types are preserved by TypeScript, so `typeof hostApiPr
 - `SubscriptionMethod` -- union of all keys with `_start`/`_receive` (e.g. `'host_account_connection_status_subscribe' | ...`)
 - `ActionString` -- union of all valid wire action strings: `` `${RequestMethod}_${'request'|'response'}` | `${SubscriptionMethod}_${'start'|'receive'|'stop'|'interrupt'}` ``
 
-These types are used throughout the transport, container, and product API to ensure method names are checked at compile time.
+These types are used throughout the transport, protocol handler, and product API to ensure method names are checked at compile time.
 
 **Derived per-method per-version types** -- given a method name `M` and version tag `V` (e.g. `'v1'`), the following types extract the inner codec types using `CodecType<>` and `Extract<>`:
 
@@ -154,7 +154,7 @@ These types are used throughout the transport, container, and product API to ens
 - `SubscriptionPayload<M, V>` -- subscription receive payload (from `_receive` codec)
 - `RequestVersions<M>`, `ResponseVersions<M>`, `StartVersions<M>`, `ReceiveVersions<M>` -- available version tags
 
-These types are the single source of truth for handler signatures on both the host and product sides. The transport methods are generic on the method name (`request<M>`, `handleRequest<M>`, etc.) so the versioned envelope types flow through automatically. The Container interface and the product HostApi facade derive their types from the same protocol codecs.
+These types are the single source of truth for handler signatures on both the host and product sides. The transport methods are generic on the method name (`request<M>`, `handleRequest<M>`, etc.) so the versioned envelope types flow through automatically. The ProtocolHandler interface and the product HostApi facade derive their types from the same protocol codecs.
 
 The `MessagePayload` enum is built by flattening all entries (concatenating method name + suffix into action keys like `host_handshake_request`). For subscriptions, `_stop` and `_interrupt` default to `_void` if omitted. Then:
 
@@ -235,7 +235,7 @@ Post-handshake codec upgrade flow.
 
 ### 1.11 Main Entry Point (`index.ts`)
 
-Single flat file re-exporting everything from leaf modules. No barrel chains.
+Single flat file re-exporting from all three layers: `shared/` (protocol, codecs, transport, utilities), `host/` (protocol handler, providers, connection manager), and `product/` (HostApi facade, sandbox transport). No barrel chains.
 
 ### 1.12 Error Representation
 
@@ -267,7 +267,7 @@ This differs from triangle-js-sdks, which uses `CodecError` class instances bake
 
 ## Part 1b: `@polkadot/host-api` -- Host layer (`src/host/`)
 
-Host-side container, providers, and chain connection manager. These live in the `host-api` package because they are the host's interface to the transport -- the bridge between the protocol layer and the handler implementations in `@polkadot/host`.
+Host-side protocol handler, providers, and chain connection manager. These live in the `host-api` package because they are the host's interface to the transport -- the bridge between the protocol layer and the handler implementations in `@polkadot/host`.
 
 ### 1b.1 Providers
 
@@ -275,13 +275,13 @@ Host-side container, providers, and chain connection manager. These live in the 
 
 For iframes, the host uses `createWindowProvider(() => iframe.contentWindow)` from shared directly -- no host-specific wrapper needed. The `sdk.ts` `embed()` method sets `iframe.src` itself and creates the provider inline.
 
-### 1b.2 Container (`host/container.ts`)
+### 1b.2 ProtocolHandler (`host/protocolHandler.ts`)
 
-`createContainer({ provider, supportedCodecs? })`:
+`createProtocolHandler({ provider, supportedCodecs? })`:
 
 1. Creates a Transport with `idPrefix: 'h:'` (always starts with SCALE, auto-detects structured clone)
 2. If `supportedCodecs` provided, auto-registers codec upgrade handler
-3. Returns Container with ~40 methods (mostly `handle*()` for product-initiated requests/subscriptions, plus one host-initiated method: `renderChatCustomMessage`)
+3. Returns ProtocolHandler with 41 methods (40 `handle*()` for product-initiated requests/subscriptions, plus one host-initiated method: `renderChatCustomMessage`)
 
 The internal helpers `wireRequest(method, handlers, defaultError)` and `wireSubscription(method, handlers)` take a **version handler map** -- an object keyed by version tag, each value a handler for that version:
 
@@ -303,24 +303,24 @@ The handler's params, ok, and err types are derived from the protocol codecs via
 
 1. **`codec/scale/v1/` (or new `v2/`)** -- define the new v2 building-block codecs.
 2. **`codec/scale/protocol.ts`** -- extend the method's enum inline: `_request: Enum({ v1: ProductAccountId, v2: NewAccountGetV2Codec })`. The `RequestVersions<M>` type automatically becomes `'v1' | 'v2'`, and `RequestParams<M, 'v2'>` derives the v2 types.
-3. **`container.ts`** -- add the v2 handler to the map: `wireRequest('host_account_get', { v1: handlerV1, v2: handlerV2 }, defaultError)`. TypeScript enforces that `handlerV2` matches the v2 codec types. Existing v1 clients continue to work unchanged.
+3. **`protocolHandler.ts`** -- add the v2 handler to the map: `wireRequest('host_account_get', { v1: handlerV1, v2: handlerV2 }, defaultError)`. TypeScript enforces that `handlerV2` matches the v2 codec types. Existing v1 clients continue to work unchanged.
 
 For subscriptions, the same pattern applies: extend `_start`/`_receive` enums and add the version entry to the handler map.
 
-`handleChainConnection(factory)` is special -- creates a `ChainConnectionManager` and wires all ~15 chain methods with its own inline version dispatch.
+`handleChainConnection(factory)` is special -- creates a `ChainConnectionManager` and wires all 13 chain methods with its own inline version dispatch.
 
-### 1b.3 Container Types (`host/types.ts`)
+### 1b.3 ProtocolHandler Types (`host/types.ts`)
 
-The `Container` interface derives all handler types from the protocol codecs:
+The `ProtocolHandler` interface derives all handler types from the protocol codecs:
 
 ```typescript
 type RequestHandler<M extends RequestMethod, V extends string = 'v1'> = (
   params: RequestParams<M, V>,
 ) => ResultAsync<ResponseOk<M, V>, ResponseErr<M, V>>;
 
-interface Container {
+interface ProtocolHandler {
   handleAccountGet(handler: RequestHandler<'host_account_get'>): VoidFunction;
-  // ~39 more handle*() methods...
+  // 39 more handle*() methods...
 
   // Host-initiated (the one exception -- host subscribes to product):
   renderChatCustomMessage(params, callback): Subscription;
@@ -331,7 +331,7 @@ interface Container {
 
 Handlers return `ResultAsync` from neverthrow. No context object -- handlers use `okAsync(value)` and `errAsync(error)` directly. All param/ok/err types flow from `hostApiProtocol`.
 
-**Directionality** -- almost all protocol methods are product-initiated: the product calls `transport.request()` or `transport.subscribe()`, and the host handles them via `transport.handleRequest()` / `transport.handleSubscription()`. The one exception is `product_chat_custom_message_render_subscribe`, where the host initiates a subscription to the product (asking it to render a custom chat message UI). The container exposes this as `renderChatCustomMessage()` (calling `transport.subscribe()`), while the product registers a handler via `handleCustomMessageRendering()` in `chat.ts` (which calls `hostApi.handleHostSubscription()` -- a proxy for `transport.handleSubscription()`).
+**Directionality** -- almost all protocol methods are product-initiated: the product calls `transport.request()` or `transport.subscribe()`, and the host handles them via `transport.handleRequest()` / `transport.handleSubscription()`. The one exception is `product_chat_custom_message_render_subscribe`, where the host initiates a subscription to the product (asking it to render a custom chat message UI). The protocol handler exposes this as `renderChatCustomMessage()` (calling `transport.subscribe()`), while the product registers a handler via `handleCustomMessageRendering()` in `chat.ts` (which calls `hostApi.handleHostSubscription()` -- a proxy for `transport.handleSubscription()`).
 
 ---
 
@@ -350,7 +350,7 @@ Creates transport with `idPrefix: 'p:'`. The `sandboxTransport` singleton wraps 
 
 ### 1c.2 Host API (`product/hostApi.ts`)
 
-Product-side facade. The **only** interface that product domain modules use to communicate with the host -- no module imports `Transport` directly. Wraps every transport method (~35 protocol methods plus transport lifecycle) with strong types derived from the protocol codecs. Version tagging is handled internally -- callers pass raw payloads and receive unwrapped results.
+Product-side facade. The **only** interface that product domain modules use to communicate with the host -- no module imports `Transport` directly. Wraps every transport method (43 protocol methods plus transport lifecycle) with strong types derived from the protocol codecs. Version tagging is handled internally -- callers pass raw payloads and receive unwrapped results.
 
 The internal `makeRequest(transport, method, version, payload)` wraps the payload in `{tag: version, value: payload}` before sending, and unwraps the response by stripping the version tag and splitting the `{success: true/false, value}` Result envelope. Callers never see the versioned wire format. `makeSubscription` similarly wraps start payloads and unwraps received payloads.
 
@@ -368,7 +368,7 @@ What runs on the host page. Handlers, auth, storage adapters, and the SDK entry 
 
 ### 2.1 Handlers (`handlers/`)
 
-**`registry.ts`** -- `wireAllHandlers(container, config)`: orchestrator calling each domain wiring function. `HandlersConfig` has `getSession()`, `subscribeAuthState()`, `chainProvider()`, plus callbacks.
+**`registry.ts`** -- `wireAllHandlers(protocolHandler, config)`: orchestrator calling each domain wiring function. `HandlersConfig` has `getSession()`, `subscribeAuthState()`, `chainProvider()`, plus callbacks.
 
 **`host.ts`** -- `featureSupported` (config callback or chainProvider check), `navigateTo` (callback or `window.open`), `pushNotification` (callback or `console.warn`).
 
@@ -378,9 +378,9 @@ What runs on the host page. Handlers, auth, storage adapters, and the SDK entry 
 
 **`accounts.ts`** -- `accountGet` derives product-specific public key via HDKD from session. `getNonProductAccounts` returns root account. `connectionStatusSubscribe` pushes connected/disconnected. `getAlias`/`createProof` are stubs.
 
-**`signing.ts`** -- `signPayload`/`signRaw` delegate to config callbacks via `ResultAsync.fromPromise`. Return `errAsync({tag: 'PermissionDenied', ...})` if no session. `createTransaction` returns `errAsync({tag: 'NotSupported', ...})` by default.
+**`signing.ts`** -- `signPayload`/`signRaw` delegate to config callbacks via `ResultAsync.fromPromise`. Return `errAsync({tag: 'PermissionDenied', ...})` if no session. `createTransaction`/`createTransactionWithNonProductAccount` delegate to config callbacks, returning `errAsync({tag: 'NotSupported', ...})` when the callback is not configured.
 
-**`chain.ts`** -- Wires `container.handleChainConnection(config.chainProvider)`.
+**`chain.ts`** -- Wires `protocolHandler.handleChainConnection(config.chainProvider)`.
 
 **`chat.ts`**, **`statementStore.ts`**, **`preimage.ts`** -- Stubs returning `errAsync(...)` with plain error objects (e.g. `{tag: 'PermissionDenied', value: undefined}`).
 
@@ -396,7 +396,7 @@ What runs on the host page. Handlers, auth, storage adapters, and the SDK entry 
 
 ### 2.4 Auth (`auth/`)
 
-**`authManager.ts`** -- State machine: `idle -> pairing -> attesting -> authenticated -> (disconnect) -> idle`. Any state can go to `error`. Pub-sub via `subscribe(callback)`. `getSession()` returns session if authenticated.
+**`authManager.ts`** -- State machine: `idle -> pairing -> attesting -> authenticated -> idle` (back to idle via `clearSession()`). Any state can go to `error`. Pub-sub via `subscribe(callback)`. `getSession()` returns session if authenticated.
 
 **`crypto.ts`** -- `deriveProductPublicKey(rootPublicKey, productId, derivationIndex)`: HDKD soft derivation through junctions `['product', productId, derivationIndex]`.
 
@@ -404,7 +404,7 @@ What runs on the host page. Handlers, auth, storage adapters, and the SDK entry 
 
 ### 2.5 Nested Bridge (`nested/`)
 
-**`detector.ts`** -- `setupNestedBridgeDetector()`: listens for postMessage from windows OTHER than the primary iframe. Auto-creates `createWindowProvider` + Container + handlers bridge for each nested dApp.
+**`detector.ts`** -- `setupNestedBridgeDetector()`: listens for postMessage from windows OTHER than the primary iframe. Auto-creates `createWindowProvider` + `createProtocolHandler` + `wireAllHandlers` bridge for each nested dApp.
 
 ### 2.6 SDK Entry Point (`sdk.ts`)
 
@@ -420,7 +420,7 @@ product.dispose();
 sdk.dispose();
 ```
 
-Creates AuthManager, then `embed()` sets `iframe.src`, creates `createWindowProvider(() => iframe.contentWindow)` -> Container -> wireAllHandlers(). On dispose, clears `iframe.src`. Also exposes `setSession()` / `clearSession()` for external auth management.
+Creates AuthManager, then `embed()` sets `iframe.src`, creates `createWindowProvider(() => iframe.contentWindow)` -> `createProtocolHandler()` -> `wireAllHandlers()`. On dispose, clears `iframe.src`. Also exposes `setSession()` / `clearSession()` for external auth management.
 
 **`types.ts`** -- `HostSdkConfig` with all options: `appId`, `chainProvider`, signing callbacks, permission callbacks, UI callbacks.
 
@@ -433,14 +433,17 @@ Domain modules that run inside the iframe. Every module accepts an optional `Hos
 ### 3.1 Accounts (`accounts.ts`)
 
 `createAccountsProvider(hostApi?)`:
-- `getProductAccount(dotNsId, derivationIndex?)` -> `hostApi.accountGet`
+- `getProductAccount(dotNsIdentifier, derivationIndex?)` -> `hostApi.accountGet`
+- `getProductAccountAlias(dotNsIdentifier, derivationIndex?)` -> `hostApi.accountGetAlias`
 - `getNonProductAccounts()`
-- `getProductAccountSigner(account)` -> returns signer routing through `hostApi`
+- `createRingVRFProof(dotNsIdentifier, derivationIndex, location, message)` -> `hostApi.accountCreateProof`
+- `getProductAccountSigner(account)` -> returns signer routing signing through `hostApi`
+- `getNonProductAccountSigner(account)` -> same signing interface for non-product accounts
 - `subscribeAccountConnectionStatus(callback)`
 
 ### 3.2 Chain (`chain.ts`)
 
-The most complex file (~695 lines). `createPapiProvider(genesisHash, fallback?, hostApi?)` returns a standard `JsonRpcProvider` compatible with Polkadot API (PAPI). Uses `hostApi.isReady()`, `hostApi.isCorrectEnvironment()`, and `hostApi.logger` for lifecycle and diagnostics.
+The most complex file (~580 lines). `createPapiProvider(genesisHash, fallback?, hostApi?)` returns a standard `JsonRpcProvider` compatible with Polkadot API (PAPI). Uses `hostApi.isReady()`, `hostApi.isCorrectEnvironment()`, and `hostApi.logger` for lifecycle and diagnostics.
 
 When PAPI calls `send('{"method":"chainHead_v1_follow",...}')`: parses JSON-RPC, maps to `hostApi` method, converts parameters, converts response back to JSON-RPC. Handles all `chainHead_v1_*`, `chainSpec_v1_*`, `transaction_v1_*` methods.
 
@@ -453,13 +456,14 @@ await storage.writeJSON('settings', { theme: 'dark' });
 const val = await storage.readString('key');
 ```
 
-`createLocalStorage(hostApi?)` wraps `hostApi.localStorageWrite/Read/Clear` with convenience methods.
+`createLocalStorage(hostApi?)` wraps `hostApi.localStorageWrite/Read/Clear` with convenience methods (`readBytes`, `writeBytes`, `clear`, `readString`, `writeString`, `readJSON`, `writeJSON`). Also exports a `hostLocalStorage` singleton.
 
 ### 3.4 Chat, Statement Store, Preimage
 
-**`chat.ts`** -- two separate concerns:
-- `createProductChatManager(hostApi?)`: pure client -- register rooms/bots, send messages, subscribe to actions.
+**`chat.ts`** -- three exports:
+- `createProductChatManager(hostApi?)`: pure client -- `registerRoom`, `registerBot`, `sendMessage`, `subscribeChatList`, `subscribeAction`.
 - `handleCustomMessageRendering(callback, hostApi?)`: standalone function that registers the product-side handler for custom chat message rendering -- the one protocol method where the product is the handler rather than the initiator. Uses `hostApi.handleHostSubscription()` so it does not need a `Transport` reference. Separated from the chat manager because handler registration is a setup-time concern, not a domain operation.
+- `matchChatCustomRenderers(map)`: utility that dispatches to a specific renderer based on the `messageType` field.
 
 **`statementStore.ts`** -- `createStatementStore(hostApi?)`: subscribe to topics, create proofs, submit statements.
 
@@ -469,23 +473,26 @@ All domain modules accept an optional `HostApi` parameter, defaulting to the sin
 
 ### 3.5 Extension (`extension.ts`)
 
-`injectSpektrExtension(hostApi?)` makes the host API bridge look like a polkadot-js browser extension. Any dApp using `@polkadot/extension-dapp` discovers it as `"spektr"`. Uses `hostApi.isReady()` to gate injection and `hostApi.logger` for error reporting. Signing routes through `hostApi`.
+`createNonProductExtensionEnableFactory(hostApi?)` creates an `enable` function that returns a polkadot-js compatible `Injected` object for **non-product accounts**. Provides `accounts.get()` (via `hostApi.getNonProductAccounts`), `signer.signPayload()`, `signer.signRaw()`, and `signer.createTransaction()` (via `hostApi.createTransactionWithNonProductAccount`). Returns `null` if the transport is not ready.
+
+`injectSpektrExtension(hostApi?)` uses the factory above to inject the extension into the global polkadot-js registry. Any dApp using `@polkadot/extension-dapp` discovers it as `"spektr"`. Returns `true` if injection succeeded, `false` otherwise.
 
 ### 3.6 Constants (`constants.ts`)
 
-`WellKnownChain` (genesis hashes for Polkadot, Kusama, Westend, Rococo + asset hubs), `SpektrExtensionName = 'spektr'`.
+`WellKnownChain` (genesis hashes for Polkadot relay + asset hub, Kusama relay + asset hub, Westend relay + asset hub, and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 ---
 
 ## Part 4: Tests
 
-### 4.1 Unit Tests (12 files, 148 tests)
+### 4.1 Unit Tests (15 files, 173 tests)
 
 **Test helper** (`helpers/mockProvider.ts`): creates connected mock Provider pairs (async and sync variants).
 
-**Shared** (5 files):
+**Shared** (6 files):
 - `transport.spec.ts` (23 tests) -- handshake, request/response correlation, subscriptions, multiplexing, connection status, destroy, codec swap, not-supported catch-all (request rejection, subscription interrupt, handler deregistration), auto-detect codec (SCALE decode, structured clone decode, outgoing auto-upgrade)
 - `negotiation.spec.ts` (5 tests) -- upgrade succeeds, fails gracefully, picks best intersection, requests work after upgrade, not-supported fast path (near-instant rejection instead of 1s timeout)
+- `messagePortProvider.spec.ts` (17 tests) -- sync/async port delivery, message validation (protocol messages, Uint8Array, rejection of invalid data), postMessage with/without buffer transfer, subscribe/unsubscribe, dispose lifecycle
 - `codec.spec.ts` (6 tests) -- structured clone round-trips, rejects Uint8Array, nested objects
 - `protocol.spec.ts` (18 tests) -- all methods present in hostApiProtocol, correct types, error type construction
 - `util.spec.ts` (24 tests) -- logger, createIdFactory, delay, promiseWithResolvers, composeAction, toHexString
@@ -497,20 +504,22 @@ All domain modules accept an optional `HostApi` parameter, defaulting to the sin
 - `rateLimiter.spec.ts` (10 tests) -- drop/queue strategies
 - `sdk.spec.ts` (7 tests) -- construction, session management
 
-**Product** (2 files):
+**Product** (4 files):
+- `hostApi.spec.ts` (5 tests) -- HostApi transport proxy methods: logger, isCorrectEnvironment, isReady, handleHostSubscription registration and unsubscribe
+- `chat.spec.ts` (3 tests) -- handleCustomMessageRendering: handler registration, render function delivery, unsubscribe deregistration
 - `constants.spec.ts` (13 tests) -- all chains present, hex format
 - `storage.spec.ts` (3 tests) -- API shape verification
 
 ### 4.2 E2E Tests (1 file, 51 tests)
 
-Playwright + headless Chromium. A Vite dev server serves two pages: host (creates Container + handlers with mock implementations) and product (inside iframe with its own Transport). Real `postMessage` across the iframe boundary.
+Playwright + headless Chromium. A Vite dev server serves two pages: host (creates `createProtocolHandler` + `wireAllHandlers` with mock implementations) and product (inside iframe with its own Transport). Real `postMessage` across the iframe boundary.
 
 Every test runs three times via `?codec=` query parameter:
 - **`structured_clone`** -- host registers codec upgrade support, product auto-upgrades after handshake, all requests run over structured clone
 - **`scale`** -- host does not register codec upgrade support, product's upgrade attempt fails (not-supported catch-all), both sides stay on SCALE
 - **`upgrade`** -- same as `structured_clone` but the product explicitly calls `requestCodecUpgrade` after handshake to trigger the negotiation flow
 
-**Happy-path tests** (12 per codec): handshake, feature check, account get, non-product accounts, sign payload, sign raw, localStorage write/read/clear, connection status subscription, navigate, device permission, multiple sequential requests.
+**Happy-path tests** (12 per codec): handshake, feature check (known chain true + unknown chain false), account get, non-product accounts, sign payload, sign raw, localStorage write/read/clear, connection status subscription, navigate, device permission, multiple sequential requests.
 
 **Error-path tests** (5 per codec): sign payload rejected (`Rejected` tag, no value), create transaction not supported (`NotSupported` tag with string value), account get alias unknown (`Unknown` tag with `{reason}` struct), navigate to permission denied (`PermissionDenied` tag, no value), storage write full (`Full` tag, no value). These verify that `Result` error envelopes (`success: false`) with plain `{tag, value}` discriminated unions survive the round-trip through encoding, iframe boundary, and decoding across all three codec modes.
 
@@ -538,11 +547,11 @@ Host: windowProvider receives MessageEvent
   -> validates source === iframe.contentWindow
   -> decodeIncoming(data)  // auto-detects: Uint8Array → SCALE, object → structured clone
   -> transport dispatches: tag matches "host_account_get_request", requestId "p:1"
-  -> container.wireRequest unwraps v1 -> ['myApp', 0]
+  -> protocolHandler.wireRequest unwraps v1 -> ['myApp', 0]
   -> handleAccountGet(['myApp', 0]) runs
     -> derives product public key via HDKD
     -> okAsync({ publicKey: <derived>, name: 'Alice' })
-  -> container wraps -> { tag:'v1', value: { success: true, value: {publicKey, name} } }
+  -> protocolHandler wraps -> { tag:'v1', value: { success: true, value: {publicKey, name} } }
   -> transport.postMessage("p:1", { tag: "host_account_get_response", value: ... })
   -> codecAdapter.encode -> iframe.contentWindow.postMessage
 
