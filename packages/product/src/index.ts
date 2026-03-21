@@ -10,7 +10,7 @@
  */
 
 // -- Host API facade --------------------------------------------------------
-export { hostApi, createHostApi } from './hostApi.js';
+export { hostApi, createHostApi } from '@polkadot/host-api';
 
 // -- Chain / JSON-RPC provider ----------------------------------------------
 export { createPapiProvider } from './chain.js';
@@ -22,7 +22,7 @@ export { createAccountsProvider } from './accounts.js';
 export { createLocalStorage, hostLocalStorage } from './storage.js';
 
 // -- Chat -------------------------------------------------------------------
-export { createProductChatManager, matchChatCustomRenderers } from './chat.js';
+export { createProductChatManager, handleCustomMessageRendering, matchChatCustomRenderers } from './chat.js';
 
 // -- Statement store --------------------------------------------------------
 export { createStatementStore } from './statementStore.js';
@@ -34,7 +34,7 @@ export { createPreimageManager, preimageManager } from './preimage.js';
 export { injectSpektrExtension, createNonProductExtensionEnableFactory } from './extension.js';
 
 // -- Transport --------------------------------------------------------------
-export { sandboxProvider, sandboxTransport } from './transport/sandboxTransport.js';
+export { sandboxProvider, sandboxTransport } from '@polkadot/host-api';
 
 // -- Constants --------------------------------------------------------------
 export { WellKnownChain, SpektrExtensionName } from './constants.js';

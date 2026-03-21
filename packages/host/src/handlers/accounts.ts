@@ -8,10 +8,10 @@
  * - accountConnectionStatusSubscribe: tracks auth state
  */
 
-import type { Container } from '../container/types.js';
+import type { Container } from '@polkadot/host-api';
 import type { HandlersConfig } from './registry.js';
 import { deriveProductPublicKey } from '../auth/crypto.js';
-import { okAsync, errAsync } from '@polkadot/shared';
+import { okAsync, errAsync } from '@polkadot/host-api';
 
 export function wireAccountHandlers(container: Container, config: HandlersConfig): VoidFunction[] {
   const cleanups: VoidFunction[] = [];

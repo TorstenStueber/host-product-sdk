@@ -7,10 +7,9 @@
  * to work inside the host sandbox.
  *
  * Ported from product-sdk/injectWeb3.ts, adapted to use the Transport
- * abstraction from @polkadot/shared.
+ * abstraction from @polkadot/host-api.
  */
 
-import type { Transport } from '@polkadot/shared';
 import { injectExtension } from '@polkadot/extension-inject/bundle';
 import type { InjectedAccount } from '@polkadot/extension-inject/types';
 import { AccountId } from '@polkadot-api/substrate-bindings';
@@ -51,8 +50,8 @@ interface SignerResult {
 }
 
 import { SpektrExtensionName } from './constants.js';
-import { createHostApi } from './hostApi.js';
-import { sandboxTransport } from './transport/sandboxTransport.js';
+import type { HostApi } from '@polkadot/host-api';
+import { hostApi as defaultHostApi } from '@polkadot/host-api';
 import type { HexString, VersionedTxPayload } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -97,12 +96,11 @@ interface Injected {
  * Returns `null` if the transport is not ready (e.g. handshake failed).
  */
 export async function createNonProductExtensionEnableFactory(
-  transport: Transport,
+  hostApi: HostApi = defaultHostApi,
 ): Promise<((_origin: string) => Promise<Injected>) | null> {
-  const ready = await transport.isReady();
+  const ready = await hostApi.isReady();
   if (!ready) return null;
 
-  const hostApi = createHostApi(transport);
   const accountId = AccountId();
 
   async function enable(_origin?: string): Promise<Injected> {
@@ -241,12 +239,10 @@ export async function createNonProductExtensionEnableFactory(
  * @returns `true` if injection succeeded, `false` otherwise.
  */
 export async function injectSpektrExtension(
-  transport: Transport | null = sandboxTransport,
+  hostApi: HostApi = defaultHostApi,
 ): Promise<boolean> {
-  if (!transport) return false;
-
   try {
-    const enable = await createNonProductExtensionEnableFactory(transport);
+    const enable = await createNonProductExtensionEnableFactory(hostApi);
 
     if (enable) {
       // Cast needed because our Signer/Injected are structurally compatible
@@ -260,7 +256,7 @@ export async function injectSpektrExtension(
       return false;
     }
   } catch (e) {
-    transport.provider.logger.error('Error injecting extension', e);
+    hostApi.logger.error('Error injecting extension', e);
     return false;
   }
 }

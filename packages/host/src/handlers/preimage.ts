@@ -5,8 +5,8 @@
  * Hosts that support preimage should override these.
  */
 
-import type { Container } from '../container/types.js';
-import { errAsync } from '@polkadot/shared';
+import type { Container } from '@polkadot/host-api';
+import { errAsync } from '@polkadot/host-api';
 
 export function wirePreimageHandlers(container: Container): VoidFunction[] {
   const cleanups: VoidFunction[] = [];

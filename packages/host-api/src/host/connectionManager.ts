@@ -6,12 +6,12 @@
  * per chain. Ported from triangle-js-sdks host-container/chainConnectionManager.ts.
  */
 
-import type { HexString } from '@polkadot/shared';
+import type { HexString } from '../shared/codec/scale/primitives.js';
 import type {
   ChainHeadEvent,
   OperationStartedResult,
   RuntimeType,
-} from '@polkadot/shared';
+} from '../shared/protocol/types.js';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 
 // ---------------------------------------------------------------------------

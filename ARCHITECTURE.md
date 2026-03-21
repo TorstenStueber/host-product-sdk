@@ -21,15 +21,15 @@ Three npm packages:
 
 | Package | Published | Purpose |
 |---|---|---|
-| `@polkadot/shared` | No (workspace-only) | Protocol types, codecs, transport, utilities |
-| `@polkadot/host` | Yes | Container, handlers, auth, SDK entry point |
-| `@polkadot/product` | Yes | Product-side facade, accounts, chain bridge |
+| `@polkadot/host-api` | No (workspace-only) | Protocol types, codecs, transport, host container, product facade |
+| `@polkadot/host` | Yes | Handlers, auth, storage, SDK entry point |
+| `@polkadot/product` | Yes | Domain modules: accounts, chain, chat, storage, etc. |
 
-Runtime dependencies of shared: `scale-ts`, `nanoevents`, `neverthrow`.
+Runtime dependencies of host-api: `scale-ts`, `nanoevents`, `neverthrow`, `@polkadot-api/json-rpc-provider`.
 
 ---
 
-## Part 1: `@polkadot/shared` (31 files)
+## Part 1: `@polkadot/host-api` -- Shared layer (`src/shared/`)
 
 Everything both sides depend on. Read bottom-up: utilities, then codec, then transport, then protocol types.
 
@@ -265,17 +265,17 @@ This differs from triangle-js-sdks, which uses `CodecError` class instances bake
 
 ---
 
-## Part 2: `@polkadot/host` (30 files)
+## Part 1b: `@polkadot/host-api` -- Host layer (`src/host/`)
 
-What runs on the host page.
+Host-side container, providers, and chain connection manager. These live in the `host-api` package because they are the host's interface to the transport -- the bridge between the protocol layer and the handler implementations in `@polkadot/host`.
 
-### 2.1 Providers (`container/`)
+### 1b.1 Providers
 
 **`webviewProvider.ts`** -- `createHostWebviewProvider({ webview })`: the only host-specific provider. Acquires a MessagePort by creating a `MessageChannel`, injecting one end into an Electron `<webview>` via `executeJavaScript` on `dom-ready`, and passing the other end to `createMessagePortProvider` from shared. The port acquisition logic (listening for `dom-ready`, `did-fail-load`, injecting JS) is inherently host-side; once the port is obtained, all communication is handled by the neutral `createMessagePortProvider`.
 
 For iframes, the host uses `createWindowProvider(() => iframe.contentWindow)` from shared directly -- no host-specific wrapper needed. The `sdk.ts` `embed()` method sets `iframe.src` itself and creates the provider inline.
 
-### 2.2 Container (`container/container.ts`)
+### 1b.2 Container (`host/container.ts`)
 
 `createContainer({ provider, supportedCodecs? })`:
 
@@ -309,7 +309,7 @@ For subscriptions, the same pattern applies: extend `_start`/`_receive` enums an
 
 `handleChainConnection(factory)` is special -- creates a `ChainConnectionManager` and wires all ~15 chain methods with its own inline version dispatch.
 
-### 2.3 Container Types (`container/types.ts`)
+### 1b.3 Container Types (`host/types.ts`)
 
 The `Container` interface derives all handler types from the protocol codecs:
 
@@ -331,9 +331,42 @@ interface Container {
 
 Handlers return `ResultAsync` from neverthrow. No context object -- handlers use `okAsync(value)` and `errAsync(error)` directly. All param/ok/err types flow from `hostApiProtocol`.
 
-**Directionality** -- almost all protocol methods are product-initiated: the product calls `transport.request()` or `transport.subscribe()`, and the host handles them via `transport.handleRequest()` / `transport.handleSubscription()`. The one exception is `product_chat_custom_message_render_subscribe`, where the host initiates a subscription to the product (asking it to render a custom chat message UI). The container exposes this as `renderChatCustomMessage()` (calling `transport.subscribe()`), while the product handles it via `transport.handleSubscription()` in `chat.ts`.
+**Directionality** -- almost all protocol methods are product-initiated: the product calls `transport.request()` or `transport.subscribe()`, and the host handles them via `transport.handleRequest()` / `transport.handleSubscription()`. The one exception is `product_chat_custom_message_render_subscribe`, where the host initiates a subscription to the product (asking it to render a custom chat message UI). The container exposes this as `renderChatCustomMessage()` (calling `transport.subscribe()`), while the product registers a handler via `handleCustomMessageRendering()` in `chat.ts` (which calls `hostApi.handleHostSubscription()` -- a proxy for `transport.handleSubscription()`).
 
-### 2.4 Handlers (`handlers/`)
+---
+
+## Part 1c: `@polkadot/host-api` -- Product layer (`src/product/`)
+
+Product-side transport setup and HostApi facade. These live in the `host-api` package because they are the product's interface to the transport -- the bridge between the protocol layer and the domain modules in `@polkadot/product`.
+
+### 1c.1 Transport (`product/sandboxTransport.ts`)
+
+`createDefaultProductProvider()` detects the environment and dispatches to the appropriate shared provider:
+- `isIframe()` -> `createWindowProvider(window.top)` from shared
+- `isWebview()` -> `createMessagePortProvider(getWebviewPort())` from shared, where `getWebviewPort()` polls `window.__HOST_API_PORT__` for the port injected by the host's webview provider
+- otherwise -> no-op provider with `isCorrectEnvironment() = false`
+
+Creates transport with `idPrefix: 'p:'`. The `sandboxTransport` singleton wraps `isReady()` so that after the handshake succeeds, it automatically attempts a codec upgrade to structured clone (see 1.10 Codec Negotiation). This happens transparently before any real protocol traffic. Exports singletons `sandboxProvider` and `sandboxTransport`.
+
+### 1c.2 Host API (`product/hostApi.ts`)
+
+Product-side facade. The **only** interface that product domain modules use to communicate with the host -- no module imports `Transport` directly. Wraps every transport method (~35 protocol methods plus transport lifecycle) with strong types derived from the protocol codecs. Version tagging is handled internally -- callers pass raw payloads and receive unwrapped results.
+
+The internal `makeRequest(transport, method, version, payload)` wraps the payload in `{tag: version, value: payload}` before sending, and unwraps the response by stripping the version tag and splitting the `{success: true/false, value}` Result envelope. Callers never see the versioned wire format. `makeSubscription` similarly wraps start payloads and unwraps received payloads.
+
+**Transport proxies** -- in addition to protocol methods, `HostApi` exposes transport lifecycle as meaningful accessors so domain modules never need a `Transport` reference:
+- `logger` -- the provider's logger instance
+- `isCorrectEnvironment()` -- whether the transport is in a supported environment
+- `isReady()` -- resolves when handshake and codec negotiation are complete
+- `handleHostSubscription(method, handler)` -- registers a handler for the one host-initiated subscription (custom chat message rendering)
+
+---
+
+## Part 2: `@polkadot/host`
+
+What runs on the host page. Handlers, auth, storage adapters, and the SDK entry point. All code here imports from `@polkadot/host-api` -- it never touches the transport directly.
+
+### 2.1 Handlers (`handlers/`)
 
 **`registry.ts`** -- `wireAllHandlers(container, config)`: orchestrator calling each domain wiring function. `HandlersConfig` has `getSession()`, `subscribeAuthState()`, `chainProvider()`, plus callbacks.
 
@@ -351,23 +384,17 @@ Handlers return `ResultAsync` from neverthrow. No context object -- handlers use
 
 **`chat.ts`**, **`statementStore.ts`**, **`preimage.ts`** -- Stubs returning `errAsync(...)` with plain error objects (e.g. `{tag: 'PermissionDenied', value: undefined}`).
 
-### 2.5 Chain Subsystem
-
-**`chain/connectionManager.ts`** -- Manages real JSON-RPC connections:
-- **Connection pooling**: ref-counted per genesis hash
-- **Request correlation**: auto-incrementing JSON-RPC ID -> Promise
-- **Follow multiplexing**: `startFollow()` starts `chainHead_v1_follow`, converts JSON-RPC events to typed `ChainHeadEvent`
-- Type converters for JSON-RPC <-> protocol format
+### 2.2 Chain
 
 **`chain/rateLimiter.ts`** -- Token-bucket rate limiter. Two strategies: `drop` (reject immediately) and `queue` (buffer up to max, process as tokens refill).
 
-### 2.6 Storage Adapters (`storage/`)
+### 2.3 Storage Adapters (`storage/`)
 
 `StorageAdapter` interface: async `read(key)`, `write(key, value)`, `clear(key)` for Uint8Array values.
 - `createMemoryStorageAdapter()` -- Map-backed, for testing
 - `createLocalStorageAdapter(prefix)` -- browser localStorage, base64, prefix-scoped
 
-### 2.7 Auth (`auth/`)
+### 2.4 Auth (`auth/`)
 
 **`authManager.ts`** -- State machine: `idle -> pairing -> attesting -> authenticated -> (disconnect) -> idle`. Any state can go to `error`. Pub-sub via `subscribe(callback)`. `getSession()` returns session if authenticated.
 
@@ -375,11 +402,11 @@ Handlers return `ResultAsync` from neverthrow. No context object -- handlers use
 
 **`pappAdapter.ts`** -- Stub interface for QR-code pairing (to be ported from old host-papp).
 
-### 2.8 Nested Bridge (`nested/`)
+### 2.5 Nested Bridge (`nested/`)
 
 **`detector.ts`** -- `setupNestedBridgeDetector()`: listens for postMessage from windows OTHER than the primary iframe. Auto-creates `createWindowProvider` + Container + handlers bridge for each nested dApp.
 
-### 2.9 SDK Entry Point (`sdk.ts`)
+### 2.6 SDK Entry Point (`sdk.ts`)
 
 ```typescript
 const sdk = createHostSdk({
@@ -399,63 +426,25 @@ Creates AuthManager, then `embed()` sets `iframe.src`, creates `createWindowProv
 
 ---
 
-## Part 3: `@polkadot/product` (12 files)
+## Part 3: `@polkadot/product`
 
-What runs inside the iframe.
+Domain modules that run inside the iframe. Every module accepts an optional `HostApi` parameter (from `@polkadot/host-api`) and defaults to the singleton. No module imports `Transport` directly.
 
-### 3.1 Transport (`transport/sandboxTransport.ts`)
+### 3.1 Accounts (`accounts.ts`)
 
-`createDefaultProductProvider()` detects the environment and dispatches to the appropriate shared provider:
-- `isIframe()` -> `createWindowProvider(window.top)` from shared
-- `isWebview()` -> `createMessagePortProvider(getWebviewPort())` from shared, where `getWebviewPort()` polls `window.__HOST_API_PORT__` for the port injected by the host's webview provider
-- otherwise -> no-op provider with `isCorrectEnvironment() = false`
-
-Creates transport with `idPrefix: 'p:'`. The `sandboxTransport` singleton wraps `isReady()` so that after the handshake succeeds, it automatically attempts a codec upgrade to structured clone (see 1.10 Codec Negotiation). This happens transparently before any real protocol traffic. Exports singletons `sandboxProvider` and `sandboxTransport`.
-
-### 3.2 Host API (`hostApi.ts`)
-
-Product-side facade. Wraps every transport method (~35 methods) with strong types derived from the protocol codecs. Version tagging is handled internally -- callers pass raw payloads and receive unwrapped results:
-
-```typescript
-const hostApi = createHostApi(sandboxTransport);
-
-// Request methods take raw payloads, return ResultAsync<Ok, Err> directly
-hostApi.signPayload(signingPayload).match(
-  (result) => result.signature,    // SigningResult — no version wrapper
-  (err) => {
-    // err is the error discriminated union directly:
-    //   { tag: 'Rejected'; value: undefined }
-    // | { tag: 'PermissionDenied'; value: undefined }
-    // | { tag: 'Unknown'; value: { reason: string } }
-    switch (err.tag) {
-      case 'Unknown': console.log(err.value.reason); // narrowed
-    }
-  },
-);
-
-// Subscription methods receive unwrapped payloads
-hostApi.accountConnectionStatusSubscribe(undefined, (status) => {
-  // status is AccountConnectionStatus directly — no version wrapper
-});
-```
-
-The internal `makeRequest(transport, method, version, payload)` wraps the payload in `{tag: version, value: payload}` before sending, and unwraps the response by stripping the version tag and splitting the `{success: true/false, value}` Result envelope. Callers never see the versioned wire format. `makeSubscription` similarly wraps start payloads and unwraps received payloads.
-
-### 3.3 Accounts (`accounts.ts`)
-
-`createAccountsProvider()`:
+`createAccountsProvider(hostApi?)`:
 - `getProductAccount(dotNsId, derivationIndex?)` -> `hostApi.accountGet`
 - `getNonProductAccounts()`
-- `getProductAccountSigner(account)` -> returns signer routing through the transport
+- `getProductAccountSigner(account)` -> returns signer routing through `hostApi`
 - `subscribeAccountConnectionStatus(callback)`
 
-### 3.4 Chain (`chain.ts`)
+### 3.2 Chain (`chain.ts`)
 
-The most complex file (~695 lines). `createPapiProvider(genesisHash)` returns a standard `JsonRpcProvider` compatible with Polkadot API (PAPI).
+The most complex file (~695 lines). `createPapiProvider(genesisHash, fallback?, hostApi?)` returns a standard `JsonRpcProvider` compatible with Polkadot API (PAPI). Uses `hostApi.isReady()`, `hostApi.isCorrectEnvironment()`, and `hostApi.logger` for lifecycle and diagnostics.
 
 When PAPI calls `send('{"method":"chainHead_v1_follow",...}')`: parses JSON-RPC, maps to `hostApi` method, converts parameters, converts response back to JSON-RPC. Handles all `chainHead_v1_*`, `chainSpec_v1_*`, `transaction_v1_*` methods.
 
-### 3.5 Storage (`storage.ts`)
+### 3.3 Storage (`storage.ts`)
 
 ```typescript
 const storage = createLocalStorage();
@@ -464,21 +453,25 @@ await storage.writeJSON('settings', { theme: 'dark' });
 const val = await storage.readString('key');
 ```
 
-Wraps `hostApi.localStorageWrite/Read/Clear` with convenience methods.
+`createLocalStorage(hostApi?)` wraps `hostApi.localStorageWrite/Read/Clear` with convenience methods.
 
-### 3.6 Chat, Statement Store, Preimage
+### 3.4 Chat, Statement Store, Preimage
 
-**`chat.ts`** -- `createProductChatManager()`: register rooms/bots, send messages, subscribe to actions. Also handles incoming custom message rendering requests from the host via `transport.handleSubscription('product_chat_custom_message_render_subscribe', ...)` -- the one protocol method where the product is the handler rather than the initiator.
+**`chat.ts`** -- two separate concerns:
+- `createProductChatManager(hostApi?)`: pure client -- register rooms/bots, send messages, subscribe to actions.
+- `handleCustomMessageRendering(callback, hostApi?)`: standalone function that registers the product-side handler for custom chat message rendering -- the one protocol method where the product is the handler rather than the initiator. Uses `hostApi.handleHostSubscription()` so it does not need a `Transport` reference. Separated from the chat manager because handler registration is a setup-time concern, not a domain operation.
 
-**`statementStore.ts`** -- `createStatementStore()`: subscribe to topics, create proofs, submit statements.
+**`statementStore.ts`** -- `createStatementStore(hostApi?)`: subscribe to topics, create proofs, submit statements.
 
-**`preimage.ts`** -- `createPreimageManager()`: lookup subscriptions, submit preimages.
+**`preimage.ts`** -- `createPreimageManager(hostApi?)`: lookup subscriptions, submit preimages.
 
-### 3.7 Extension (`extension.ts`)
+All domain modules accept an optional `HostApi` parameter, defaulting to the singleton. None import `Transport` directly.
 
-`injectSpektrExtension()` makes the transport bridge look like a polkadot-js browser extension. Any dApp using `@polkadot/extension-dapp` discovers it as `"spektr"`. Signing routes through the transport.
+### 3.5 Extension (`extension.ts`)
 
-### 3.8 Constants (`constants.ts`)
+`injectSpektrExtension(hostApi?)` makes the host API bridge look like a polkadot-js browser extension. Any dApp using `@polkadot/extension-dapp` discovers it as `"spektr"`. Uses `hostApi.isReady()` to gate injection and `hostApi.logger` for error reporting. Signing routes through `hostApi`.
+
+### 3.6 Constants (`constants.ts`)
 
 `WellKnownChain` (genesis hashes for Polkadot, Kusama, Westend, Rococo + asset hubs), `SpektrExtensionName = 'spektr'`.
 

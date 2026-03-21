@@ -8,8 +8,10 @@
  * Ported from triangle-js-sdks host-container/createWebviewProvider.ts.
  */
 
-import type { Provider, Logger } from '@polkadot/shared';
-import { createMessagePortProvider, createIdFactory } from '@polkadot/shared';
+import type { Provider } from '../shared/transport/provider.js';
+import type { Logger } from '../shared/util/logger.js';
+import { createMessagePortProvider } from '../shared/transport/messagePortProvider.js';
+import { createIdFactory } from '../shared/util/idFactory.js';
 
 const nextPortId = createIdFactory('port:');
 

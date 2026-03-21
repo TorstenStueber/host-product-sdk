@@ -11,7 +11,7 @@
 
 ## Typechecking
 
-- **Rebuild `shared` before typechecking.** The `host` and `product` packages compile against the built `.d.ts` files in `packages/shared/dist/`. Run `npm run build -w @polkadot/shared` (or `npx nx run @polkadot/shared:build`) before running `npx nx run-many -t typecheck`, otherwise downstream packages may typecheck against stale declarations.
+- **Rebuild `host-api` before typechecking.** The `host` and `product` packages compile against the built `.d.ts` files in `packages/host-api/dist/`. Run `npm run build -w @polkadot/host-api` (or `npx nx run @polkadot/host-api:build`) before running `npx nx run-many -t typecheck`, otherwise downstream packages may typecheck against stale declarations.
 
 ## Testing
 

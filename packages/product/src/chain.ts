@@ -7,29 +7,20 @@
  *
  * Ported from product-sdk/papiProvider.ts -- the full ~460-line
  * JSON-RPC bridge implementation, adapted to use the Transport
- * abstraction from @polkadot/shared.
+ * abstraction from @polkadot/host-api.
  */
 
 import type {
-  Transport,
   SubscriptionPayload,
   RuntimeType,
   OperationStartedResult,
-} from '@polkadot/shared';
+} from '@polkadot/host-api';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 import { getSyncProvider } from '@polkadot-api/json-rpc-provider-proxy';
 
-import { createHostApi } from './hostApi.js';
-import { sandboxTransport } from './transport/sandboxTransport.js';
+import type { HostApi } from '@polkadot/host-api';
+import { hostApi as defaultHostApi } from '@polkadot/host-api';
 import type { HexString } from './types.js';
-
-// ---------------------------------------------------------------------------
-// Factory
-// ---------------------------------------------------------------------------
-
-type InternalParams = {
-  transport?: Transport;
-};
 
 /**
  * Create a `JsonRpcProvider` for a given chain, identified by its genesis hash.
@@ -45,15 +36,11 @@ type InternalParams = {
 export function createPapiProvider(
   genesisHash: HexString,
   __fallback?: JsonRpcProvider,
-  internal?: InternalParams,
+  hostApi: HostApi = defaultHostApi,
 ): JsonRpcProvider {
-  const transport = internal?.transport ?? sandboxTransport;
-
-  if (!transport.isCorrectEnvironment()) {
+  if (!hostApi.isCorrectEnvironment()) {
     throw new Error('PapiProvider can only be used in a product environment');
   }
-
-  const hostApi = createHostApi(transport);
 
   // -------------------------------------------------------------------------
   // Follow state tracking
@@ -552,7 +539,7 @@ export function createPapiProvider(
   // -------------------------------------------------------------------------
 
   function checkIfReady(): Promise<boolean> {
-    return transport.isReady().then(ready => {
+    return hostApi.isReady().then(ready => {
       if (!ready) return false;
 
       return hostApi
@@ -577,7 +564,7 @@ export function createPapiProvider(
       return () => {
         return {
           send() {
-            transport.provider.logger.error(
+            hostApi.logger.error(
               `Provider for chain ${genesisHash} was not started because Host doesn't support it`,
             );
           },

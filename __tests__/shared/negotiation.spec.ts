@@ -12,7 +12,7 @@ import {
   scaleCodecAdapter,
   requestCodecUpgrade,
   handleCodecUpgrade,
-} from '@polkadot/shared';
+} from '@polkadot/host-api';
 import { createMockProviderPair } from '../helpers/mockProvider.js';
 
 function setupTransports() {

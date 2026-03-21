@@ -5,9 +5,9 @@
  * Returns PermissionDenied when no session is available.
  */
 
-import type { Container } from '../container/types.js';
+import type { Container } from '@polkadot/host-api';
 import type { HandlersConfig } from './registry.js';
-import { errAsync, ResultAsync } from '@polkadot/shared';
+import { errAsync, ResultAsync } from '@polkadot/host-api';
 
 export function wireSigningHandlers(container: Container, config: HandlersConfig): VoidFunction[] {
   const cleanups: VoidFunction[] = [];

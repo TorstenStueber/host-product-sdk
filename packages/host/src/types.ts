@@ -2,7 +2,7 @@
  * Public types for @polkadot/host.
  */
 
-import type { HexString, ResponseOk, RequestParams } from '@polkadot/shared';
+import type { HexString, ResponseOk, RequestParams } from '@polkadot/host-api';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 import type {
   SigningPayloadRequest,
@@ -12,9 +12,9 @@ import type {
   DevicePermissionRequest,
   RemotePermissionRequest,
   PushNotification,
-} from '@polkadot/shared';
+} from '@polkadot/host-api';
 
-import type { Container } from './container/types.js';
+import type { Container } from '@polkadot/host-api';
 import type { AuthManager, UserSession, Identity } from './auth/authManager.js';
 
 // ---------------------------------------------------------------------------
@@ -117,6 +117,6 @@ export type HostSdk = {
 // ---------------------------------------------------------------------------
 
 export type { AuthState, UserSession, Identity } from './auth/authManager.js';
-export type { Container } from './container/types.js';
+export type { Container } from '@polkadot/host-api';
 export type { HandlersConfig, UserSessionInfo } from './handlers/registry.js';
 export type { StorageAdapter } from './storage/types.js';

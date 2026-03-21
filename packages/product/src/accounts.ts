@@ -6,12 +6,11 @@
  * subscribing to account connection status changes.
  *
  * Ported from product-sdk/accounts.ts, adapted to use plain TS types
- * and the Transport abstraction from @polkadot/shared.
+ * and the HostApi facade from @polkadot/host-api.
  */
 
-import type { Transport } from '@polkadot/shared';
-import { createHostApi } from './hostApi.js';
-import { sandboxTransport } from './transport/sandboxTransport.js';
+import type { HostApi } from '@polkadot/host-api';
+import { hostApi as defaultHostApi } from '@polkadot/host-api';
 import type {
   AccountConnectionStatus,
   HexString,
@@ -37,13 +36,11 @@ function fromHex(hex: string): Uint8Array {
 // ---------------------------------------------------------------------------
 
 /**
- * Create an accounts provider bound to a transport.
+ * Create an accounts provider.
  *
- * @param transport - The transport to use. Defaults to the sandbox transport.
+ * @param hostApi - The HostApi instance to use. Defaults to the singleton.
  */
-export const createAccountsProvider = (transport: Transport = sandboxTransport) => {
-  const hostApi = createHostApi(transport);
-
+export const createAccountsProvider = (hostApi: HostApi = defaultHostApi) => {
   return {
     /**
      * Get the product account for a given dotNs identifier and derivation index.
@@ -124,7 +121,7 @@ export const createAccountsProvider = (transport: Transport = sandboxTransport) 
 // ---------------------------------------------------------------------------
 
 function createSignerForAccount(
-  hostApi: ReturnType<typeof createHostApi>,
+  hostApi: HostApi,
   account: ProductAccount,
 ) {
   return {

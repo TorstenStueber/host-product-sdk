@@ -15,7 +15,9 @@ import type {
   ConnectionStatus,
   Transport,
   Subscription,
-  HexString,
+} from '../shared/transport/transport.js';
+import type { HexString } from '../shared/codec/scale/primitives.js';
+import type {
   RequestParams,
   ResponseOk,
   ResponseErr,
@@ -23,7 +25,7 @@ import type {
   SubscriptionPayload,
   RequestMethod,
   SubscriptionMethod,
-} from '@polkadot/shared';
+} from '../shared/codec/scale/protocol.js';
 import type { ResultAsync } from 'neverthrow';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 

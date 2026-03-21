@@ -5,25 +5,25 @@
  * Each handler method translates between the versioned wire format
  * (v1 tagged enums with Ok/Err results) and plain TypeScript types.
  *
- * Ported from triangle-js-sdks host-container/createContainer.ts,
+ * Ported from triangle-js-sdks host-container/createProtocolHandler.ts,
  * simplified to use plain Result objects instead of neverthrow.
  */
 
+import type { CodecAdapterMap } from '../shared/codec/negotiation.js';
+import type { Provider } from '../shared/transport/provider.js';
+import type { HexString } from '../shared/codec/scale/primitives.js';
 import type {
-  CodecAdapterMap, Provider, HexString,
   RequestMethod, SubscriptionMethod,
   RequestVersions, StartVersions,
   RequestCodecType, ResponseCodecType, StartCodecType, ReceiveCodecType,
   RequestParams, ResponseOk, ResponseErr,
   SubscriptionParams, SubscriptionPayload,
-} from '@polkadot/shared';
-import {
-  createTransport,
-  handleCodecUpgrade,
-} from '@polkadot/shared';
+} from '../shared/codec/scale/protocol.js';
+import { createTransport } from '../shared/transport/transport.js';
+import { handleCodecUpgrade } from '../shared/codec/negotiation.js';
 import type { ResultAsync } from 'neverthrow';
 
-import { createChainConnectionManager } from '../chain/connectionManager.js';
+import { createChainConnectionManager } from './connectionManager.js';
 import type { Container } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ function genericError(reason: string) {
 // Container options
 // ---------------------------------------------------------------------------
 
-export type CreateContainerOptions = {
+export type CreateProtocolHandlerOptions = {
   provider: Provider;
 
   /**
@@ -85,7 +85,7 @@ export type CreateContainerOptions = {
 // Factory
 // ---------------------------------------------------------------------------
 
-export function createContainer(options: CreateContainerOptions): Container {
+export function createProtocolHandler(options: CreateProtocolHandlerOptions): Container {
   const { provider, supportedCodecs } = options;
 
   const transport = createTransport({

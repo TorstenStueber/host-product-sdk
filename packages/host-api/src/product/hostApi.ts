@@ -11,19 +11,18 @@
  * `SubscriptionParams`, and `SubscriptionPayload`.
  */
 
+import type { Subscription, Transport } from '../shared/transport/transport.js';
+import type { Logger } from '../shared/util/logger.js';
 import type {
-  Subscription, Transport,
   RequestMethod, SubscriptionMethod,
-  RequestCodecType, StartCodecType,
+  RequestCodecType, StartCodecType, ReceiveCodecType,
   RequestParams, ResponseOk, ResponseErr,
   SubscriptionParams, SubscriptionPayload,
-} from '@polkadot/shared';
-import {
-  ResultAsync,
-  extractErrorMessage,
-} from '@polkadot/shared';
+} from '../shared/codec/scale/protocol.js';
+import { ResultAsync } from 'neverthrow';
+import { extractErrorMessage } from '../shared/util/helpers.js';
 
-import { sandboxTransport } from './transport/sandboxTransport.js';
+import { sandboxTransport } from './sandboxTransport.js';
 
 // ---------------------------------------------------------------------------
 // Versioned envelope helper
@@ -99,12 +98,47 @@ function makeSubscription<M extends SubscriptionMethod, V extends string>(
  * Create a product-side HostApi facade bound to a given transport.
  *
  * Every method corresponds to a protocol method defined in
- * `@polkadot/shared/codec/scale/protocol`. Request methods return
+ * `@polkadot/host-api` (shared/codec/scale/protocol). Request methods return
  * `ResultAsync` with versioned success/error envelopes. Subscription
  * methods return a `Subscription` handle.
  */
 export function createHostApi(transport: Transport) {
   return {
+    // -- Transport proxies --------------------------------------------------
+
+    /** The logger instance from the underlying transport provider. */
+    get logger(): Logger {
+      return transport.provider.logger;
+    },
+
+    /** Whether the transport is in a supported environment (iframe or webview). */
+    isCorrectEnvironment(): boolean {
+      return transport.isCorrectEnvironment();
+    },
+
+    /** Resolves when the handshake and codec negotiation are complete. */
+    isReady(): Promise<boolean> {
+      return transport.isReady();
+    },
+
+    /**
+     * Register a handler for a host-initiated subscription.
+     *
+     * This is the product-side counterpart to `transport.handleSubscription`.
+     * Used for the one protocol method where the product is the handler
+     * rather than the initiator (`product_chat_custom_message_render_subscribe`).
+     */
+    handleHostSubscription<M extends SubscriptionMethod>(
+      method: M,
+      handler: (
+        params: StartCodecType<M>,
+        send: (value: ReceiveCodecType<M>) => void,
+        interrupt: () => void,
+      ) => VoidFunction,
+    ): VoidFunction {
+      return transport.handleSubscription(method, handler);
+    },
+
     // -- Core / lifecycle ---------------------------------------------------
 
     handshake(payload: RequestParams<'host_handshake', 'v1'>) {
@@ -219,10 +253,6 @@ export function createHostApi(transport: Transport) {
     ): Subscription {
       return makeSubscription(transport, 'host_chat_action_subscribe', 'v1', args, callback);
     },
-
-    // Note: product_chat_custom_message_render_subscribe is host-initiated.
-    // The product handles it via transport.handleSubscription() in chat.ts,
-    // not via the hostApi facade.
 
     // -- Statement store ----------------------------------------------------
 

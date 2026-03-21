@@ -5,7 +5,7 @@
  * which wraps all chain_* methods via the ChainConnectionManager.
  */
 
-import type { Container } from '../container/types.js';
+import type { Container } from '@polkadot/host-api';
 import type { HandlersConfig } from './registry.js';
 
 export function wireChainHandlers(container: Container, config: HandlersConfig): VoidFunction[] {

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { hostApiProtocol } from '@polkadot/shared';
+import { hostApiProtocol } from '@polkadot/host-api';
 import type {
   GenericError,
   HandshakeError,
@@ -18,7 +18,7 @@ import type {
   ChatMessagePostingError,
   StatementProofError,
   PreimageSubmitError,
-} from '@polkadot/shared';
+} from '@polkadot/host-api';
 
 describe('hostApiProtocol', () => {
   it('is a non-empty object', () => {

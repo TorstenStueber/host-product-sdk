@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { structuredCloneCodecAdapter, createScaleCodecAdapter } from '@polkadot/shared';
-import type { ProtocolMessage } from '@polkadot/shared';
+import { structuredCloneCodecAdapter, createScaleCodecAdapter } from '@polkadot/host-api';
+import type { ProtocolMessage } from '@polkadot/host-api';
 
 describe('structuredCloneCodecAdapter', () => {
   const codec = structuredCloneCodecAdapter;

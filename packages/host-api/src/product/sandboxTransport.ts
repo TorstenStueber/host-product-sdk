@@ -12,16 +12,15 @@
  * otherwise the connection stays on SCALE.
  */
 
-import type { Provider, Transport } from '@polkadot/shared';
-import {
-  scaleCodecAdapter,
-  structuredCloneCodecAdapter,
-  requestCodecUpgrade,
-  createDefaultLogger,
-  createTransport,
-  createWindowProvider,
-  createMessagePortProvider,
-} from '@polkadot/shared';
+import type { Provider } from '../shared/transport/provider.js';
+import type { Transport } from '../shared/transport/transport.js';
+import { scaleCodecAdapter } from '../shared/codec/scale/protocol.js';
+import { structuredCloneCodecAdapter } from '../shared/codec/structured/index.js';
+import { requestCodecUpgrade } from '../shared/codec/negotiation.js';
+import { createDefaultLogger } from '../shared/util/logger.js';
+import { createTransport } from '../shared/transport/transport.js';
+import { createWindowProvider } from '../shared/transport/windowProvider.js';
+import { createMessagePortProvider } from '../shared/transport/messagePortProvider.js';
 // ---------------------------------------------------------------------------
 // Global augmentation for webview
 // ---------------------------------------------------------------------------

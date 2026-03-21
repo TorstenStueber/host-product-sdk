@@ -5,9 +5,9 @@
  * - pushNotification
  */
 
-import type { Container } from '../container/types.js';
+import type { Container } from '@polkadot/host-api';
 import type { HandlersConfig } from './registry.js';
-import { okAsync } from '@polkadot/shared';
+import { okAsync } from '@polkadot/host-api';
 
 export function wireHostHandlers(container: Container, config: HandlersConfig): VoidFunction[] {
   const cleanups: VoidFunction[] = [];

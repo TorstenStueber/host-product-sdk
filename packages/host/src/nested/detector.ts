@@ -11,9 +11,9 @@
  * Ported from dotli-clone/container.ts (setupNestedBridgeDetector).
  */
 
-import { createContainer } from '../container/container.js';
+import { createProtocolHandler } from '@polkadot/host-api';
 import { wireAllHandlers, type HandlersConfig } from '../handlers/registry.js';
-import { createWindowProvider } from '@polkadot/shared';
+import { createWindowProvider } from '@polkadot/host-api';
 
 function isUint8ArrayLike(data: unknown): data is Uint8Array {
   if (data instanceof Uint8Array) return true;
@@ -59,13 +59,13 @@ export function setupNestedBridgeDetector(options: NestedBridgeDetectorOptions):
     console.warn(`[${label}] Nested dApp #${nestedId} detected, creating bridge`);
 
     const provider = createWindowProvider(event.source as Window);
-    const container = createContainer({ provider });
+    const handler = createProtocolHandler({ provider });
     const config = createConfig(nestedId);
-    const cleanup = wireAllHandlers(container, config);
+    const cleanup = wireAllHandlers(handler, config);
 
     disposers.push(() => {
       cleanup();
-      container.dispose();
+      handler.dispose();
     });
   }
 

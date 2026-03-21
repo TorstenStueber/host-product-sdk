@@ -32,15 +32,15 @@ export type {
 // Container
 // ---------------------------------------------------------------------------
 
-export { createContainer } from './container/container.js';
-export type { CreateContainerOptions } from './container/container.js';
+export { createProtocolHandler } from '@polkadot/host-api';
+export type { CreateProtocolHandlerOptions } from '@polkadot/host-api';
 
 // ---------------------------------------------------------------------------
 // Providers
 // ---------------------------------------------------------------------------
 
-export { createHostWebviewProvider } from './container/webviewProvider.js';
-export type { CreateHostWebviewProviderParams, WebviewTag } from './container/webviewProvider.js';
+export { createHostWebviewProvider } from '@polkadot/host-api';
+export type { CreateHostWebviewProviderParams, WebviewTag } from '@polkadot/host-api';
 
 // ---------------------------------------------------------------------------
 // Handlers
@@ -59,8 +59,8 @@ export { createLocalStorageAdapter } from './storage/localStorage.js';
 // Chain
 // ---------------------------------------------------------------------------
 
-export { createChainConnectionManager } from './chain/connectionManager.js';
-export type { ChainConnectionManager } from './chain/connectionManager.js';
+export { createChainConnectionManager } from '@polkadot/host-api';
+export type { ChainConnectionManager } from '@polkadot/host-api';
 
 export { createRateLimiter, RATE_LIMITED_MESSAGE } from './chain/rateLimiter.js';
 export type {
@@ -94,4 +94,4 @@ export type {
 export { setupNestedBridgeDetector } from './nested/detector.js';
 export type { NestedBridgeDetectorOptions } from './nested/detector.js';
 
-export { createWindowProvider } from '@polkadot/shared';
+export { createWindowProvider } from '@polkadot/host-api';

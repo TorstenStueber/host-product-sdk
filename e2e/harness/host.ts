@@ -9,14 +9,14 @@
  * - `scale`: use SCALE codec throughout
  * - `upgrade`: start with SCALE, allow upgrade to structured clone
  */
-import { createContainer } from '@polkadot/host';
+import { createProtocolHandler } from '@polkadot/host';
 import type { Container } from '@polkadot/host';
 import {
   structuredCloneCodecAdapter, scaleCodecAdapter,
   createWindowProvider,
   okAsync, errAsync,
-} from '@polkadot/shared';
-import type { CodecAdapterMap } from '@polkadot/shared';
+} from '@polkadot/host-api';
+import type { CodecAdapterMap } from '@polkadot/host-api';
 
 declare global {
   interface Window {
@@ -53,7 +53,7 @@ window.__e2e = e2e;
 const iframe = document.getElementById('product-frame') as HTMLIFrameElement;
 iframe.src = `/product.html?codec=${codecParam}`;
 const provider = createWindowProvider(() => iframe.contentWindow);
-const container = createContainer({ provider, supportedCodecs });
+const container = createProtocolHandler({ provider, supportedCodecs });
 e2e.container = container;
 
 // --- Feature supported ---

@@ -6,7 +6,7 @@
  * all handler modules.
  */
 
-import type { HexString, RequestParams } from '@polkadot/shared';
+import type { HexString, RequestParams } from '@polkadot/host-api';
 import type {
   Feature,
   DevicePermissionRequest,
@@ -16,10 +16,10 @@ import type {
   SigningRawRequest,
   SigningResult,
   ResponseOk,
-} from '@polkadot/shared';
+} from '@polkadot/host-api';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 
-import type { Container } from '../container/types.js';
+import type { Container } from '@polkadot/host-api';
 import { wireHostHandlers } from './host.js';
 import { wirePermissionHandlers } from './permissions.js';
 import { wireStorageHandlers } from './storage.js';

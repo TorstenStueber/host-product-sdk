@@ -5,8 +5,8 @@
  * the other's subscribers receive it -- like two sides of postMessage.
  */
 
-import type { Provider, Logger } from '@polkadot/shared';
-import { createDefaultLogger } from '@polkadot/shared';
+import type { Provider, Logger } from '@polkadot/host-api';
+import { createDefaultLogger } from '@polkadot/host-api';
 
 export type MockProvider = Provider & {
   /** Manually inject a message as if it was received from the other side. */

@@ -4,9 +4,9 @@
  * Both devicePermission and permission return false by default.
  */
 
-import type { Container } from '../container/types.js';
+import type { Container } from '@polkadot/host-api';
 import type { HandlersConfig } from './registry.js';
-import { okAsync, ResultAsync } from '@polkadot/shared';
+import { okAsync, ResultAsync } from '@polkadot/host-api';
 
 export function wirePermissionHandlers(container: Container, config: HandlersConfig): VoidFunction[] {
   const cleanups: VoidFunction[] = [];

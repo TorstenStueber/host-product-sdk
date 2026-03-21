@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@polkadot/shared": "0.1.0",
+    "@polkadot/host-api": "0.1.0",
     "@polkadot-api/json-rpc-provider": "^0.0.4",
     "nanoevents": "9.1.0",
     "neverthrow": "^8.2.0"

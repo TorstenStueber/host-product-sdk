@@ -4,9 +4,9 @@ This project is experimental. It serves as a playground for exploring the archit
 
 The three packages in this repo map to the three layers of the Host-Product architecture:
 
-- `packages/shared`: Host API definition (versioned, SCALE-encoded)
-- `packages/host`: Host SDK
-- `packages/product`: Product SDK
+- `packages/host-api`: Host API protocol, codecs, transport, container, and product facade
+- `packages/host`: Host SDK (handlers, auth, storage, SDK entry point)
+- `packages/product`: Product SDK (domain modules: accounts, chain, chat, storage, etc.)
 
 For a detailed walkthrough of the code in this repo, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 

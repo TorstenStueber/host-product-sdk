@@ -5,13 +5,11 @@
  * proofs, and submitting signed statements through the host.
  *
  * Ported from product-sdk/statementStore.ts, adapted to use the
- * Transport abstraction from @polkadot/shared.
+ * HostApi facade.
  */
 
-import type { Transport } from '@polkadot/shared';
-
-import { createHostApi } from './hostApi.js';
-import { sandboxTransport } from './transport/sandboxTransport.js';
+import type { HostApi } from '@polkadot/host-api';
+import { hostApi as defaultHostApi } from '@polkadot/host-api';
 import type {
   ProductAccountId,
   SignedStatement,
@@ -24,13 +22,11 @@ import type {
 // ---------------------------------------------------------------------------
 
 /**
- * Create a statement store provider bound to a transport.
+ * Create a statement store provider.
  *
- * @param transport - The transport to use. Defaults to the sandbox transport.
+ * @param hostApi - The HostApi instance to use. Defaults to the singleton.
  */
-export const createStatementStore = (transport: Transport = sandboxTransport) => {
-  const hostApi = createHostApi(transport);
-
+export const createStatementStore = (hostApi: HostApi = defaultHostApi) => {
   return {
     /**
      * Subscribe to statements matching the given topics.

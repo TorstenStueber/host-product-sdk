@@ -9,14 +9,14 @@
  * - `scale`: use SCALE codec throughout
  * - `upgrade`: start with SCALE, upgrade to structured clone after handshake
  */
-import type { Provider, Transport, Subscription } from '@polkadot/shared';
+import type { Provider, Transport, Subscription } from '@polkadot/host-api';
 import {
   createTransport,
   structuredCloneCodecAdapter,
   scaleCodecAdapter,
   requestCodecUpgrade,
   createDefaultLogger,
-} from '@polkadot/shared';
+} from '@polkadot/host-api';
 
 declare global {
   interface Window {

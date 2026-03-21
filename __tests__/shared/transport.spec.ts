@@ -11,8 +11,8 @@ import {
   structuredCloneCodecAdapter,
   scaleCodecAdapter,
   MethodNotSupportedError,
-} from '@polkadot/shared';
-import type { Transport, CodecAdapter, ProtocolMessage } from '@polkadot/shared';
+} from '@polkadot/host-api';
+import type { Transport, CodecAdapter, ProtocolMessage } from '@polkadot/host-api';
 import { createMockProviderPair, createSyncMockProviderPair } from '../helpers/mockProvider.js';
 import type { MockProvider } from '../helpers/mockProvider.js';
 

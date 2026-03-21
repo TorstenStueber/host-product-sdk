@@ -4,13 +4,11 @@
  * Provides lookup subscriptions and submission of preimages through the
  * host transport layer.
  *
- * Ported from product-sdk/preimage.ts, adapted to use the Transport
- * abstraction from @polkadot/shared.
+ * Ported from product-sdk/preimage.ts, adapted to use the HostApi facade.
  */
 
-import type { Transport } from '@polkadot/shared';
-import { createHostApi } from './hostApi.js';
-import { sandboxTransport } from './transport/sandboxTransport.js';
+import type { HostApi } from '@polkadot/host-api';
+import { hostApi as defaultHostApi } from '@polkadot/host-api';
 import type { HexString } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -18,13 +16,11 @@ import type { HexString } from './types.js';
 // ---------------------------------------------------------------------------
 
 /**
- * Create a preimage manager bound to a transport.
+ * Create a preimage manager.
  *
- * @param transport - The transport to use. Defaults to the sandbox transport.
+ * @param hostApi - The HostApi instance to use. Defaults to the singleton.
  */
-export const createPreimageManager = (transport: Transport = sandboxTransport) => {
-  const hostApi = createHostApi(transport);
-
+export const createPreimageManager = (hostApi: HostApi = defaultHostApi) => {
   return {
     /**
      * Subscribe to a preimage lookup by key.

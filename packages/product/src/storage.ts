@@ -6,24 +6,22 @@
  * string, and JSON serialisation.
  *
  * Ported from product-sdk/localStorage.ts, adapted to use the
- * Transport abstraction from @polkadot/shared.
+ * HostApi facade.
  */
 
-import type { Transport } from '@polkadot/shared';
-import { createHostApi } from './hostApi.js';
-import { sandboxTransport } from './transport/sandboxTransport.js';
+import type { HostApi } from '@polkadot/host-api';
+import { hostApi as defaultHostApi } from '@polkadot/host-api';
 
 // ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
 /**
- * Create a local storage provider bound to a transport.
+ * Create a local storage provider.
  *
- * @param transport - The transport to use. Defaults to the sandbox transport.
+ * @param hostApi - The HostApi instance to use. Defaults to the singleton.
  */
-export const createLocalStorage = (transport: Transport = sandboxTransport) => {
-  const hostApi = createHostApi(transport);
+export const createLocalStorage = (hostApi: HostApi = defaultHostApi) => {
   const textEncoder = new TextEncoder();
   const textDecoder = new TextDecoder();
 
