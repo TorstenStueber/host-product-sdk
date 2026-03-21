@@ -30,6 +30,8 @@
   rm -rf packages/*/dist packages/*/node_modules/.tmp .nx
   npx nx run-many -t build --skip-nx-cache
   ```
+- **Keep tsconfig paths in sync with Vite aliases.** Code that uses Vite `resolve.alias` (like the e2e harness) must
+  have a companion `tsconfig.json` with matching `paths` entries, otherwise `tsc` and IDEs cannot resolve the imports.
 - **Rebuild `host-api` before typechecking.** The `host` and `product` packages compile against the built `.d.ts` files
   in `packages/host-api/dist/`. Run `npm run build -w @polkadot/host-api` (or `npx nx run @polkadot/host-api:build`)
   before running `npx nx run-many -t typecheck`, otherwise downstream packages may typecheck against stale declarations.
