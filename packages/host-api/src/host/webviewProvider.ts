@@ -9,7 +9,6 @@
  */
 
 import type { Provider } from '../shared/transport/provider.js';
-import type { Logger } from '../shared/util/logger.js';
 import { createMessagePortProvider } from '../shared/transport/messagePortProvider.js';
 import { createIdFactory } from '../shared/util/idFactory.js';
 
@@ -31,7 +30,6 @@ export type WebviewTag = HTMLElement & {
 
 export type CreateHostWebviewProviderParams = {
   webview: WebviewTag;
-  logger?: Logger;
   openDevTools?: boolean;
 };
 
@@ -76,10 +74,6 @@ function acquireWebviewPort(webview: WebviewTag, openDevTools?: boolean): Promis
   });
 }
 
-export function createHostWebviewProvider({
-  webview,
-  logger,
-  openDevTools,
-}: CreateHostWebviewProviderParams): Provider {
-  return createMessagePortProvider(acquireWebviewPort(webview, openDevTools), logger);
+export function createHostWebviewProvider({ webview, openDevTools }: CreateHostWebviewProviderParams): Provider {
+  return createMessagePortProvider(acquireWebviewPort(webview, openDevTools));
 }

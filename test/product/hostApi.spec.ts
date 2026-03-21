@@ -2,8 +2,8 @@
  * HostApi proxy method tests.
  *
  * Verifies that the HostApi facade correctly delegates transport lifecycle
- * methods (isReady, isCorrectEnvironment, logger, handleHostSubscription)
- * to the underlying transport.
+ * methods (isReady, isCorrectEnvironment, handleHostSubscription) to the
+ * underlying transport.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -39,11 +39,6 @@ describe('HostApi transport proxies', () => {
     } catch {
       /* */
     }
-  });
-
-  it('logger returns the transport provider logger', () => {
-    const hostApi = createHostApi(productTransport);
-    expect(hostApi.logger).toBe(productProvider.logger);
   });
 
   it('isCorrectEnvironment delegates to transport', () => {

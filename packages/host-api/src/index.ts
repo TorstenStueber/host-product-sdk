@@ -216,6 +216,8 @@ export type { ChainConnectionManager } from './host/connectionManager.js';
 export { createHostApi, hostApi } from './product/hostApi.js';
 export type { HostApi } from './product/hostApi.js';
 
+export { productLogger, setProductLogger } from './product/logger.js';
+
 export {
   sandboxProvider,
   sandboxTransport,

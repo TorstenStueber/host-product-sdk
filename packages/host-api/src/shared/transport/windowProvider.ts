@@ -12,8 +12,6 @@
  */
 
 import type { Provider } from './provider.js';
-import type { Logger } from '../util/logger.js';
-import { createDefaultLogger } from '../util/logger.js';
 
 function isProtocolMessage(data: unknown): boolean {
   return (
@@ -42,7 +40,7 @@ function resolveWindow(ref: WindowRef): Window | null {
   return typeof ref === 'function' ? ref() : ref;
 }
 
-export function createWindowProvider(target: WindowRef, logger?: Logger): Provider {
+export function createWindowProvider(target: WindowRef): Provider {
   let disposed = false;
   const subscribers = new Set<(message: Uint8Array | unknown) => void>();
 
@@ -58,8 +56,6 @@ export function createWindowProvider(target: WindowRef, logger?: Logger): Provid
   window.addEventListener('message', messageHandler);
 
   return {
-    logger: logger ?? createDefaultLogger(),
-
     isCorrectEnvironment() {
       return true;
     },

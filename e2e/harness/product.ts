@@ -15,7 +15,6 @@ import {
   structuredCloneCodecAdapter,
   scaleCodecAdapter,
   requestCodecUpgrade,
-  createDefaultLogger,
 } from '@polkadot/host-api';
 
 type ProductE2E = {
@@ -33,7 +32,6 @@ const codecParam = new URLSearchParams(location.search).get('codec') ?? 'structu
 
 function createProductProvider(): Provider {
   const subscribers = new Set<(message: Uint8Array | unknown) => void>();
-  const logger = createDefaultLogger('Product');
 
   function isProtocolMessage(data: unknown): boolean {
     return (
@@ -62,7 +60,6 @@ function createProductProvider(): Provider {
   window.addEventListener('message', handler);
 
   return {
-    logger,
     isCorrectEnvironment: () => window !== window.top,
     postMessage(message) {
       if (message instanceof Uint8Array) {

@@ -219,7 +219,6 @@ The lowest abstraction -- a raw message pipe:
 
 ```typescript
 type Provider = {
-  readonly logger: Logger;
   isCorrectEnvironment(): boolean;
   postMessage(message: Uint8Array | unknown): void;
   subscribe(callback: (message: Uint8Array | unknown) => void): () => void;
@@ -483,11 +482,14 @@ unwraps received payloads.
 **Transport proxies**: in addition to protocol methods, `HostApi` exposes transport lifecycle as meaningful accessors so
 domain modules never need a `Transport` reference:
 
-- `logger`: the provider's logger instance
 - `isCorrectEnvironment()`: whether the transport is in a supported environment
 - `isReady()`: resolves when handshake and codec negotiation are complete
 - `handleHostSubscription(method, handler)`: registers a handler for the one host-initiated subscription (custom chat
   message rendering)
+
+**Product logger**: `productLogger` is a standalone singleton exported from `product/logger.ts` (not part of `HostApi`
+or `Provider`). Product code that needs to log imports it directly. `setProductLogger(logger)` swaps the backing
+implementation -- useful for routing log output to a debug UI overlay instead of the console.
 
 ---
 
@@ -592,8 +594,8 @@ Domain modules that run inside the iframe. Every module accepts an optional `Hos
 ### 3.2 Chain (`chain.ts`)
 
 The most complex file (~580 lines). `createPapiProvider(genesisHash, fallback?, hostApi?)` returns a standard
-`JsonRpcProvider` compatible with Polkadot API (PAPI). Uses `hostApi.isReady()`, `hostApi.isCorrectEnvironment()`, and
-`hostApi.logger` for lifecycle and diagnostics.
+`JsonRpcProvider` compatible with Polkadot API (PAPI). Uses `hostApi.isReady()` and `hostApi.isCorrectEnvironment()` for
+lifecycle, and `productLogger` for diagnostics.
 
 When PAPI calls `send('{"method":"chainHead_v1_follow",...}')`: parses JSON-RPC, maps to `hostApi` method, converts
 parameters, converts response back to JSON-RPC. Handles all `chainHead_v1_*`, `chainSpec_v1_*`, `transaction_v1_*`
@@ -651,7 +653,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 ## Part 4: Tests
 
-### 4.1 Unit Tests (15 files, 173 tests)
+### 4.1 Unit Tests (15 files, 172 tests)
 
 **Test helper** (`test/helpers/mockProvider.ts`): creates connected mock Provider pairs (async and sync variants).
 
@@ -678,8 +680,8 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 **Product** (4 files):
 
-- `hostApi.spec.ts` (5 tests): HostApi transport proxy methods: logger, isCorrectEnvironment, isReady,
-  handleHostSubscription registration and unsubscribe
+- `hostApi.spec.ts` (4 tests): HostApi transport proxy methods: isCorrectEnvironment, isReady, handleHostSubscription
+  registration and unsubscribe
 - `chat.spec.ts` (3 tests): handleCustomMessageRendering: handler registration, render function delivery, unsubscribe
   deregistration
 - `constants.spec.ts` (13 tests): all chains present, hex format

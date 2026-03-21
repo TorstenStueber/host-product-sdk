@@ -69,8 +69,6 @@ export type Subscription = {
 };
 
 export type Transport = {
-  readonly provider: Provider;
-
   isCorrectEnvironment(): boolean;
   isReady(): Promise<boolean>;
   destroy(): void;
@@ -258,8 +256,6 @@ export function createTransport(options: CreateTransportOptions): Transport {
   // -- Transport implementation ---------------------------------------------
 
   const transport: Transport = {
-    provider,
-
     isCorrectEnvironment() {
       return provider.isCorrectEnvironment();
     },

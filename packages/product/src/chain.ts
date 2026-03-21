@@ -15,7 +15,7 @@ import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 import { getSyncProvider } from '@polkadot-api/json-rpc-provider-proxy';
 
 import type { HostApi } from '@polkadot/host-api';
-import { hostApi as defaultHostApi } from '@polkadot/host-api';
+import { hostApi as defaultHostApi, productLogger } from '@polkadot/host-api';
 import type { HexString } from './types.js';
 
 /**
@@ -503,7 +503,7 @@ export function createPapiProvider(
       return () => {
         return {
           send() {
-            hostApi.logger.error(`Provider for chain ${genesisHash} was not started because Host doesn't support it`);
+            productLogger.error(`Provider for chain ${genesisHash} was not started because Host doesn't support it`);
           },
           disconnect() {
             /* empty */

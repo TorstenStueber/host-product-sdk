@@ -10,12 +10,7 @@
  * negotiation.
  */
 
-import type { Logger } from '../util/logger.js';
-
 export type Provider = {
-  /** Logger instance scoped to this provider. */
-  readonly logger: Logger;
-
   /**
    * Returns `true` when the provider can actually send/receive
    * messages (e.g. running inside an iframe with a parent window).

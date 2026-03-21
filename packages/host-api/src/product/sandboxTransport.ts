@@ -17,7 +17,6 @@ import type { Transport } from '../shared/transport/transport.js';
 import { scaleCodecAdapter } from '../shared/codec/scale/protocol.js';
 import { structuredCloneCodecAdapter } from '../shared/codec/structured/index.js';
 import { requestCodecUpgrade } from '../shared/codec/negotiation.js';
-import { createDefaultLogger } from '../shared/util/logger.js';
 import { createTransport } from '../shared/transport/transport.js';
 import { createWindowProvider } from '../shared/transport/windowProvider.js';
 import { createMessagePortProvider } from '../shared/transport/messagePortProvider.js';
@@ -117,9 +116,7 @@ export function createDefaultProductProvider(): Provider {
   }
 
   // Not in a supported environment — return a no-op provider.
-  const logger = createDefaultLogger('ProductProvider');
   return {
-    logger,
     isCorrectEnvironment: () => false,
     postMessage: () => {},
     subscribe: () => () => {},

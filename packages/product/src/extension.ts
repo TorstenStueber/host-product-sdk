@@ -51,7 +51,7 @@ interface SignerResult {
 
 import { SpektrExtensionName } from './constants.js';
 import type { HostApi } from '@polkadot/host-api';
-import { hostApi as defaultHostApi } from '@polkadot/host-api';
+import { hostApi as defaultHostApi, productLogger } from '@polkadot/host-api';
 import type { HexString, VersionedTxPayload } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -245,7 +245,7 @@ export async function injectSpektrExtension(hostApi: HostApi = defaultHostApi): 
       return false;
     }
   } catch (e) {
-    hostApi.logger.error('Error injecting extension', e);
+    productLogger.error('Error injecting extension', e);
     return false;
   }
 }

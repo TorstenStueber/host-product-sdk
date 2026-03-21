@@ -12,7 +12,6 @@
  */
 
 import type { Subscription, Transport } from '../shared/transport/transport.js';
-import type { Logger } from '../shared/util/logger.js';
 import type {
   RequestMethod,
   SubscriptionMethod,
@@ -104,11 +103,6 @@ function makeSubscription<M extends SubscriptionMethod, V extends string>(
 export function createHostApi(transport: Transport) {
   return {
     // -- Transport proxies --------------------------------------------------
-
-    /** The logger instance from the underlying transport provider. */
-    get logger(): Logger {
-      return transport.provider.logger;
-    },
 
     /** Whether the transport is in a supported environment (iframe or webview). */
     isCorrectEnvironment(): boolean {

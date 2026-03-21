@@ -8,8 +8,6 @@
  */
 
 import type { Provider } from './provider.js';
-import type { Logger } from '../util/logger.js';
-import { createDefaultLogger } from '../util/logger.js';
 
 function isProtocolMessage(data: unknown): boolean {
   return (
@@ -35,12 +33,8 @@ function isValidMessage(event: MessageEvent): boolean {
  * @param portOrPromise - A ready MessagePort or a Promise that resolves
  *   to one.  Messages sent before the promise resolves are delivered
  *   once the port becomes available.
- * @param logger - Optional logger instance.
  */
-export function createMessagePortProvider(
-  portOrPromise: MessagePort | Promise<MessagePort>,
-  logger?: Logger,
-): Provider {
+export function createMessagePortProvider(portOrPromise: MessagePort | Promise<MessagePort>): Provider {
   let disposed = false;
   let port: MessagePort | undefined;
   const subscribers = new Set<(message: Uint8Array | unknown) => void>();
@@ -77,8 +71,6 @@ export function createMessagePortProvider(
   }
 
   return {
-    logger: logger ?? createDefaultLogger(),
-
     isCorrectEnvironment() {
       return true;
     },

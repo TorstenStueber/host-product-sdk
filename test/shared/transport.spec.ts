@@ -75,7 +75,6 @@ describe('Transport', () => {
       expect(typeof transport.handleSubscription).toBe('function');
       expect(typeof transport.postMessage).toBe('function');
       expect(typeof transport.listenMessages).toBe('function');
-      expect(transport.provider).toBe(hostProvider);
 
       transport.destroy();
     });

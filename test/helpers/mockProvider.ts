@@ -5,22 +5,22 @@
  * the other's subscribers receive it -- like two sides of postMessage.
  */
 
-import type { Provider, Logger } from '@polkadot/host-api';
-import { createDefaultLogger } from '@polkadot/host-api';
+import type { Provider } from '@polkadot/host-api';
 
 export type MockProvider = Provider & {
   /** Manually inject a message as if it was received from the other side. */
   _injectMessage(message: unknown): void;
 };
 
-function createMockProvider(name: string, isCorrectEnv: boolean, sendTo: () => MockProvider | undefined): MockProvider {
-  const logger: Logger = createDefaultLogger(name);
+function createMockProvider(
+  _name: string,
+  isCorrectEnv: boolean,
+  sendTo: () => MockProvider | undefined,
+): MockProvider {
   const subscribers = new Set<(message: unknown) => void>();
   let disposed = false;
 
   return {
-    logger,
-
     isCorrectEnvironment() {
       return isCorrectEnv;
     },
@@ -89,17 +89,14 @@ export function createSyncMockProviderPair(): [MockProvider, MockProvider] {
   let productProvider: MockProvider;
 
   function createSyncProvider(
-    name: string,
+    _name: string,
     isCorrectEnv: boolean,
     sendTo: () => MockProvider | undefined,
   ): MockProvider {
-    const logger: Logger = createDefaultLogger(name);
     const subscribers = new Set<(message: unknown) => void>();
     let disposed = false;
 
     return {
-      logger,
-
       isCorrectEnvironment() {
         return isCorrectEnv;
       },
