@@ -98,15 +98,14 @@ const e2e: ProductE2E = {
 
 // -- Test runners (called by Playwright) -------------------------------------
 
-async function waitReady(): Promise<boolean> {
-  const ready = await transport.isReady();
-  if (ready && codecParam === 'upgrade') {
+async function waitReady(): Promise<void> {
+  await transport.whenReady();
+  if (codecParam === 'upgrade') {
     await requestCodecUpgrade(transport, {
       scale: scaleCodecAdapter,
       structured_clone: structuredCloneCodecAdapter,
     });
   }
-  return ready;
 }
 
 async function testFeatureSupported(genesisHash: `0x${string}`): Promise<unknown> {

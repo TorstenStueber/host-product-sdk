@@ -69,8 +69,8 @@ export type Subscription = {
 };
 
 export type Transport = {
-  /** Resolves when the handshake completes (initiator or responder). */
-  isReady(): Promise<boolean>;
+  /** Resolves when the handshake completes. Rejects on timeout or disposal. */
+  whenReady(): Promise<void>;
   destroy(): void;
   onConnectionStatusChange(callback: (status: ConnectionStatus) => void): () => void;
   onDestroy(callback: () => void): () => void;
@@ -212,7 +212,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
 
   const handshakeAbortController = new AbortController();
 
-  let handshakePromise: Promise<boolean>;
+  let handshakePromise: Promise<void>;
   let connectionStatus: ConnectionStatus = 'disconnected';
   let disposed = false;
 
@@ -253,7 +253,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
 
     // -- Handshake ----------------------------------------------------------
 
-    isReady() {
+    whenReady() {
       throwIfDisposed();
       return handshakePromise;
     },
@@ -266,10 +266,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
       signal?: AbortSignal,
     ): Promise<ResponseCodecType<M>> {
       throwIfDisposed();
-
-      if (!(await transport.isReady())) {
-        throw new Error('Polkadot host is not ready');
-      }
+      await transport.whenReady();
 
       signal?.throwIfAborted();
 
@@ -565,15 +562,15 @@ export function createTransport(options: CreateTransportOptions): Transport {
   // -- Handshake setup -------------------------------------------------------
 
   if (handshake === 'respond') {
-    // Host side: register handler and resolve isReady() when the first
+    // Host side: register handler and resolve whenReady() when the first
     // handshake request arrives and is successfully responded to.
-    const { resolve: resolveHandshake, promise } = promiseWithResolvers<boolean>();
+    const { resolve: resolveHandshake, reject: rejectHandshake, promise } = promiseWithResolvers<void>();
     handshakePromise = promise;
 
     transport.handleRequest('host_handshake', async (version): Promise<ResponseCodecType<'host_handshake'>> => {
       if (version.tag === 'v1' && version.value === protocolVersionId) {
         changeConnectionStatus('connected');
-        resolveHandshake(true);
+        resolveHandshake();
         return { tag: 'v1', value: { success: true, value: undefined } };
       }
       return {
@@ -581,13 +578,17 @@ export function createTransport(options: CreateTransportOptions): Transport {
         value: { success: false, value: { tag: 'UnsupportedProtocolVersion', value: undefined } },
       };
     });
+
+    // Reject on disposal so whenReady() doesn't hang forever.
+    events.on('destroy', () => rejectHandshake(new Error('Transport destroyed before handshake completed')));
+    // Suppress unhandled rejection — callers that care will await whenReady().
+    handshakePromise.catch(() => {});
   } else {
     // Product side: eagerly start sending handshake requests.
     changeConnectionStatus('connecting');
 
-    const performHandshake = (): Promise<boolean> => {
+    const performHandshake = (): Promise<void> => {
       const id = nextId();
-      let resolved = false;
 
       const cleanup = (interval: ReturnType<typeof setInterval>, unsubscribe: () => void): void => {
         clearInterval(interval);
@@ -595,12 +596,11 @@ export function createTransport(options: CreateTransportOptions): Transport {
         handshakeAbortController.signal.removeEventListener('abort', unsubscribe);
       };
 
-      return new Promise<boolean>(resolve => {
+      return new Promise<void>((resolve, reject) => {
         const unsubscribe = transport.listenMessages('host_handshake_response', responseId => {
           if (responseId === id) {
             cleanup(interval, unsubscribe);
-            resolved = true;
-            resolve(true);
+            resolve();
           }
         });
 
@@ -611,7 +611,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
         const interval = setInterval(() => {
           if (handshakeAbortController.signal.aborted) {
             clearInterval(interval);
-            resolve(false);
+            reject(new Error('Handshake aborted'));
             return;
           }
 
@@ -620,20 +620,26 @@ export function createTransport(options: CreateTransportOptions): Transport {
             value: { tag: 'v1', value: protocolVersionId },
           });
         }, HANDSHAKE_INTERVAL);
-      }).then(success => {
-        if (!success && !resolved) {
-          handshakeAbortController.abort('Timeout');
-        }
-        return success;
       });
     };
 
-    const timedOutRequest = Promise.race([performHandshake(), delay(HANDSHAKE_TIMEOUT).then(() => false)]);
-
-    handshakePromise = timedOutRequest.then(result => {
-      changeConnectionStatus(result ? 'connected' : 'disconnected');
-      return result;
-    });
+    handshakePromise = Promise.race([
+      performHandshake(),
+      delay(HANDSHAKE_TIMEOUT).then(() => {
+        handshakeAbortController.abort('Timeout');
+        throw new Error('Handshake timed out');
+      }),
+    ]).then(
+      () => {
+        changeConnectionStatus('connected');
+      },
+      err => {
+        changeConnectionStatus('disconnected');
+        throw err;
+      },
+    );
+    // Suppress unhandled rejection — callers that care will await whenReady().
+    handshakePromise.catch(() => {});
   }
 
   return transport;

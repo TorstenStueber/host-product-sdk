@@ -150,23 +150,19 @@ export const sandboxTransport: Transport | undefined = sandboxProvider
 
 /**
  * Wraps a transport so that after the handshake succeeds, a codec upgrade
- * to structured clone is automatically attempted before `isReady()` resolves.
+ * to structured clone is automatically attempted before `whenReady()` resolves.
  */
 function wrapWithAutoCodecUpgrade(transport: Transport): Transport {
-  const readyPromise = transport.isReady().then(async ready => {
-    if (!ready) return false;
-
+  const readyPromise = transport.whenReady().then(async () => {
     await requestCodecUpgrade(transport, {
       scale: scaleCodecAdapter,
       structured_clone: structuredCloneCodecAdapter,
     });
-
-    return true;
   });
 
   return {
     ...transport,
-    isReady(): Promise<boolean> {
+    whenReady(): Promise<void> {
       return readyPromise;
     },
   };

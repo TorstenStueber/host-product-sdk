@@ -476,14 +476,15 @@ export function createPapiProvider(
   // -------------------------------------------------------------------------
 
   function checkIfReady(): Promise<boolean> {
-    return hostApi.isReady().then(ready => {
-      if (!ready) return false;
-
-      return hostApi.featureSupported({ tag: 'Chain' as const, value: genesisHash }).match(
-        supported => supported,
-        () => false,
-      );
-    });
+    return hostApi
+      .whenReady()
+      .then(() =>
+        hostApi.featureSupported({ tag: 'Chain' as const, value: genesisHash }).match(
+          supported => supported,
+          () => false,
+        ),
+      )
+      .catch(() => false);
   }
 
   // -------------------------------------------------------------------------

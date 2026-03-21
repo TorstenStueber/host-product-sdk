@@ -105,8 +105,8 @@ export function createHostApi(transport: Transport) {
     // -- Transport proxies --------------------------------------------------
 
     /** Resolves when the handshake and codec negotiation are complete. */
-    isReady(): Promise<boolean> {
-      return transport.isReady();
+    whenReady(): Promise<void> {
+      return transport.whenReady();
     },
 
     /**

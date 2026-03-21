@@ -258,9 +258,9 @@ requests from hanging indefinitely when the other side doesn't support a method.
 
 **Handshake**: `createTransport` takes a required `handshake: 'initiate' | 'respond'` option. The `'initiate'` side
 (product) eagerly sends `host_handshake_request` every 50ms, up to 10s timeout. The `'respond'` side (host) auto-wires a
-handler that validates the protocol version and resolves its own `isReady()` when the first handshake succeeds.
-`transport.isReady()` returns a promise that resolves when the handshake completes (on either side). Connection status
-goes `disconnected` -> `connecting` -> `connected`.
+handler that validates the protocol version and resolves its own `whenReady()` when the first handshake succeeds.
+`transport.whenReady()` returns `Promise<void>` that resolves when the handshake completes, or rejects on timeout or
+disposal. Connection status goes `disconnected` -> `connecting` -> `connected`.
 
 **Request/Response**: `transport.request<M>(method, payload)` is generic on the method name. It takes
 `RequestCodecType<M>` (the versioned envelope), generates a unique ID (e.g. `"p:1"`), posts
@@ -305,9 +305,9 @@ the product's 1s timeout has already fired (so `requestCodecUpgrade` returned `u
 `decodeIncoming` detects the structured clone response and auto-upgrades the outgoing codec. Both sides converge on
 structured clone regardless of timing.
 
-**Automatic upgrade**: the product-side `sandboxTransport` singleton wraps `isReady()` so that after the handshake
+**Automatic upgrade**: the product-side `sandboxTransport` singleton wraps `whenReady()` so that after the handshake
 succeeds, it automatically calls `requestCodecUpgrade` with both `scale` and `structured_clone` adapters. Since every
-`transport.request()` and `transport.subscribe()` internally awaits `isReady()`, the upgrade happens transparently
+`transport.request()` and `transport.subscribe()` internally awaits `whenReady()`, the upgrade happens transparently
 before any real protocol traffic.
 
 **Backward compatibility**: old hosts running `triangle-js-sdks` don't have the not-supported catch-all, so the
@@ -467,7 +467,7 @@ not in a supported environment:
 - otherwise -> `undefined`
 
 Creates transport with `handshake: 'initiate'` and `idPrefix: 'p:'`. The handshake starts eagerly when the transport is
-created. The `sandboxTransport` singleton wraps `isReady()` so that after the handshake succeeds, it automatically
+created. The `sandboxTransport` singleton wraps `whenReady()` so that after the handshake succeeds, it automatically
 attempts a codec upgrade to structured clone (see 1.10 Codec Negotiation). This happens transparently before any real
 protocol traffic. The singletons `sandboxProvider`, `sandboxTransport`, and `hostApi` are all `undefined` when not in a
 supported environment.
@@ -487,7 +487,7 @@ unwraps received payloads.
 **Transport proxies**: in addition to protocol methods, `HostApi` exposes transport lifecycle as meaningful accessors so
 domain modules never need a `Transport` reference:
 
-- `isReady()`: resolves when handshake and codec negotiation are complete
+- `whenReady()`: resolves when handshake and codec negotiation are complete
 - `handleHostSubscription(method, handler)`: registers a handler for the one host-initiated subscription (custom chat
   message rendering)
 
@@ -598,7 +598,7 @@ Domain modules that run inside the iframe. Every module takes a required `HostAp
 ### 3.2 Chain (`chain.ts`)
 
 The most complex file (~580 lines). `createPapiProvider(genesisHash, hostApi, fallback?)` returns a standard
-`JsonRpcProvider` compatible with Polkadot API (PAPI). Uses `hostApi.isReady()` for lifecycle and `productLogger` for
+`JsonRpcProvider` compatible with Polkadot API (PAPI). Uses `hostApi.whenReady()` for lifecycle and `productLogger` for
 diagnostics.
 
 When PAPI calls `send('{"method":"chainHead_v1_follow",...}')`: parses JSON-RPC, maps to `hostApi` method, converts
@@ -682,7 +682,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 **Product** (4 files):
 
-- `hostApi.spec.ts` (3 tests): HostApi transport proxy methods: isReady, handleHostSubscription registration and
+- `hostApi.spec.ts` (3 tests): HostApi transport proxy methods: whenReady, handleHostSubscription registration and
   unsubscribe
 - `chat.spec.ts` (3 tests): handleCustomMessageRendering: handler registration, render function delivery, unsubscribe
   deregistration

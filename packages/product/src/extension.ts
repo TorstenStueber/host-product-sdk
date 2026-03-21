@@ -98,8 +98,11 @@ interface Injected {
 export async function createNonProductExtensionEnableFactory(
   hostApi: HostApi,
 ): Promise<((_origin: string) => Promise<Injected>) | undefined> {
-  const ready = await hostApi.isReady();
-  if (!ready) return undefined;
+  try {
+    await hostApi.whenReady();
+  } catch {
+    return undefined;
+  }
 
   const accountId = AccountId();
 

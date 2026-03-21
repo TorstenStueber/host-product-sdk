@@ -2,7 +2,7 @@
  * HostApi proxy method tests.
  *
  * Verifies that the HostApi facade correctly delegates transport lifecycle
- * methods (isReady, handleHostSubscription) to the underlying transport.
+ * methods (whenReady, handleHostSubscription) to the underlying transport.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -40,16 +40,14 @@ describe('HostApi transport proxies', () => {
     }
   });
 
-  it('isReady delegates to transport and resolves after handshake', async () => {
+  it('whenReady delegates to transport and resolves after handshake', async () => {
     const hostApi = createHostApi(productTransport);
-
-    const ready = await hostApi.isReady();
-    expect(ready).toBe(true);
+    await hostApi.whenReady();
   });
 
   it('handleHostSubscription registers a handler on the transport', async () => {
     const hostApi = createHostApi(productTransport);
-    await hostApi.isReady();
+    await hostApi.whenReady();
 
     const receivedValues: unknown[] = [];
 
@@ -79,7 +77,7 @@ describe('HostApi transport proxies', () => {
 
   it('handleHostSubscription returns an unsubscribe function', async () => {
     const hostApi = createHostApi(productTransport);
-    await hostApi.isReady();
+    await hostApi.whenReady();
 
     const unsub = hostApi.handleHostSubscription('product_chat_custom_message_render_subscribe', () => () => {});
 

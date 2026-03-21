@@ -37,9 +37,7 @@ async function connectTransports(
   hostTransport: ReturnType<typeof createTransport>,
   productTransport: ReturnType<typeof createTransport>,
 ) {
-  const [hostReady, productReady] = await Promise.all([hostTransport.isReady(), productTransport.isReady()]);
-  expect(hostReady).toBe(true);
-  expect(productReady).toBe(true);
+  await Promise.all([hostTransport.whenReady(), productTransport.whenReady()]);
 }
 
 describe('Codec negotiation', () => {

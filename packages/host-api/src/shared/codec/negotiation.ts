@@ -57,8 +57,8 @@ export type CodecAdapterMap = Partial<Record<CodecFormat, CodecAdapter>>;
 /**
  * Request a codec upgrade from the product side.
  *
- * Call this AFTER the handshake has completed (`transport.isReady()`
- * returned `true`). Sends a `host_codec_upgrade` request with the
+ * Call this AFTER the handshake has completed (`transport.whenReady()`
+ * resolved). Sends a `host_codec_upgrade` request with the
  * list of formats the product supports. If the host responds with a
  * format both sides support, both swap their codec adapters.
  *

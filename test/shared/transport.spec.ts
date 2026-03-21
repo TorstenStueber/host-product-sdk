@@ -64,7 +64,7 @@ describe('Transport', () => {
       });
 
       expect(transport).toBeDefined();
-      expect(typeof transport.isReady).toBe('function');
+      expect(typeof transport.whenReady).toBe('function');
       expect(typeof transport.destroy).toBe('function');
       expect(typeof transport.onConnectionStatusChange).toBe('function');
       expect(typeof transport.onDestroy).toBe('function');
@@ -96,10 +96,9 @@ describe('Transport', () => {
         handshake: 'initiate',
       });
 
-      // The host transport auto-wires handshake handler in createTransport
       // The host transport uses handshake: 'respond' to auto-wire the handler.
-      const ready = await productTransport.isReady();
-      expect(ready).toBe(true);
+      // whenReady() resolves (no return value) when handshake completes.
+      await productTransport.whenReady();
     });
 
     it('connection status changes to connected after successful handshake', async () => {
@@ -118,7 +117,7 @@ describe('Transport', () => {
         statuses.push(status);
       });
 
-      await productTransport.isReady();
+      await productTransport.whenReady();
 
       expect(statuses).toContain('connected');
     });
@@ -149,7 +148,7 @@ describe('Transport', () => {
       });
 
       // Wait for handshake
-      await productTransport.isReady();
+      await productTransport.whenReady();
 
       const result = await productTransport.request('host_feature_supported', {
         tag: 'v1',
@@ -171,7 +170,7 @@ describe('Transport', () => {
         };
       });
 
-      await productTransport.isReady();
+      await productTransport.whenReady();
 
       const [r1, r2] = await Promise.all([
         productTransport.request('host_feature_supported', {
@@ -227,7 +226,7 @@ describe('Transport', () => {
         };
       });
 
-      await productTransport.isReady();
+      await productTransport.whenReady();
 
       await new Promise<void>(resolve => {
         const sub = productTransport.subscribe(
@@ -264,7 +263,7 @@ describe('Transport', () => {
         };
       });
 
-      await productTransport.isReady();
+      await productTransport.whenReady();
 
       const sub = productTransport.subscribe(
         'host_account_connection_status_subscribe',
@@ -319,7 +318,7 @@ describe('Transport', () => {
         return () => clearInterval(interval);
       });
 
-      await productTransport.isReady();
+      await productTransport.whenReady();
 
       const received1: unknown[] = [];
       const received2: unknown[] = [];
@@ -388,7 +387,7 @@ describe('Transport', () => {
       const statuses: string[] = [];
       productTransport.onConnectionStatusChange(s => statuses.push(s));
 
-      await productTransport.isReady();
+      await productTransport.whenReady();
 
       expect(statuses).toContain('connecting');
       expect(statuses).toContain('connected');
@@ -434,7 +433,7 @@ describe('Transport', () => {
       });
       transport.destroy();
 
-      expect(() => transport.isReady()).toThrow('disposed');
+      expect(() => transport.whenReady()).toThrow('disposed');
     });
   });
 
@@ -549,7 +548,7 @@ describe('Transport', () => {
     });
 
     it('request to method with no handler rejects with MethodNotSupportedError', async () => {
-      await productTransport.isReady();
+      await productTransport.whenReady();
 
       // Swap both sides to structured clone so the NOT_SUPPORTED_MARKER
       // can be encoded (SCALE cannot encode arbitrary marker objects).
@@ -565,7 +564,7 @@ describe('Transport', () => {
     });
 
     it('subscription to method with no handler gets interrupted', async () => {
-      await productTransport.isReady();
+      await productTransport.whenReady();
 
       const interrupted = await new Promise<boolean>(resolve => {
         const sub = productTransport.subscribe(
@@ -593,7 +592,7 @@ describe('Transport', () => {
 
       unsubscribe();
 
-      await productTransport.isReady();
+      await productTransport.whenReady();
 
       // Swap both sides to structured clone so the NOT_SUPPORTED_MARKER
       // can be encoded (SCALE cannot encode arbitrary marker objects).
@@ -613,7 +612,7 @@ describe('Transport', () => {
         return { tag: 'v1', value: { success: true, value: true } };
       });
 
-      await productTransport.isReady();
+      await productTransport.whenReady();
 
       const result = await productTransport.request('host_feature_supported', {
         tag: 'v1',

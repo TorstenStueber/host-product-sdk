@@ -124,7 +124,7 @@ export type ProtocolHandler = {
   // -- Transport lifecycle ---------------------------------------------------
   readonly transport: Transport;
 
-  isReady(): Promise<boolean>;
+  whenReady(): Promise<void>;
   subscribeProductConnectionStatus(callback: (status: ConnectionStatus) => void): () => void;
   dispose(): void;
 };

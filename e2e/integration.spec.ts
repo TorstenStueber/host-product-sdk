@@ -70,8 +70,9 @@ for (const codec of codecs) {
 
     test('handshake completes and product becomes ready', async ({ page }) => {
       const frame = await getProductFrame(page);
-      const result = await runProductTest(frame, 'waitReady');
-      expect(result).toBe(true);
+      // whenReady() resolves (void) on success, rejects on failure.
+      // If this doesn't throw, the handshake succeeded.
+      await runProductTest(frame, 'waitReady');
     });
 
     test('feature supported: known chain returns true', async ({ page }) => {

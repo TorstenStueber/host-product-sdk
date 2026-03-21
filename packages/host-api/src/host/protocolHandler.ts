@@ -753,8 +753,8 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
 
     // -- Transport lifecycle ------------------------------------------------
 
-    isReady() {
-      return transport.isReady();
+    whenReady() {
+      return transport.whenReady();
     },
 
     subscribeProductConnectionStatus(callback) {
