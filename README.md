@@ -5,7 +5,7 @@ in interaction with the Host API.
 
 The three packages in this repo map to the three layers of the Host-Product architecture:
 
-- `packages/host-api`: Host API protocol, codecs, transport, container, and product facade
+- `packages/host-api`: Host API protocol, codecs, transport, protocol handler, and product facade
 - `packages/host`: Host SDK (handlers, auth, storage, SDK entry point)
 - `packages/product`: Product SDK (domain modules: accounts, chain, chat, storage, etc.)
 
@@ -34,7 +34,7 @@ hot-swap the adapter at runtime. Old hosts that do not support negotiation simpl
 ### Inlined codec primitives
 
 triangle-js-sdks depends on `@novasamatech/scale` for codec helpers like `ErrEnum`, `Err`, and various utilities. This
-project inlines those primitives (~170 lines in `codec/scale/primitives.ts`), removing the external dependency. The
+project inlines those primitives (~130 lines in `codec/scale/primitives.ts`), removing the external dependency. The
 inlined versions produce plain `{tag, value}` discriminated unions rather than `CodecError` class instances.
 
 ### Plain error objects instead of error classes
@@ -58,10 +58,11 @@ triangle-js-sdks generates random request IDs using `nanoid`. This project uses 
 (`createIdFactory('p:')` produces `'p:1'`, `'p:2'`, etc.). The host uses prefix `'h:'`, the product uses `'p:'`, so IDs
 never collide on the shared postMessage channel. This is more deterministic and easier to trace in logs.
 
-### Richer provider interface
+### Explicit provider lifecycle
 
-triangle-js-sdks defines a minimal provider (just `postMessage` and `subscribe`). This project adds a scoped `logger`
-instance and an explicit `dispose()` method for lifecycle cleanup.
+triangle-js-sdks defines a minimal provider (just `postMessage` and `subscribe`). This project adds an explicit
+`dispose()` method for lifecycle cleanup. Logging is handled separately via a `productLogger` singleton rather than
+being attached to the provider.
 
 ### Self-contained handshake
 
@@ -71,10 +72,10 @@ handler inside the transport when it detects it is on the host side, making the 
 ### Stronger end-to-end type safety
 
 In this project, the `hostApiProtocol` object (declared `as const`) is the single source from which mapped types like
-`RequestParams<M, V>`, `ResponseOk<M, V>`, and `ResponseErr<M, V>` are extracted. These same types are used for
-container handler signatures on the host side and for the facade return types on the product side. This means the types
-that flow through the SCALE codec are mechanically the same types that the handler receives and that the product facade
-returns. If a codec definition changes, TypeScript catches mismatches everywhere.
+`RequestParams<M, V>`, `ResponseOk<M, V>`, and `ResponseErr<M, V>` are extracted. These same types are used for protocol
+handler signatures on the host side and for the facade return types on the product side. This means the types that flow
+through the SCALE codec are mechanically the same types that the handler receives and that the product facade returns.
+If a codec definition changes, TypeScript catches mismatches everywhere.
 
 triangle-js-sdks has no such mechanism. The SCALE codec definitions exist, but handler functions are not typed against
 them. A handler can accept one shape while the codec actually produces a different shape, and nothing catches this at
@@ -112,5 +113,5 @@ triangle-js-sdks dispatches handlers through monadic chains (`guardVersion().asy
 Handlers receive a context object `(params, ctx) => ctx.ok(value)` where `ctx.ok` and `ctx.err` are typed as `any`,
 erasing type safety at the handler boundary. This project's handlers return `ResultAsync` directly:
 `(params) => okAsync(value)`. The return type is fully constrained by the protocol codecs, so there is no context object
-and no type erasure. The container wiring uses `result.match()` with explicit `wrapOk`/`wrapErr` helpers instead of
-monadic chains.
+and no type erasure. The protocol handler wiring uses `result.match()` with explicit `wrapOk`/`wrapErr` helpers instead
+of monadic chains.
