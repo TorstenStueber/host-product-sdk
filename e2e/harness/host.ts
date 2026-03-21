@@ -94,7 +94,7 @@ const storageData: Record<string, Uint8Array> = {};
 container.handleLocalStorageRead(key => {
   const fullKey = storagePrefix + (key as string);
   const val = storageData[fullKey];
-  return okAsync(val ?? undefined);
+  return okAsync(val);
 });
 
 container.handleLocalStorageWrite(params => {

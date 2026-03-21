@@ -14,7 +14,7 @@ export type ResolvedIdentity = {
   /** Short username (e.g., the lite/anonymous username). */
   liteUsername: string;
   /** Full display name if available. */
-  fullUsername: string | undefined;
+  fullUsername?: string;
   /** Optional avatar URL. */
   avatarUrl?: string;
   /** Chain-specific identity fields. */

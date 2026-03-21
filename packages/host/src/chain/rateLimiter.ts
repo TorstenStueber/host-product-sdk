@@ -33,7 +33,7 @@ type TokenBucketState = {
   remainingTokens: number;
   lastRefillTimestamp: number;
   queue: QueuedTask<unknown>[];
-  timerId: ReturnType<typeof setTimeout> | undefined;
+  timerId?: ReturnType<typeof setTimeout>;
 };
 
 export type RateLimiter = {

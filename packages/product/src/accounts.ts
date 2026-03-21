@@ -118,8 +118,8 @@ function createSignerForAccount(hostApi: HostApi, account: ProductAccount) {
       transactionVersion: string;
       signedExtensions: string[];
       version: number;
-      assetId?: string | undefined;
-      metadataHash?: string | undefined;
+      assetId?: string;
+      metadataHash?: string;
       mode?: number;
       withSignedTransaction?: boolean;
     }): Promise<{ id: number; signature: HexString; signedTransaction: HexString | undefined }> {

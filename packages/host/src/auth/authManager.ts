@@ -22,7 +22,7 @@ export type UserSession = {
 
 export type Identity = {
   liteUsername: string;
-  fullUsername: string | undefined;
+  fullUsername?: string;
   /** Additional identity fields are adapter-specific. */
   [key: string]: unknown;
 };
