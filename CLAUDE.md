@@ -22,8 +22,14 @@
 
 - **Never mention Claude in commit messages.** No co-authored-by lines, no references to AI assistance.
 
-## Typechecking
+## Building and typechecking
 
+- **Clean rebuild after renaming or deleting files.** Nx and tsc incremental builds cache old output. When files are
+  renamed or deleted, stale `.d.ts` files in `dist/` cause phantom type errors. After such changes, run:
+  ```
+  rm -rf packages/*/dist packages/*/node_modules/.tmp .nx
+  npx nx run-many -t build --skip-nx-cache
+  ```
 - **Rebuild `host-api` before typechecking.** The `host` and `product` packages compile against the built `.d.ts` files
   in `packages/host-api/dist/`. Run `npm run build -w @polkadot/host-api` (or `npx nx run @polkadot/host-api:build`)
   before running `npx nx run-many -t typecheck`, otherwise downstream packages may typecheck against stale declarations.
