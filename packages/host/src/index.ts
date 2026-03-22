@@ -81,6 +81,23 @@ export { createPappAdapterStub } from './auth/pappAdapter.js';
 export type { PappAdapter, PappAdapterConfig, PairingStatus, AttestationStatus } from './auth/pappAdapter.js';
 
 // ---------------------------------------------------------------------------
+// SSO transport
+// ---------------------------------------------------------------------------
+
+export type {
+  SsoTransport,
+  SsoSubscription,
+  SsoSigner,
+  SsoSessionStore,
+  PersistedSessionMeta,
+  Statement,
+  SignedStatement,
+} from './auth/sso/types.js';
+
+export { createSsoSessionStore } from './auth/sso/sessionStore.js';
+export { createMemoryTransportBus } from './auth/sso/memoryTransport.js';
+
+// ---------------------------------------------------------------------------
 // Nested bridge
 // ---------------------------------------------------------------------------
 

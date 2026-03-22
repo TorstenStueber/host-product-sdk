@@ -564,6 +564,22 @@ junctions `['product', productId, derivationIndex]`.
 
 **`pappAdapter.ts`**: Stub interface for QR-code pairing (to be ported from old host-papp).
 
+**`sso/transport.ts`**: SSO transport interfaces modelled after the Rust host-sdk's trait-injection pattern:
+
+- `SsoTransport`: topic-keyed publish/subscribe (`subscribe(topics, callback)`, `submit(statement)`) for exchanging
+  encrypted messages with the mobile wallet. Canonical implementation wraps the statement-store parachain; the
+  in-memory implementation is for testing.
+- `SsoSigner`: sr25519 signing for statement proofs (`publicKey`, `sign(message)`).
+- `SsoSessionStore`: persistence for session metadata (`save`, `load`, `clear`, `subscribe`).
+- `PersistedSessionMeta`: minimal session data surviving page reloads (sessionId, address, displayName, remote keys).
+- `Statement` / `SignedStatement`: wire types for the transport.
+
+**`sso/sessionStore.ts`**: `createSsoSessionStore(storage)` — backed by a `ReactiveStorageAdapter`. Serializes
+`PersistedSessionMeta` to JSON bytes. Subscriptions delegate to the underlying reactive storage.
+
+**`sso/memoryTransport.ts`**: `createMemoryTransportBus()` — in-memory transport for testing. All transports from the
+same bus see each other's statements. Topic matching uses byte-level comparison.
+
 ### 2.5 Webview Port (`webviewPort.ts`)
 
 `acquireWebviewPort({ webview, openDevTools? })` acquires a `MessagePort` by creating a `MessageChannel`, injecting one
@@ -679,7 +695,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 ## Part 4: Tests
 
-### 4.1 Unit Tests (15 files, 177 tests)
+### 4.1 Unit Tests (16 files, 192 tests)
 
 **Test helper** (`test/helpers/mockProvider.ts`): creates connected mock Provider pairs (async and sync variants).
 
@@ -696,7 +712,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 - `protocol.spec.ts` (18 tests): all methods present in hostApiProtocol, correct types, error type construction
 - `util.spec.ts` (24 tests): logger, createIdFactory, delay, promiseWithResolvers, composeAction, toHexString
 
-**Host** (5 files):
+**Host** (6 files):
 
 - `handlers.spec.ts` (14 tests): featureSupported, navigateTo, pushNotification, permissions, storage
 - `authManager.spec.ts` (14 tests): full state machine, subscribe/unsubscribe
@@ -704,6 +720,8 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
   notifications, unsubscribe, multiple listeners, key isolation)
 - `rateLimiter.spec.ts` (10 tests): drop/queue strategies
 - `sdk.spec.ts` (7 tests): construction, session management
+- `ssoTransport.spec.ts` (15 tests): memory transport bus (topic matching, cross-transport delivery, unsubscribe,
+  multi-subscriber), session store (CRUD, round-trip serialization, reactive subscriptions, Uint8Array preservation)
 
 **Product** (4 files):
 
