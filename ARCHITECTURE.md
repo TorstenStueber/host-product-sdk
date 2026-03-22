@@ -567,8 +567,8 @@ junctions `['product', productId, derivationIndex]`.
 **`sso/transport.ts`**: SSO transport interfaces modelled after the Rust host-sdk's trait-injection pattern:
 
 - `SsoTransport`: topic-keyed publish/subscribe (`subscribe(topics, callback)`, `submit(statement)`) for exchanging
-  encrypted messages with the mobile wallet. Canonical implementation wraps the statement-store parachain; the
-  in-memory implementation is for testing.
+  encrypted messages with the mobile wallet. Canonical implementation wraps the statement-store parachain; the in-memory
+  implementation is for testing.
 - `SsoSigner`: sr25519 signing for statement proofs (`publicKey`, `sign(message)`).
 - `SsoSessionStore`: persistence for session metadata (`save`, `load`, `clear`, `subscribe`).
 - `PersistedSessionMeta`: minimal session data surviving page reloads (sessionId, address, displayName, remote keys).
@@ -579,6 +579,17 @@ junctions `['product', productId, derivationIndex]`.
 
 **`sso/memoryTransport.ts`**: `createMemoryTransportBus()` — in-memory transport for testing. All transports from the
 same bus see each other's statements. Topic matching uses byte-level comparison.
+
+**`sso/manager.ts`**: `createSsoManager(config)` — drives the QR-based pairing lifecycle:
+
+- State machine: `idle` -> `pairing` -> `awaiting_scan` -> `paired`, with `failed` on error.
+- `pair()`: delegates to an injected `PairingExecutor` which handles the cryptographic handshake.
+- `cancelPairing()`: aborts in-progress pairing via `AbortController`.
+- `unpair()`: clears persisted session and transitions to `idle`.
+- `restoreSession()`: loads a persisted session and transitions directly to `paired`.
+- `subscribe(callback)`: fires on every state transition.
+- `PairingExecutor` is the pluggable crypto protocol — implementations handle mnemonic generation, P-256 ECDH,
+  statement-store key exchange, and attestation. The manager only drives the state machine and persistence.
 
 ### 2.5 Webview Port (`webviewPort.ts`)
 
@@ -695,7 +706,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 ## Part 4: Tests
 
-### 4.1 Unit Tests (16 files, 192 tests)
+### 4.1 Unit Tests (17 files, 209 tests)
 
 **Test helper** (`test/helpers/mockProvider.ts`): creates connected mock Provider pairs (async and sync variants).
 
@@ -712,7 +723,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 - `protocol.spec.ts` (18 tests): all methods present in hostApiProtocol, correct types, error type construction
 - `util.spec.ts` (24 tests): logger, createIdFactory, delay, promiseWithResolvers, composeAction, toHexString
 
-**Host** (6 files):
+**Host** (7 files):
 
 - `handlers.spec.ts` (14 tests): featureSupported, navigateTo, pushNotification, permissions, storage
 - `authManager.spec.ts` (14 tests): full state machine, subscribe/unsubscribe
@@ -722,6 +733,8 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 - `sdk.spec.ts` (7 tests): construction, session management
 - `ssoTransport.spec.ts` (15 tests): memory transport bus (topic matching, cross-transport delivery, unsubscribe,
   multi-subscriber), session store (CRUD, round-trip serialization, reactive subscriptions, Uint8Array preservation)
+- `ssoManager.spec.ts` (17 tests): state machine lifecycle (idle -> pairing -> awaiting_scan -> paired), cancellation,
+  failure handling, session persistence, session restore, dispose, subscribe/unsubscribe
 
 **Product** (4 files):
 

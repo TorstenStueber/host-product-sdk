@@ -92,8 +92,14 @@ export type {
   PersistedSessionMeta,
   Statement,
   SignedStatement,
+  SsoState,
+  SsoManager,
+  SsoManagerConfig,
+  PairingExecutor,
+  PairingResult,
 } from './auth/sso/types.js';
 
+export { createSsoManager } from './auth/sso/manager.js';
 export { createSsoSessionStore } from './auth/sso/sessionStore.js';
 export { createMemoryTransportBus } from './auth/sso/memoryTransport.js';
 

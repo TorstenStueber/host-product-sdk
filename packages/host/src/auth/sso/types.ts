@@ -1,7 +1,7 @@
 /**
  * SSO public types.
  *
- * Re-exports from the transport module for convenience.
+ * Re-exports from the transport and manager modules for convenience.
  */
 
 export type {
@@ -13,3 +13,5 @@ export type {
   Statement,
   SignedStatement,
 } from './transport.js';
+
+export type { SsoState, SsoManager, SsoManagerConfig, PairingExecutor, PairingResult } from './manager.js';
