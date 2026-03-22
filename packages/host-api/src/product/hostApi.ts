@@ -1,10 +1,11 @@
 /**
  * Product-side Host API facade.
  *
- * Wraps the low-level transport `request()` / `subscribe()` calls into a
- * typed, ergonomic API surface.  Every request method returns a
- * `ResultAsync<Ok, Err>` from neverthrow so callers can
- * chain with `.map()`, `.andThen()`, `.match()`, etc.
+ * `createHostApi` builds the full product-side communication stack:
+ * provider → transport (with handshake and codec upgrade) → typed facade.
+ *
+ * Every request method returns a `ResultAsync<Ok, Err>` from neverthrow
+ * so callers can chain with `.map()`, `.andThen()`, `.match()`, etc.
  *
  * Handler param/ok/err types are derived from the SCALE codec definitions
  * in `hostApiProtocol` via `RequestParams`, `ResponseOk`, `ResponseErr`,
@@ -24,28 +25,40 @@ import type {
   SubscriptionParams,
   SubscriptionPayload,
 } from '../shared/codec/scale/protocol.js';
+import { scaleCodecAdapter } from '../shared/codec/scale/protocol.js';
+import { structuredCloneCodecAdapter } from '../shared/codec/structured/index.js';
+import { requestCodecUpgrade } from '../shared/codec/negotiation.js';
+import { createTransport } from '../shared/transport/transport.js';
+import { createWindowProvider } from '../shared/transport/windowProvider.js';
+import { createMessagePortProvider } from '../shared/transport/messagePortProvider.js';
 import { ResultAsync } from 'neverthrow';
 import { extractErrorMessage } from '../shared/util/helpers.js';
 
-import { sandboxTransport } from './sandboxTransport.js';
+// ---------------------------------------------------------------------------
+// Options
+// ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// Versioned envelope helper
-// ---------------------------------------------------------------------------
+export type CreateHostApiOptions = {
+  /** How the product communicates with the host. */
+  messaging: { type: 'window'; target: Window } | { type: 'messagePort'; port: MessagePort | Promise<MessagePort> };
+
+  /** Protocol version for handshake validation. Defaults to 1. */
+  protocolVersionId?: number;
+};
+
+/**
+ * Internal options for testing — accepts a pre-built transport directly.
+ * @internal
+ */
+export type CreateHostApiFromTransportOptions = {
+  /** A pre-built transport (bypasses provider/handshake/codec-upgrade setup). */
+  transport: Transport;
+};
 
 // ---------------------------------------------------------------------------
 // Internal: generic request / subscribe wrappers
 // ---------------------------------------------------------------------------
 
-/**
- * Send a versioned request and unwrap the response.
- *
- * Wraps the payload in `{ tag: version, value: payload }` before sending.
- * Unwraps the response by stripping the version tag and splitting the
- * `{ success: true/false, value }` Result envelope.
- *
- * Returns `ResultAsync<Ok, Err>` directly — no Tagged wrapper.
- */
 function makeRequest<M extends RequestMethod, V extends string>(
   transport: Transport,
   method: M,
@@ -71,12 +84,6 @@ function makeRequest<M extends RequestMethod, V extends string>(
   });
 }
 
-/**
- * Start a versioned subscription and unwrap received payloads.
- *
- * Wraps the start payload in `{ tag: version, value: payload }`.
- * Unwraps received payloads by stripping the version tag.
- */
 function makeSubscription<M extends SubscriptionMethod, V extends string>(
   transport: Transport,
   method: M,
@@ -92,21 +99,59 @@ function makeSubscription<M extends SubscriptionMethod, V extends string>(
   });
 }
 
+// ---------------------------------------------------------------------------
+// Factory
+// ---------------------------------------------------------------------------
+
 /**
- * Create a product-side HostApi facade bound to a given transport.
+ * Create a product-side HostApi.
  *
- * Every method corresponds to a protocol method defined in
- * `@polkadot/host-api` (shared/codec/scale/protocol). Request methods return
- * `ResultAsync` with versioned success/error envelopes. Subscription
- * methods return a `Subscription` handle.
+ * Builds the full stack internally: creates the appropriate provider from
+ * `messaging`, creates a transport with `handshake: 'initiate'`, and wraps
+ * it with automatic codec upgrade negotiation.
+ *
+ * For testing, accepts `{ transport }` to bypass provider/handshake/codec setup.
  */
-export function createHostApi(transport: Transport) {
+export function createHostApi(options: CreateHostApiOptions | CreateHostApiFromTransportOptions) {
+  let transport: Transport;
+  let readyPromise: Promise<void>;
+
+  if ('transport' in options) {
+    // Testing path: use pre-built transport directly.
+    transport = options.transport;
+    readyPromise = transport.whenReady();
+  } else {
+    const { messaging, protocolVersionId } = options;
+
+    // Build provider from messaging option.
+    const provider =
+      messaging.type === 'window' ? createWindowProvider(messaging.target) : createMessagePortProvider(messaging.port);
+
+    // Build transport with eager handshake.
+    transport = createTransport({
+      provider,
+      handshake: 'initiate',
+      idPrefix: 'p:',
+      protocolVersionId,
+    });
+
+    // Auto-upgrade codec after handshake.
+    readyPromise = transport.whenReady().then(async () => {
+      await requestCodecUpgrade(transport, {
+        scale: scaleCodecAdapter,
+        structured_clone: structuredCloneCodecAdapter,
+      });
+    });
+  }
+  // Suppress unhandled rejection if no one awaits whenReady().
+  readyPromise.catch(() => {});
+
   return {
     // -- Transport proxies --------------------------------------------------
 
     /** Resolves when the handshake and codec negotiation are complete. */
     whenReady(): Promise<void> {
-      return transport.whenReady();
+      return readyPromise;
     },
 
     /**
@@ -345,16 +390,6 @@ export function createHostApi(transport: Transport) {
     },
   };
 }
-
-// ---------------------------------------------------------------------------
-// Singleton
-// ---------------------------------------------------------------------------
-
-/**
- * Default HostApi instance bound to the default sandbox transport.
- * `undefined` when not in a supported environment (not in iframe or webview).
- */
-export const hostApi: HostApi | undefined = sandboxTransport ? createHostApi(sandboxTransport) : undefined;
 
 /**
  * Return type of `createHostApi`.

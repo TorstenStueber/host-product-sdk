@@ -305,8 +305,8 @@ the product's 1s timeout has already fired (so `requestCodecUpgrade` returned `u
 `decodeIncoming` detects the structured clone response and auto-upgrades the outgoing codec. Both sides converge on
 structured clone regardless of timing.
 
-**Automatic upgrade**: the product-side `sandboxTransport` singleton wraps `whenReady()` so that after the handshake
-succeeds, it automatically calls `requestCodecUpgrade` with both `scale` and `structured_clone` adapters. Since every
+**Automatic upgrade**: `createHostApi` wraps the handshake so that after it succeeds, it automatically calls
+`requestCodecUpgrade` with both `scale` and `structured_clone` adapters before `whenReady()` resolves. Since every
 `transport.request()` and `transport.subscribe()` internally awaits `whenReady()`, the upgrade happens transparently
 before any real protocol traffic.
 
@@ -453,26 +453,27 @@ product (asking it to render a custom chat message UI). The protocol handler exp
 
 ## Part 1c: `@polkadot/host-api`: Product layer (`src/product/`)
 
-Product-side transport setup and HostApi facade. These live in the `host-api` package because they are the product's
-interface to the transport -- the bridge between the protocol layer and the domain modules in `@polkadot/product`.
+Product-side HostApi facade. Lives in `host-api` because it is the product's interface to the transport -- the bridge
+between the protocol layer and the domain modules in `@polkadot/product`.
 
-### 1c.1 Transport (`product/sandboxTransport.ts`)
+### 1c.1 Host API (`product/hostApi.ts`)
 
-`createDefaultProductProvider()` detects the environment and returns the appropriate shared provider, or `undefined` if
-not in a supported environment:
+`createHostApi(options)` builds the full product-side communication stack in one call:
 
-- `isIframe()` -> `createWindowProvider(window.top)` from shared
-- `isWebview()` -> `createMessagePortProvider(getWebviewPort())` from shared, where `getWebviewPort()` polls
-  `window.__HOST_API_PORT__` for the port injected by the host's webview provider
-- otherwise -> `undefined`
+```typescript
+const hostApi = createHostApi({
+  messaging: { type: 'window', target: window.top },
+});
+```
 
-Creates transport with `handshake: 'initiate'` and `idPrefix: 'p:'`. The handshake starts eagerly when the transport is
-created. The `sandboxTransport` singleton wraps `whenReady()` so that after the handshake succeeds, it automatically
-attempts a codec upgrade to structured clone (see 1.10 Codec Negotiation). This happens transparently before any real
-protocol traffic. The singletons `sandboxProvider`, `sandboxTransport`, and `hostApi` are all `undefined` when not in a
-supported environment.
+The `messaging` option determines the underlying provider:
 
-### 1c.2 Host API (`product/hostApi.ts`)
+- `{ type: 'window', target }` -> `createWindowProvider(target)` (iframe communication)
+- `{ type: 'messagePort', port }` -> `createMessagePortProvider(port)` (webview communication)
+
+Internally, `createHostApi` creates the provider, builds a transport with `handshake: 'initiate'` and `idPrefix: 'p:'`,
+and wraps `whenReady()` so that after the handshake succeeds, it automatically attempts a codec upgrade to structured
+clone before resolving.
 
 Product-side facade. The **only** interface that product domain modules use to communicate with the host -- no module
 imports `Transport` directly. Wraps every transport method (43 protocol methods plus transport lifecycle) with strong
@@ -484,8 +485,7 @@ before sending, and unwraps the response by stripping the version tag and splitt
 Result envelope. Callers never see the versioned wire format. `makeSubscription` similarly wraps start payloads and
 unwraps received payloads.
 
-**Transport proxies**: in addition to protocol methods, `HostApi` exposes transport lifecycle as meaningful accessors so
-domain modules never need a `Transport` reference:
+**Transport proxies**: in addition to protocol methods, `HostApi` exposes:
 
 - `whenReady()`: resolves when handshake and codec negotiation are complete
 - `handleHostSubscription(method, handler)`: registers a handler for the one host-initiated subscription (custom chat

@@ -41,12 +41,12 @@ describe('HostApi transport proxies', () => {
   });
 
   it('whenReady delegates to transport and resolves after handshake', async () => {
-    const hostApi = createHostApi(productTransport);
+    const hostApi = createHostApi({ transport: productTransport });
     await hostApi.whenReady();
   });
 
   it('handleHostSubscription registers a handler on the transport', async () => {
-    const hostApi = createHostApi(productTransport);
+    const hostApi = createHostApi({ transport: productTransport });
     await hostApi.whenReady();
 
     const receivedValues: unknown[] = [];
@@ -76,7 +76,7 @@ describe('HostApi transport proxies', () => {
   });
 
   it('handleHostSubscription returns an unsubscribe function', async () => {
-    const hostApi = createHostApi(productTransport);
+    const hostApi = createHostApi({ transport: productTransport });
     await hostApi.whenReady();
 
     const unsub = hostApi.handleHostSubscription('product_chat_custom_message_render_subscribe', () => () => {});

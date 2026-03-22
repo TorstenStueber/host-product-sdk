@@ -44,7 +44,7 @@ describe('handleCustomMessageRendering', () => {
   });
 
   it('registers a handler and receives rendering requests from the host', async () => {
-    const hostApi = createHostApi(productTransport);
+    const hostApi = createHostApi({ transport: productTransport });
     await hostApi.whenReady();
 
     const rendererCalls: { messageId: string; messageType: string }[] = [];
@@ -81,7 +81,7 @@ describe('handleCustomMessageRendering', () => {
   });
 
   it('provides a render function to the callback', async () => {
-    const hostApi = createHostApi(productTransport);
+    const hostApi = createHostApi({ transport: productTransport });
     await hostApi.whenReady();
 
     let renderFn: ((node: unknown) => void) | undefined;
@@ -112,7 +112,7 @@ describe('handleCustomMessageRendering', () => {
   });
 
   it('returns an unsubscribe function that deregisters the handler', async () => {
-    const hostApi = createHostApi(productTransport);
+    const hostApi = createHostApi({ transport: productTransport });
     await hostApi.whenReady();
 
     const unsub = handleCustomMessageRendering(() => () => {}, hostApi);

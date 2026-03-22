@@ -10,7 +10,8 @@
  */
 
 // -- Host API facade --------------------------------------------------------
-export { hostApi, createHostApi } from '@polkadot/host-api';
+export { createHostApi } from '@polkadot/host-api';
+export type { CreateHostApiOptions } from '@polkadot/host-api';
 
 // -- Chain / JSON-RPC provider ----------------------------------------------
 export { createPapiProvider } from './chain.js';
@@ -35,9 +36,6 @@ export { injectSpektrExtension, createNonProductExtensionEnableFactory } from '.
 
 // -- Logger -----------------------------------------------------------------
 export { productLogger, setProductLogger } from './logger.js';
-
-// -- Transport --------------------------------------------------------------
-export { sandboxProvider, sandboxTransport } from '@polkadot/host-api';
 
 // -- Constants --------------------------------------------------------------
 export { WellKnownChain, SpektrExtensionName } from './constants.js';

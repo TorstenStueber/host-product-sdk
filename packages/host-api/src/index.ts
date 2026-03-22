@@ -210,17 +210,8 @@ export { createChainConnectionManager } from './host/connectionManager.js';
 export type { ChainConnectionManager } from './host/connectionManager.js';
 
 // ===========================================================================
-// Product: facade and transport
+// Product: facade
 // ===========================================================================
 
-export { createHostApi, hostApi } from './product/hostApi.js';
-export type { HostApi } from './product/hostApi.js';
-
-export {
-  sandboxProvider,
-  sandboxTransport,
-  createDefaultProductProvider,
-  hasWindow,
-  isIframe,
-  isWebview,
-} from './product/sandboxTransport.js';
+export { createHostApi } from './product/hostApi.js';
+export type { HostApi, CreateHostApiOptions, CreateHostApiFromTransportOptions } from './product/hostApi.js';
