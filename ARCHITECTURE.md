@@ -591,8 +591,8 @@ same bus see each other's statements. Topic matching uses byte-level comparison.
 - `PairingExecutor` is the pluggable crypto protocol — implementations handle mnemonic generation, P-256 ECDH,
   statement-store key exchange, and attestation. The manager only drives the state machine and persistence.
 
-**`sso/signing.ts`**: `createRemoteSigner(config)` — routes sign requests through the SSO transport to the paired
-mobile wallet:
+**`sso/signing.ts`**: `createRemoteSigner(config)` — routes sign requests through the SSO transport to the paired mobile
+wallet:
 
 - `signPayload(request)` / `signRaw(request)`: guards that the manager is paired, delegates to an injected
   `SignRequestExecutor` (which handles AES encryption, statement framing, and response correlation), and applies a
@@ -600,6 +600,14 @@ mobile wallet:
 - `SignRequestExecutor` is the pluggable crypto layer — implementations encrypt the payload with the session key,
   publish to the statement-store topic, wait for the wallet's signed response, and decrypt it.
 - `RemoteSigner` can be wired as the `onSignPayload`/`onSignRaw` callbacks in `HandlersConfig`.
+
+**`identity/types.ts`**: `IdentityProvider` interface (`getIdentity(accountIdHex)`) and `ResolvedIdentity` type
+(liteUsername, fullUsername, avatarUrl, chainIdentity). Implementations query a chain (e.g. People parachain's
+`Resources.Consumers` storage) and return structured identity data.
+
+**`identity/resolver.ts`**: `createIdentityResolver(provider)` — wraps an `IdentityProvider` with in-memory caching
+and concurrent-request deduplication. Failed requests are not cached so transient errors are retried. Supports
+`invalidate(accountId)` and `invalidateAll()` for cache control.
 
 ### 2.5 Webview Port (`webviewPort.ts`)
 
@@ -716,7 +724,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 ## Part 4: Tests
 
-### 4.1 Unit Tests (18 files, 218 tests)
+### 4.1 Unit Tests (19 files, 228 tests)
 
 **Test helper** (`test/helpers/mockProvider.ts`): creates connected mock Provider pairs (async and sync variants).
 
@@ -733,7 +741,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 - `protocol.spec.ts` (18 tests): all methods present in hostApiProtocol, correct types, error type construction
 - `util.spec.ts` (24 tests): logger, createIdFactory, delay, promiseWithResolvers, composeAction, toHexString
 
-**Host** (8 files):
+**Host** (9 files):
 
 - `handlers.spec.ts` (14 tests): featureSupported, navigateTo, pushNotification, permissions, storage
 - `authManager.spec.ts` (14 tests): full state machine, subscribe/unsubscribe
@@ -747,6 +755,8 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
   failure handling, session persistence, session restore, dispose, subscribe/unsubscribe
 - `ssoSigning.spec.ts` (9 tests): paired guard, signPayload/signRaw delegation, timeout, executor error propagation,
   signedTransaction passthrough
+- `identityResolver.spec.ts` (10 tests): delegation, caching (hit/miss/undefined), invalidation (single/all),
+  concurrent deduplication, error propagation, transient error retry
 
 **Product** (4 files):
 

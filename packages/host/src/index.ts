@@ -81,6 +81,14 @@ export { createPappAdapterStub } from './auth/pappAdapter.js';
 export type { PappAdapter, PappAdapterConfig, PairingStatus, AttestationStatus } from './auth/pappAdapter.js';
 
 // ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+export type { IdentityProvider, ResolvedIdentity } from './auth/identity/types.js';
+export type { IdentityResolver } from './auth/identity/resolver.js';
+export { createIdentityResolver } from './auth/identity/resolver.js';
+
+// ---------------------------------------------------------------------------
 // SSO transport
 // ---------------------------------------------------------------------------
 
