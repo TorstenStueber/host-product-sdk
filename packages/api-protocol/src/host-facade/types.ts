@@ -1,7 +1,7 @@
 /**
- * ProtocolHandler types.
+ * HostFacade types.
  *
- * The ProtocolHandler is the central type that bridges a host application with
+ * The HostFacade is the central type that bridges a host application with
  * an embedded product via the transport layer. It exposes handler
  * registration methods for every protocol method, translating between
  * the versioned wire format (v1 tagged enums) and plain TypeScript types.
@@ -42,10 +42,10 @@ type SubscriptionHandlerFn<M extends SubscriptionMethod, SV extends string = 'v1
 ) => () => void;
 
 // ---------------------------------------------------------------------------
-// ProtocolHandler interface
+// HostFacade interface
 // ---------------------------------------------------------------------------
 
-export type ProtocolHandler = {
+export type HostFacade = {
   // -- Core / lifecycle -----------------------------------------------------
   handleFeatureSupported(handler: RequestHandler<'host_feature_supported'>): () => void;
   handleDevicePermission(handler: RequestHandler<'host_device_permission'>): () => void;

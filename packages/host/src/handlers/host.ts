@@ -5,11 +5,11 @@
  * - pushNotification
  */
 
-import type { ProtocolHandler } from '@polkadot/host-api';
+import type { HostFacade } from '@polkadot/api-protocol';
 import type { HandlersConfig } from './registry.js';
-import { okAsync } from '@polkadot/host-api';
+import { okAsync } from '@polkadot/api-protocol';
 
-export function wireHostHandlers(container: ProtocolHandler, config: HandlersConfig): (() => void)[] {
+export function wireHostHandlers(container: HostFacade, config: HandlersConfig): (() => void)[] {
   const cleanups: (() => void)[] = [];
 
   // Feature supported - delegates to config callback or returns false

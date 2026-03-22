@@ -5,10 +5,10 @@
  * which wraps all chain_* methods via the ChainConnectionManager.
  */
 
-import type { ProtocolHandler } from '@polkadot/host-api';
+import type { HostFacade } from '@polkadot/api-protocol';
 import type { HandlersConfig } from './registry.js';
 
-export function wireChainHandlers(container: ProtocolHandler, config: HandlersConfig): (() => void)[] {
+export function wireChainHandlers(container: HostFacade, config: HandlersConfig): (() => void)[] {
   const cleanups: (() => void)[] = [];
 
   if (config.chainProvider) {

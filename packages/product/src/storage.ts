@@ -6,10 +6,10 @@
  * string, and JSON serialisation.
  *
  * Ported from product-sdk/localStorage.ts, adapted to use the
- * HostApi facade.
+ * ProductFacade.
  */
 
-import type { HostApi } from '@polkadot/host-api';
+import type { ProductFacade } from '@polkadot/api-protocol';
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -18,24 +18,24 @@ import type { HostApi } from '@polkadot/host-api';
 /**
  * Create a local storage provider.
  *
- * @param hostApi - The HostApi instance to use. Defaults to the singleton.
+ * @param facade - The ProductFacade instance to use.
  */
-export const createLocalStorage = (hostApi: HostApi) => {
+export const createLocalStorage = (facade: ProductFacade) => {
   const textEncoder = new TextEncoder();
   const textDecoder = new TextDecoder();
 
   function readBytes(key: string): Promise<Uint8Array | undefined> {
     return new Promise<Uint8Array | undefined>((resolve, reject) =>
-      hostApi.localStorageRead(key).match(resolve, reject),
+      facade.localStorageRead(key).match(resolve, reject),
     );
   }
 
   function writeBytes(key: string, value: Uint8Array): Promise<void> {
-    return new Promise<void>((resolve, reject) => hostApi.localStorageWrite([key, value]).match(resolve, reject));
+    return new Promise<void>((resolve, reject) => facade.localStorageWrite([key, value]).match(resolve, reject));
   }
 
   function clearKey(key: string): Promise<void> {
-    return new Promise<void>((resolve, reject) => hostApi.localStorageClear(key).match(resolve, reject));
+    return new Promise<void>((resolve, reject) => facade.localStorageClear(key).match(resolve, reject));
   }
 
   return {

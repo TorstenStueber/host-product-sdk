@@ -5,13 +5,13 @@
  *
  * Usage:
  * ```ts
- * import { createHostApi, createPapiProvider, createAccountsProvider } from '@polkadot/product';
+ * import { createProductFacade, createPapiProvider, createAccountsProvider } from '@polkadot/product';
  * ```
  */
 
 // -- Host API facade --------------------------------------------------------
-export { createHostApi } from '@polkadot/host-api';
-export type { CreateHostApiOptions } from '@polkadot/host-api';
+export { createProductFacade } from '@polkadot/api-protocol';
+export type { CreateProductFacadeOptions } from '@polkadot/api-protocol';
 
 // -- Chain / JSON-RPC provider ----------------------------------------------
 export { createPapiProvider } from './chain.js';

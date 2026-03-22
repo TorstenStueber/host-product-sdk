@@ -1,7 +1,7 @@
 /**
  * E2E host harness.
  *
- * Creates a ProtocolHandler from the iframe, wires handlers, and exposes
+ * Creates a HostFacade from the iframe, wires handlers, and exposes
  * results on window.__e2e for Playwright to inspect.
  *
  * Reads `?codec=scale|structured_clone|upgrade` from the URL:
@@ -9,13 +9,13 @@
  * - `scale`: use SCALE codec throughout
  * - `upgrade`: start with SCALE, allow upgrade to structured clone
  */
-import { createProtocolHandler } from '@polkadot/host';
-import type { ProtocolHandler } from '@polkadot/host';
-import { okAsync, errAsync } from '@polkadot/host-api';
+import { createHostFacade } from '@polkadot/host';
+import type { HostFacade } from '@polkadot/host';
+import { okAsync, errAsync } from '@polkadot/api-protocol';
 
 type HostE2E = {
   ready: boolean;
-  container: ProtocolHandler | undefined;
+  container: HostFacade | undefined;
   signPayloadCalls: unknown[];
   signRawCalls: unknown[];
   storageBacking: Record<string, string>;
@@ -39,7 +39,7 @@ iframe.src = `/product.html?codec=${codecParam}`;
 
 // For the 'scale' test, disable codec upgrade so the connection stays on SCALE.
 const allowCodecUpgrade = codecParam !== 'scale';
-const container = createProtocolHandler({
+const container = createHostFacade({
   messaging: { type: 'window', target: () => iframe.contentWindow },
   allowCodecUpgrade,
 });

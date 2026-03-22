@@ -2,11 +2,11 @@
  * Public types for the @polkadot/product package.
  *
  * These are plain TypeScript types (no SCALE codec dependencies) that
- * mirror the protocol domain types from @polkadot/host-api. Consumers
+ * mirror the protocol domain types from @polkadot/api-protocol. Consumers
  * of this package should use these types directly.
  */
 
-import type { ConnectionStatus, HexString, Subscription, Transport } from '@polkadot/host-api';
+import type { ConnectionStatus, HexString, Subscription, Transport } from '@polkadot/api-protocol';
 
 // Re-export shared types that are part of our public API
 export type { ConnectionStatus, HexString, Subscription, Transport };

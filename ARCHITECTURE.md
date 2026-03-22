@@ -20,17 +20,17 @@ A **host** application (like dot.li) embeds third-party **product** dApps inside
 
 Three npm packages:
 
-| Package              | Published           | Purpose                                                                  |
-| -------------------- | ------------------- | ------------------------------------------------------------------------ |
-| `@polkadot/host-api` | No (workspace-only) | Protocol types, codecs, transport, host protocol handler, product facade |
-| `@polkadot/host`     | Yes                 | Handlers, auth, storage, SDK entry point                                 |
-| `@polkadot/product`  | Yes                 | Domain modules: accounts, chain, chat, storage, etc.                     |
+| Package                  | Published           | Purpose                                                                  |
+| ------------------------ | ------------------- | ------------------------------------------------------------------------ |
+| `@polkadot/api-protocol` | No (workspace-only) | Protocol types, codecs, transport, host protocol handler, product facade |
+| `@polkadot/host`         | Yes                 | Handlers, auth, storage, SDK entry point                                 |
+| `@polkadot/product`      | Yes                 | Domain modules: accounts, chain, chat, storage, etc.                     |
 
-Runtime dependencies of host-api: `scale-ts`, `nanoevents`, `neverthrow`, `@polkadot-api/json-rpc-provider`.
+Runtime dependencies of api-protocol: `scale-ts`, `nanoevents`, `neverthrow`, `@polkadot-api/json-rpc-provider`.
 
 ---
 
-## Part 1: `@polkadot/host-api`: Shared layer (`src/shared/`)
+## Part 1: `@polkadot/api-protocol`: Shared layer (`src/shared/`)
 
 Everything both sides depend on. Read bottom-up: utilities, then codec, then transport, then protocol types.
 
@@ -188,8 +188,8 @@ extract the inner codec types using `CodecType<>` and `Extract<>`:
 
 These types are the single source of truth for handler signatures on both the host and product sides. The transport
 methods are generic on the method name (`request<M>`, `handleRequest<M>`, etc.) so the versioned envelope types flow
-through automatically. The ProtocolHandler interface and the product HostApi facade derive their types from the same
-protocol codecs.
+through automatically. The HostFacade interface and the product ProductFacade derive their types from the same protocol
+codecs.
 
 The `MessagePayload` enum is built by flattening all entries (concatenating method name + suffix into action keys like
 `host_handshake_request`). For subscriptions, `_stop` and `_interrupt` default to `_void` if omitted. Then:
@@ -233,7 +233,7 @@ Two concrete provider implementations live in shared as neutral building blocks:
 Accepts either a direct `Window` reference or a lazy getter `() => Window | null`. Validates incoming messages (accepts
 both Uint8Array for SCALE and protocol message objects for structured clone), manages subscribers, handles Uint8Array
 buffer transfer. When the getter returns null, outgoing messages are silently dropped. Used internally by
-`createProtocolHandler` and `createHostApi` when `messaging.type` is `'window'`.
+`createHostFacade` and `createProductFacade` when `messaging.type` is `'window'`.
 
 **`transport/messagePortProvider.ts`**: `createMessagePortProvider(port: MessagePort | Promise<MessagePort>)`:
 communicates over a MessagePort. Accepts a ready port or a Promise (for async acquisition). Same message validation as
@@ -303,7 +303,7 @@ the product's 1s timeout has already fired (so `requestCodecUpgrade` returned `u
 `decodeIncoming` detects the structured clone response and auto-upgrades the outgoing codec. Both sides converge on
 structured clone regardless of timing.
 
-**Automatic upgrade**: `createHostApi` wraps the handshake so that after it succeeds, it automatically calls
+**Automatic upgrade**: `createProductFacade` wraps the handshake so that after it succeeds, it automatically calls
 `requestCodecUpgrade` with both `scale` and `structured_clone` adapters before `whenReady()` resolves. Since every
 `transport.request()` and `transport.subscribe()` internally awaits `whenReady()`, the upgrade happens transparently
 before any real protocol traffic.
@@ -315,7 +315,7 @@ product's request hangs until the 1s timeout. With our code, the not-supported c
 ### 1.11 Main Entry Point (`index.ts`)
 
 Single flat file re-exporting from all three layers: `shared/` (protocol, codecs, transport, utilities), `host/`
-(protocol handler, providers, connection manager), and `product/` (HostApi facade, sandbox transport). No barrel chains.
+(protocol handler, providers, connection manager), and `product/` (ProductFacade, sandbox transport). No barrel chains.
 
 ### 1.12 Error Representation
 
@@ -352,25 +352,25 @@ flatten/hydrate layer between host and product.
 
 ---
 
-## Part 1b: `@polkadot/host-api`: Host layer (`src/host/`)
+## Part 1b: `@polkadot/api-protocol`: Host facade (`src/host-facade/`)
 
-Host-side protocol handler, providers, and chain connection manager. These live in the `host-api` package because they
-are the host's interface to the transport -- the bridge between the protocol layer and the handler implementations in
-`@polkadot/host`.
+Host-side protocol handler, providers, and chain connection manager. These live in the `api-protocol` package because
+they are the host's interface to the transport -- the bridge between the protocol layer and the handler implementations
+in `@polkadot/host`.
 
-### 1b.1 ProtocolHandler (`host/protocolHandler.ts`)
+### 1b.1 HostFacade (`host-facade/protocolHandler.ts`)
 
-`createProtocolHandler(options)` builds the host-side communication stack:
+`createHostFacade(options)` builds the host-side communication stack:
 
 ```typescript
-const handler = createProtocolHandler({
+const handler = createHostFacade({
   messaging: { type: 'window', target: () => iframe.contentWindow },
   allowCodecUpgrade: true, // default
 });
 ```
 
-The `messaging` option determines the underlying provider (same tagged union as `createHostApi` on the product side, but
-`WindowRef` supports lazy getters `() => Window | null` for iframes where `contentWindow` may not be available
+The `messaging` option determines the underlying provider (same tagged union as `createProductFacade` on the product
+side, but `WindowRef` supports lazy getters `() => Window | null` for iframes where `contentWindow` may not be available
 immediately):
 
 - `{ type: 'window', target }` -> `createWindowProvider(target)` (iframe communication)
@@ -379,8 +379,8 @@ immediately):
 `allowCodecUpgrade` (default `true`) registers a codec upgrade handler with hardcoded `scale` and `structured_clone`
 adapters.
 
-Internally creates a Transport with `handshake: 'respond'` and `idPrefix: 'h:'`. Returns ProtocolHandler with 41 methods
-(40 `handle*()` for product-initiated requests/subscriptions, plus one host-initiated method: `renderChatCustomMessage`)
+Internally creates a Transport with `handshake: 'respond'` and `idPrefix: 'h:'`. Returns HostFacade with 41 methods (40
+`handle*()` for product-initiated requests/subscriptions, plus one host-initiated method: `renderChatCustomMessage`)
 
 The internal helpers `wireRequest(method, handlers, defaultError)` and `wireSubscription(method, handlers)` take a
 **version handler map**: an object keyed by version tag, each value a handler for that version:
@@ -420,16 +420,16 @@ map.
 `handleChainConnection(factory)` is special -- creates a `ChainConnectionManager` and wires all 13 chain methods with
 its own inline version dispatch.
 
-### 1b.3 ProtocolHandler Types (`host/types.ts`)
+### 1b.3 HostFacade Types (`host-facade/types.ts`)
 
-The `ProtocolHandler` interface derives all handler types from the protocol codecs:
+The `HostFacade` interface derives all handler types from the protocol codecs:
 
 ```typescript
 type RequestHandler<M extends RequestMethod, V extends string = 'v1'> = (
   params: RequestParams<M, V>,
 ) => ResultAsync<ResponseOk<M, V>, ResponseErr<M, V>>;
 
-interface ProtocolHandler {
+interface HostFacade {
   handleAccountGet(handler: RequestHandler<'host_account_get'>): VoidFunction;
   // 39 more handle*() methods...
 
@@ -452,17 +452,17 @@ product (asking it to render a custom chat message UI). The protocol handler exp
 
 ---
 
-## Part 1c: `@polkadot/host-api`: Product layer (`src/product/`)
+## Part 1c: `@polkadot/api-protocol`: Product facade (`src/product-facade/`)
 
-Product-side HostApi facade. Lives in `host-api` because it is the product's interface to the transport -- the bridge
+Product-side ProductFacade. Lives in `api-protocol` because it is the product's interface to the transport -- the bridge
 between the protocol layer and the domain modules in `@polkadot/product`.
 
-### 1c.1 Host API (`product/hostApi.ts`)
+### 1c.1 Product Facade (`product-facade/hostApi.ts`)
 
-`createHostApi(options)` builds the full product-side communication stack in one call:
+`createProductFacade(options)` builds the full product-side communication stack in one call:
 
 ```typescript
-const hostApi = createHostApi({
+const hostApi = createProductFacade({
   messaging: { type: 'window', target: window.top },
 });
 ```
@@ -472,9 +472,9 @@ The `messaging` option determines the underlying provider:
 - `{ type: 'window', target }` -> `createWindowProvider(target)` (iframe communication)
 - `{ type: 'messagePort', port }` -> `createMessagePortProvider(port)` (webview communication)
 
-Internally, `createHostApi` creates the provider, builds a transport with `handshake: 'initiate'` and `idPrefix: 'p:'`,
-and wraps `whenReady()` so that after the handshake succeeds, it automatically attempts a codec upgrade to structured
-clone before resolving.
+Internally, `createProductFacade` creates the provider, builds a transport with `handshake: 'initiate'` and
+`idPrefix: 'p:'`, and wraps `whenReady()` so that after the handshake succeeds, it automatically attempts a codec
+upgrade to structured clone before resolving.
 
 Product-side facade. The **only** interface that product domain modules use to communicate with the host -- no module
 imports `Transport` directly. Wraps every transport method (43 protocol methods plus transport lifecycle) with strong
@@ -486,7 +486,7 @@ before sending, and unwraps the response by stripping the version tag and splitt
 Result envelope. Callers never see the versioned wire format. `makeSubscription` similarly wraps start payloads and
 unwraps received payloads.
 
-**Transport proxies**: in addition to protocol methods, `HostApi` exposes:
+**Transport proxies**: in addition to protocol methods, `ProductFacade` exposes:
 
 - `whenReady()`: resolves when handshake and codec negotiation are complete
 - `handleHostSubscription(method, handler)`: registers a handler for the one host-initiated subscription (custom chat
@@ -497,7 +497,7 @@ unwraps received payloads.
 ## Part 2: `@polkadot/host`
 
 What runs on the host page. Handlers, auth, storage adapters, and the SDK entry point. All code here imports from
-`@polkadot/host-api` -- it never touches the transport directly.
+`@polkadot/api-protocol` -- it never touches the transport directly.
 
 ### 2.1 Handlers (`handlers/`)
 
@@ -551,12 +551,12 @@ junctions `['product', productId, derivationIndex]`.
 
 `acquireWebviewPort({ webview, openDevTools? })` acquires a `MessagePort` by creating a `MessageChannel`, injecting one
 end into an Electron `<webview>` via `executeJavaScript` on `dom-ready`, and returning the other end. The returned port
-is passed to `createProtocolHandler` via `messaging: { type: 'messagePort', port }`.
+is passed to `createHostFacade` via `messaging: { type: 'messagePort', port }`.
 
 ### 2.6 Nested Bridge (`nested/`)
 
 **`detector.ts`**: `setupNestedBridgeDetector()`: listens for postMessage from windows OTHER than the primary iframe.
-Auto-creates `createProtocolHandler` + `wireAllHandlers` bridge for each nested dApp.
+Auto-creates `createHostFacade` + `wireAllHandlers` bridge for each nested dApp.
 
 ### 2.7 SDK Entry Point (`sdk.ts`)
 
@@ -573,8 +573,8 @@ sdk.dispose();
 ```
 
 Creates AuthManager, then `embed()` sets `iframe.src`, creates
-`createProtocolHandler({ messaging: { type: 'window', target: () => iframe.contentWindow } })` -> `wireAllHandlers()`.
-On dispose, clears `iframe.src`. Also exposes `setSession()` / `clearSession()` for external auth management.
+`createHostFacade({ messaging: { type: 'window', target: () => iframe.contentWindow } })` -> `wireAllHandlers()`. On
+dispose, clears `iframe.src`. Also exposes `setSession()` / `clearSession()` for external auth management.
 
 **`types.ts`**: `HostSdkConfig` with all options: `appId`, `chainProvider`, signing callbacks, permission callbacks, UI
 callbacks.
@@ -583,8 +583,8 @@ callbacks.
 
 ## Part 3: `@polkadot/product`
 
-Domain modules that run inside the iframe. Every module takes a required `HostApi` parameter (from
-`@polkadot/host-api`). No module imports `Transport` directly.
+Domain modules that run inside the iframe. Every module takes a required `ProductFacade` parameter (from
+`@polkadot/api-protocol`). No module imports `Transport` directly.
 
 **Product logger** (`logger.ts`): `productLogger` is a standalone singleton that any product code imports directly.
 `setProductLogger(logger)` swaps the backing implementation -- useful for routing log output to a debug UI overlay
@@ -640,7 +640,7 @@ const val = await storage.readString('key');
 
 **`preimage.ts`**: `createPreimageManager(hostApi)`: lookup subscriptions, submit preimages.
 
-All domain modules take a required `HostApi` parameter. None import `Transport` directly.
+All domain modules take a required `ProductFacade` parameter. None import `Transport` directly.
 
 ### 3.5 Extension (`extension.ts`)
 
@@ -689,7 +689,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 **Product** (4 files):
 
-- `hostApi.spec.ts` (3 tests): HostApi transport proxy methods via real MessageChannel: whenReady,
+- `hostApi.spec.ts` (3 tests): ProductFacade transport proxy methods via real MessageChannel: whenReady,
   handleHostSubscription registration and unsubscribe
 - `chat.spec.ts` (3 tests): handleCustomMessageRendering via real MessageChannel: handler registration, render function
   delivery, unsubscribe deregistration
@@ -698,9 +698,9 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 ### 4.2 E2E Tests (1 file, 51 tests)
 
-Playwright + headless Chromium. A Vite dev server serves two pages: host (creates `createProtocolHandler` +
-`wireAllHandlers` with mock implementations) and product (inside iframe with its own Transport). Real `postMessage`
-across the iframe boundary.
+Playwright + headless Chromium. A Vite dev server serves two pages: host (creates `createHostFacade` + `wireAllHandlers`
+with mock implementations) and product (inside iframe with its own Transport). Real `postMessage` across the iframe
+boundary.
 
 Every test runs three times via `?codec=` query parameter:
 

@@ -4,7 +4,7 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "paths": {
-      "@polkadot/host-api": ["../packages/host-api/src/index.ts"],
+      "@polkadot/api-protocol": ["../packages/api-protocol/src/index.ts"],
       "@polkadot/host": ["../packages/host/src/index.ts"],
       "@polkadot/product": ["../packages/product/src/index.ts"]
     }

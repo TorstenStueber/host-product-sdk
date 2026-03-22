@@ -5,11 +5,11 @@
  * Returns PermissionDenied when no session is available.
  */
 
-import type { ProtocolHandler } from '@polkadot/host-api';
+import type { HostFacade } from '@polkadot/api-protocol';
 import type { HandlersConfig } from './registry.js';
-import { errAsync, ResultAsync } from '@polkadot/host-api';
+import { errAsync, ResultAsync } from '@polkadot/api-protocol';
 
-export function wireSigningHandlers(container: ProtocolHandler, config: HandlersConfig): (() => void)[] {
+export function wireSigningHandlers(container: HostFacade, config: HandlersConfig): (() => void)[] {
   const cleanups: (() => void)[] = [];
 
   cleanups.push(

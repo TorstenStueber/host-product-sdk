@@ -1,7 +1,7 @@
 /**
  * Product-side Host API facade.
  *
- * `createHostApi` builds the full product-side communication stack:
+ * `createProductFacade` builds the full product-side communication stack:
  * provider → transport (with handshake and codec upgrade) → typed facade.
  *
  * Every request method returns a `ResultAsync<Ok, Err>` from neverthrow
@@ -38,7 +38,7 @@ import { extractErrorMessage } from '../shared/util/helpers.js';
 // Options
 // ---------------------------------------------------------------------------
 
-export type CreateHostApiOptions = {
+export type CreateProductFacadeOptions = {
   /** How the product communicates with the host. */
   messaging: { type: 'window'; target: Window } | { type: 'messagePort'; port: MessagePort | Promise<MessagePort> };
 
@@ -95,13 +95,13 @@ function makeSubscription<M extends SubscriptionMethod, V extends string>(
 // ---------------------------------------------------------------------------
 
 /**
- * Create a product-side HostApi.
+ * Create a product-side ProductFacade.
  *
  * Builds the full stack internally: creates the appropriate provider from
  * `messaging`, creates a transport with `handshake: 'initiate'`, and wraps
  * it with automatic codec upgrade negotiation.
  */
-export function createHostApi(options: CreateHostApiOptions) {
+export function createProductFacade(options: CreateProductFacadeOptions) {
   const { messaging, protocolVersionId } = options;
 
   // Build provider from messaging option.
@@ -372,6 +372,6 @@ export function createHostApi(options: CreateHostApiOptions) {
 }
 
 /**
- * Return type of `createHostApi`.
+ * Return type of `createProductFacade`.
  */
-export type HostApi = ReturnType<typeof createHostApi>;
+export type ProductFacade = ReturnType<typeof createProductFacade>;

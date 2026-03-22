@@ -4,11 +4,11 @@
  * Both devicePermission and permission return false by default.
  */
 
-import type { ProtocolHandler } from '@polkadot/host-api';
+import type { HostFacade } from '@polkadot/api-protocol';
 import type { HandlersConfig } from './registry.js';
-import { okAsync, ResultAsync } from '@polkadot/host-api';
+import { okAsync, ResultAsync } from '@polkadot/api-protocol';
 
-export function wirePermissionHandlers(container: ProtocolHandler, config: HandlersConfig): (() => void)[] {
+export function wirePermissionHandlers(container: HostFacade, config: HandlersConfig): (() => void)[] {
   const cleanups: (() => void)[] = [];
 
   cleanups.push(

@@ -2,7 +2,7 @@
  * Public types for @polkadot/host.
  */
 
-import type { HexString, ResponseOk, RequestParams } from '@polkadot/host-api';
+import type { HexString, ResponseOk, RequestParams } from '@polkadot/api-protocol';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 import type {
   SigningPayloadRequest,
@@ -12,9 +12,9 @@ import type {
   DevicePermissionRequest,
   RemotePermissionRequest,
   PushNotification,
-} from '@polkadot/host-api';
+} from '@polkadot/api-protocol';
 
-import type { ProtocolHandler } from '@polkadot/host-api';
+import type { HostFacade } from '@polkadot/api-protocol';
 import type { AuthManager, UserSession, Identity } from './auth/authManager.js';
 
 // ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ export type HostSdkConfig = {
 
 export type EmbeddedProduct = {
   /** The container managing this product's protocol bridge. */
-  readonly container: ProtocolHandler;
+  readonly container: HostFacade;
   /** Dispose the embedded product and its container. */
   dispose(): void;
 };
@@ -118,6 +118,6 @@ export type HostSdk = {
 // ---------------------------------------------------------------------------
 
 export type { AuthState, UserSession, Identity } from './auth/authManager.js';
-export type { ProtocolHandler } from '@polkadot/host-api';
+export type { HostFacade } from '@polkadot/api-protocol';
 export type { HandlersConfig, UserSessionInfo } from './handlers/registry.js';
 export type { StorageAdapter } from './storage/types.js';

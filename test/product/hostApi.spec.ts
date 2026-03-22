@@ -1,7 +1,7 @@
 /**
- * HostApi proxy method tests.
+ * ProductFacade proxy method tests.
  *
- * Verifies that the HostApi facade correctly delegates transport lifecycle
+ * Verifies that the ProductFacade facade correctly delegates transport lifecycle
  * methods (whenReady, handleHostSubscription) to the underlying transport.
  *
  * Uses a real MessageChannel so the full provider → transport → facade
@@ -9,17 +9,17 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createHostApi, createTransport, createMessagePortProvider } from '@polkadot/host-api';
-import type { HostApi, Transport } from '@polkadot/host-api';
+import { createProductFacade, createTransport, createMessagePortProvider } from '@polkadot/api-protocol';
+import type { ProductFacade, Transport } from '@polkadot/api-protocol';
 
 function flush(): Promise<void> {
   return new Promise(r => setTimeout(r, 0));
 }
 
-describe('HostApi transport proxies', () => {
+describe('ProductFacade transport proxies', () => {
   let channel: MessageChannel;
   let hostTransport: Transport;
-  let hostApi: HostApi;
+  let facade: ProductFacade;
 
   beforeEach(() => {
     channel = new MessageChannel();
@@ -28,7 +28,7 @@ describe('HostApi transport proxies', () => {
       handshake: 'respond',
       idPrefix: 'h:',
     });
-    hostApi = createHostApi({
+    facade = createProductFacade({
       messaging: { type: 'messagePort', port: channel.port1 },
     });
   });
@@ -42,15 +42,15 @@ describe('HostApi transport proxies', () => {
   });
 
   it('whenReady resolves after handshake', async () => {
-    await hostApi.whenReady();
+    await facade.whenReady();
   });
 
   it('handleHostSubscription registers a handler on the transport', async () => {
-    await hostApi.whenReady();
+    await facade.whenReady();
 
     const receivedValues: unknown[] = [];
 
-    hostApi.handleHostSubscription('product_chat_custom_message_render_subscribe', (params, send, interrupt) => {
+    facade.handleHostSubscription('product_chat_custom_message_render_subscribe', (params, send, interrupt) => {
       receivedValues.push(params);
       return () => {};
     });
@@ -72,9 +72,9 @@ describe('HostApi transport proxies', () => {
   });
 
   it('handleHostSubscription returns an unsubscribe function', async () => {
-    await hostApi.whenReady();
+    await facade.whenReady();
 
-    const unsub = hostApi.handleHostSubscription('product_chat_custom_message_render_subscribe', () => () => {});
+    const unsub = facade.handleHostSubscription('product_chat_custom_message_render_subscribe', () => () => {});
 
     expect(typeof unsub).toBe('function');
     unsub();

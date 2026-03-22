@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createMessagePortProvider } from '@polkadot/host-api';
+import { createMessagePortProvider } from '@polkadot/api-protocol';
 
 // ---------------------------------------------------------------------------
 // Helpers

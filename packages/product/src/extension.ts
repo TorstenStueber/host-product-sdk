@@ -7,7 +7,7 @@
  * to work inside the host sandbox.
  *
  * Ported from product-sdk/injectWeb3.ts, adapted to use the Transport
- * abstraction from @polkadot/host-api.
+ * abstraction from @polkadot/api-protocol.
  */
 
 import { injectExtension } from '@polkadot/extension-inject/bundle';
@@ -50,7 +50,7 @@ interface SignerResult {
 }
 
 import { SpektrExtensionName } from './constants.js';
-import type { HostApi } from '@polkadot/host-api';
+import type { ProductFacade } from '@polkadot/api-protocol';
 import { productLogger } from './logger.js';
 import type { HexString, VersionedTxPayload } from './types.js';
 
@@ -96,10 +96,10 @@ interface Injected {
  * Returns `undefined` if the transport is not ready (e.g. handshake failed).
  */
 export async function createNonProductExtensionEnableFactory(
-  hostApi: HostApi,
+  facade: ProductFacade,
 ): Promise<((_origin: string) => Promise<Injected>) | undefined> {
   try {
-    await hostApi.whenReady();
+    await facade.whenReady();
   } catch {
     return undefined;
   }
@@ -108,7 +108,7 @@ export async function createNonProductExtensionEnableFactory(
 
   async function enable(_origin?: string): Promise<Injected> {
     async function getAccounts(): Promise<InjectedAccount[]> {
-      const response = await hostApi.getNonProductAccounts(undefined);
+      const response = await facade.getNonProductAccounts(undefined);
 
       return response.match(
         response => {
@@ -147,7 +147,7 @@ export async function createNonProductExtensionEnableFactory(
                 : { tag: 'Payload' as const, value: raw.data },
           };
 
-          const response = await hostApi.signRaw(payload);
+          const response = await facade.signRaw(payload);
 
           return response.match(
             response => {
@@ -183,7 +183,7 @@ export async function createNonProductExtensionEnableFactory(
             withSignedTransaction: payload.withSignedTransaction,
           };
 
-          const response = await hostApi.signPayload(codecPayload);
+          const response = await facade.signPayload(codecPayload);
 
           return response.match(
             response => {
@@ -200,7 +200,7 @@ export async function createNonProductExtensionEnableFactory(
         },
 
         async createTransaction(payload: VersionedTxPayload): Promise<HexString> {
-          const response = await hostApi.createTransactionWithNonProductAccount(payload);
+          const response = await facade.createTransactionWithNonProductAccount(payload);
 
           return response.match(
             response => {
@@ -232,9 +232,9 @@ export async function createNonProductExtensionEnableFactory(
  * @param transport - The transport to use. Pass `undefined` to skip injection.
  * @returns `true` if injection succeeded, `false` otherwise.
  */
-export async function injectSpektrExtension(hostApi: HostApi): Promise<boolean> {
+export async function injectSpektrExtension(facade: ProductFacade): Promise<boolean> {
   try {
-    const enable = await createNonProductExtensionEnableFactory(hostApi);
+    const enable = await createNonProductExtensionEnableFactory(facade);
 
     if (enable) {
       // Cast needed because our Signer/Injected are structurally compatible

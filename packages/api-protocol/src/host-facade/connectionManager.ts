@@ -36,7 +36,7 @@ type ChainEntry = {
 // Factory
 // ---------------------------------------------------------------------------
 
-export type ChainConnectionManager = ReturnType<typeof createChainConnectionManager>;
+type ChainConnectionManager = ReturnType<typeof createChainConnectionManager>;
 
 let instanceCounter = 0;
 

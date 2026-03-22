@@ -3,13 +3,13 @@
  *
  * Creates a MessageChannel, injects one end into the webview via
  * `executeJavaScript`, and returns the other end as a `Promise<MessagePort>`.
- * The returned port can be passed directly to `createProtocolHandler`
+ * The returned port can be passed directly to `createHostFacade`
  * via `messaging: { type: 'messagePort', port }`.
  *
  * Ported from triangle-js-sdks host-container/createWebviewProvider.ts.
  */
 
-import { createIdFactory } from '@polkadot/host-api';
+import { createIdFactory } from '@polkadot/api-protocol';
 
 const nextPortId = createIdFactory('port:');
 
@@ -40,7 +40,7 @@ export type AcquireWebviewPortOptions = {
  * Usage:
  * ```ts
  * const port = acquireWebviewPort({ webview });
- * const handler = createProtocolHandler({
+ * const handler = createHostFacade({
  *   messaging: { type: 'messagePort', port },
  * });
  * ```

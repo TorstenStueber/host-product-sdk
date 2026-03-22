@@ -14,7 +14,7 @@ import {
   composeAction,
   extractErrorMessage,
   toHexString,
-} from '@polkadot/host-api';
+} from '@polkadot/api-protocol';
 
 // ---------------------------------------------------------------------------
 // Logger

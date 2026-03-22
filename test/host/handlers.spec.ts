@@ -3,12 +3,12 @@
  *
  * Tests for wireHostHandlers, wirePermissionHandlers, and wireStorageHandlers
  * using a mock container approach. Since the handlers interact with the
- * ProtocolHandler interface, we test them through the container's handler
+ * HostFacade interface, we test them through the container's handler
  * registration pattern.
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { okAsync, errAsync } from '@polkadot/host-api';
+import { okAsync, errAsync } from '@polkadot/api-protocol';
 
 // We test the handler logic directly using okAsync/errAsync,
 // since the actual wiring requires a full container + transport setup.

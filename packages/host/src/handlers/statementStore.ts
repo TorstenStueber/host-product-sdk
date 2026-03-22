@@ -5,10 +5,10 @@
  * Hosts that support statement store should override these.
  */
 
-import type { ProtocolHandler } from '@polkadot/host-api';
-import { errAsync } from '@polkadot/host-api';
+import type { HostFacade } from '@polkadot/api-protocol';
+import { errAsync } from '@polkadot/api-protocol';
 
-export function wireStatementStoreHandlers(container: ProtocolHandler): (() => void)[] {
+export function wireStatementStoreHandlers(container: HostFacade): (() => void)[] {
   const cleanups: (() => void)[] = [];
 
   cleanups.push(

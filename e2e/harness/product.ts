@@ -9,13 +9,13 @@
  * - `scale`: use SCALE codec throughout
  * - `upgrade`: start with SCALE, upgrade to structured clone after handshake
  */
-import type { Provider, Transport, Subscription } from '@polkadot/host-api';
+import type { Provider, Transport, Subscription } from '@polkadot/api-protocol';
 import {
   createTransport,
   structuredCloneCodecAdapter,
   scaleCodecAdapter,
   requestCodecUpgrade,
-} from '@polkadot/host-api';
+} from '@polkadot/api-protocol';
 
 type ProductE2E = {
   ready: boolean;

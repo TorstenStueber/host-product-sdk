@@ -3,7 +3,7 @@
  *
  * Listens for Uint8Array postMessage events from windows other than the
  * primary iframe. When a new source is detected, creates a full bridge
- * (Provider + ProtocolHandler + handlers) for that window.
+ * (Provider + HostFacade + handlers) for that window.
  *
  * This enables nested dApps (dApp-in-dApp) to communicate with the host,
  * since all dApps send to window.top regardless of depth.
@@ -11,7 +11,7 @@
  * Ported from dotli-clone/container.ts (setupNestedBridgeDetector).
  */
 
-import { createProtocolHandler } from '@polkadot/host-api';
+import { createHostFacade } from '@polkadot/api-protocol';
 import { wireAllHandlers, type HandlersConfig } from '../handlers/registry.js';
 
 function isUint8ArrayLike(data: unknown): data is Uint8Array {
@@ -57,7 +57,7 @@ export function setupNestedBridgeDetector(options: NestedBridgeDetectorOptions):
     const nestedId = String(knownWindows.size);
     console.warn(`[${label}] Nested dApp #${nestedId} detected, creating bridge`);
 
-    const handler = createProtocolHandler({
+    const handler = createHostFacade({
       messaging: { type: 'window', target: event.source as Window },
     });
     const config = createConfig(nestedId);

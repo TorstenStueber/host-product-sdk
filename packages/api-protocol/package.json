@@ -1,5 +1,5 @@
 {
-  "name": "@polkadot/host-api",
+  "name": "@polkadot/api-protocol",
   "private": true,
   "version": "0.1.0",
   "type": "module",

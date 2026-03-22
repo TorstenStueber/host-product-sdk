@@ -9,12 +9,12 @@
  * `transport.handleSubscription` at the transport level rather than
  * burying it inside a domain module.
  *
- * Ported from product-sdk/chat.ts, adapted to use the HostApi facade.
+ * Ported from product-sdk/chat.ts, adapted to use the ProductFacade.
  */
 
-import type { ReceiveCodecType } from '@polkadot/host-api';
+import type { ReceiveCodecType } from '@polkadot/api-protocol';
 
-import type { HostApi } from '@polkadot/host-api';
+import type { ProductFacade } from '@polkadot/api-protocol';
 import type {
   ChatBotRegistrationStatus,
   ChatCustomMessageRenderer,
@@ -32,9 +32,9 @@ import type {
 /**
  * Create a product chat manager.
  *
- * @param hostApi - The HostApi instance to use. Defaults to the singleton.
+ * @param facade - The ProductFacade instance to use.
  */
-export const createProductChatManager = (hostApi: HostApi) => {
+export const createProductChatManager = (facade: ProductFacade) => {
   const roomRegistrationStatus: Record<string, ChatRoomRegistrationStatus> = {};
   const botRegistrationStatus: Record<string, ChatBotRegistrationStatus> = {};
 
@@ -50,7 +50,7 @@ export const createProductChatManager = (hostApi: HostApi) => {
         return existingRegistration;
       }
 
-      const result = await hostApi.chatCreateRoom(params);
+      const result = await facade.chatCreateRoom(params);
 
       return result.match(
         payload => {
@@ -74,7 +74,7 @@ export const createProductChatManager = (hostApi: HostApi) => {
         return existingRegistration;
       }
 
-      const result = await hostApi.chatRegisterBot(params);
+      const result = await facade.chatRegisterBot(params);
 
       return result.match(
         payload => {
@@ -92,7 +92,7 @@ export const createProductChatManager = (hostApi: HostApi) => {
      * Returns the message ID assigned by the host.
      */
     async sendMessage(roomId: string, payload: ChatMessageContent): Promise<{ messageId: string }> {
-      const result = await hostApi.chatPostMessage({ roomId, payload });
+      const result = await facade.chatPostMessage({ roomId, payload });
 
       return result.match(
         payload => {
@@ -108,7 +108,7 @@ export const createProductChatManager = (hostApi: HostApi) => {
      * Subscribe to the list of chat rooms the product participates in.
      */
     subscribeChatList(callback: (rooms: ChatRoom[]) => void) {
-      return hostApi.chatListSubscribe(undefined, action => {
+      return facade.chatListSubscribe(undefined, action => {
         callback(action);
       });
     },
@@ -117,7 +117,7 @@ export const createProductChatManager = (hostApi: HostApi) => {
      * Subscribe to incoming chat actions (messages, triggers, commands).
      */
     subscribeAction(callback: (action: ReceivedChatAction) => void) {
-      return hostApi.chatActionSubscribe(undefined, action => {
+      return facade.chatActionSubscribe(undefined, action => {
         callback(action);
       });
     },
@@ -140,12 +140,12 @@ export const createProductChatManager = (hostApi: HostApi) => {
  * separate from the chat manager which only acts as a client.
  *
  * @param callback - The renderer callback.
- * @param hostApi - The HostApi instance for action subscriptions. Defaults to the singleton.
+ * @param facade - The ProductFacade instance for action subscriptions.
  * @param transport - The transport for handler registration. Defaults to the sandbox transport.
  * @returns An unsubscribe function.
  */
-export function handleCustomMessageRendering(callback: ChatCustomMessageRenderer, hostApi: HostApi): () => void {
-  return hostApi.handleHostSubscription('product_chat_custom_message_render_subscribe', (params, send, interrupt) => {
+export function handleCustomMessageRendering(callback: ChatCustomMessageRenderer, facade: ProductFacade): () => void {
+  return facade.handleHostSubscription('product_chat_custom_message_render_subscribe', (params, send, interrupt) => {
     const typed = params as { tag: string; value: unknown };
     if (typed.tag !== 'v1') {
       interrupt();
@@ -166,7 +166,7 @@ export function handleCustomMessageRendering(callback: ChatCustomMessageRenderer
         messageType,
         payload,
         subscribeActions(actionCallback: (actionId: string, payload: Uint8Array | undefined) => void) {
-          const actionsSubscription = hostApi.chatActionSubscribe(undefined, action => {
+          const actionsSubscription = facade.chatActionSubscribe(undefined, action => {
             if (action.payload.tag === 'ActionTriggered' && action.payload.value.messageId === messageId) {
               actionCallback(action.payload.value.actionId, action.payload.value.payload);
             }

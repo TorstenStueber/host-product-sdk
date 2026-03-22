@@ -6,8 +6,8 @@
  * (e.g. one that routes messages to a debug UI overlay).
  */
 
-import type { Logger } from '@polkadot/host-api';
-import { createDefaultLogger } from '@polkadot/host-api';
+import type { Logger } from '@polkadot/api-protocol';
+import { createDefaultLogger } from '@polkadot/api-protocol';
 
 let current: Logger = createDefaultLogger('Product');
 

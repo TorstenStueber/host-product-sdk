@@ -5,11 +5,11 @@
  * isolate storage per product.
  */
 
-import type { ProtocolHandler } from '@polkadot/host-api';
+import type { HostFacade } from '@polkadot/api-protocol';
 import type { HandlersConfig } from './registry.js';
-import { okAsync, errAsync } from '@polkadot/host-api';
+import { okAsync, errAsync } from '@polkadot/api-protocol';
 
-export function wireStorageHandlers(container: ProtocolHandler, config: HandlersConfig): (() => void)[] {
+export function wireStorageHandlers(container: HostFacade, config: HandlersConfig): (() => void)[] {
   const cleanups: (() => void)[] = [];
   const prefix = config.storagePrefix ?? `${config.appId ?? 'host'}:`;
 

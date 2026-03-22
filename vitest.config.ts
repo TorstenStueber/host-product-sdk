@@ -6,7 +6,7 @@ import path from 'node:path';
 export default defineConfig({
   resolve: {
     alias: {
-      '@polkadot/host-api': path.resolve(__dirname, 'packages/host-api/src/index.ts'),
+      '@polkadot/api-protocol': path.resolve(__dirname, 'packages/api-protocol/src/index.ts'),
       '@polkadot/host': path.resolve(__dirname, 'packages/host/src/index.ts'),
       '@polkadot/product': path.resolve(__dirname, 'packages/product/src/index.ts'),
     },

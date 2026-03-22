@@ -1,12 +1,12 @@
 /**
- * @polkadot/host-api -- Main entry point.
+ * @polkadot/api-protocol -- Main entry point.
  *
- * The Host API package defines the protocol, codecs, transport, and
+ * The API protocol package defines the protocol, codecs, transport, and
  * facades for host-product communication.  It is organised into three
  * layers:
  *
  * - `shared/`   -- protocol types, codecs, transport, utilities
- * - `host/`     -- host-side protocol handler (creates transport, wires handlers)
+ * - `host/`     -- host-side facade (creates transport, wires handlers)
  * - `product/`  -- product-side facade (creates transport, wraps methods)
  */
 
@@ -199,16 +199,13 @@ export type { Ok, Err } from 'neverthrow';
 // Host: protocol handler
 // ===========================================================================
 
-export { createProtocolHandler } from './host/protocolHandler.js';
-export type { CreateProtocolHandlerOptions } from './host/protocolHandler.js';
-export type { ProtocolHandler } from './host/types.js';
-
-export { createChainConnectionManager } from './host/connectionManager.js';
-export type { ChainConnectionManager } from './host/connectionManager.js';
+export { createHostFacade } from './host-facade/protocolHandler.js';
+export type { CreateHostFacadeOptions } from './host-facade/protocolHandler.js';
+export type { HostFacade } from './host-facade/types.js';
 
 // ===========================================================================
 // Product: facade
 // ===========================================================================
 
-export { createHostApi } from './product/hostApi.js';
-export type { HostApi, CreateHostApiOptions } from './product/hostApi.js';
+export { createProductFacade } from './product-facade/hostApi.js';
+export type { ProductFacade, CreateProductFacadeOptions } from './product-facade/hostApi.js';

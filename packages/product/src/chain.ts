@@ -3,18 +3,18 @@
  *
  * Creates a `JsonRpcProvider` that translates standard JSON-RPC calls
  * (`chainHead_v1_follow`, `chainSpec_v1_genesisHash`, etc.) into typed
- * HostApi calls over the transport layer.
+ * ProductFacade calls over the transport layer.
  *
  * Ported from product-sdk/papiProvider.ts -- the full ~460-line
  * JSON-RPC bridge implementation, adapted to use the Transport
- * abstraction from @polkadot/host-api.
+ * abstraction from @polkadot/api-protocol.
  */
 
-import type { SubscriptionPayload, RuntimeType, OperationStartedResult } from '@polkadot/host-api';
+import type { SubscriptionPayload, RuntimeType, OperationStartedResult } from '@polkadot/api-protocol';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 import { getSyncProvider } from '@polkadot-api/json-rpc-provider-proxy';
 
-import type { HostApi } from '@polkadot/host-api';
+import type { ProductFacade } from '@polkadot/api-protocol';
 import { productLogger } from './logger.js';
 import type { HexString } from './types.js';
 
@@ -22,7 +22,7 @@ import type { HexString } from './types.js';
  * Create a `JsonRpcProvider` for a given chain, identified by its genesis hash.
  *
  * The provider translates every incoming JSON-RPC message into the
- * corresponding HostApi method call and routes the response/subscription
+ * corresponding ProductFacade method call and routes the response/subscription
  * events back as JSON-RPC responses.
  *
  * @param genesisHash - The genesis hash of the target chain.
@@ -31,7 +31,7 @@ import type { HexString } from './types.js';
  */
 export function createPapiProvider(
   genesisHash: HexString,
-  hostApi: HostApi,
+  facade: ProductFacade,
   __fallback?: JsonRpcProvider,
 ): JsonRpcProvider {
   // -------------------------------------------------------------------------
@@ -222,7 +222,7 @@ export function createPapiProvider(
           const [withRuntime] = params as [boolean];
           const syntheticSubId = getNextSubId();
 
-          const subscription = hostApi.chainHeadFollow({ genesisHash, withRuntime }, payload => {
+          const subscription = facade.chainHeadFollow({ genesisHash, withRuntime }, payload => {
             const jsonRpcEvent = convertTypedEventToJsonRpc(payload);
             sendFollowEvent(syntheticSubId, jsonRpcEvent);
           });
@@ -251,7 +251,7 @@ export function createPapiProvider(
         // -- chainHead_v1_header --------------------------------------------
         case 'chainHead_v1_header': {
           const [followSubId, hash] = params as [string, HexString];
-          hostApi
+          facade
             .chainHeadHeader({
               genesisHash,
               followSubscriptionId: followSubId,
@@ -267,7 +267,7 @@ export function createPapiProvider(
         // -- chainHead_v1_body ----------------------------------------------
         case 'chainHead_v1_body': {
           const [followSubId, hash] = params as [string, HexString];
-          hostApi
+          facade
             .chainHeadBody({
               genesisHash,
               followSubscriptionId: followSubId,
@@ -293,7 +293,7 @@ export function createPapiProvider(
             key: item.key,
             type: convertStorageTypeToTyped(item.type),
           }));
-          hostApi
+          facade
             .chainHeadStorage({
               genesisHash,
               followSubscriptionId: followSubId,
@@ -311,7 +311,7 @@ export function createPapiProvider(
         // -- chainHead_v1_call ----------------------------------------------
         case 'chainHead_v1_call': {
           const [followSubId, hash, fn, callParameters] = params as [string, HexString, string, HexString];
-          hostApi
+          facade
             .chainHeadCall({
               genesisHash,
               followSubscriptionId: followSubId,
@@ -330,7 +330,7 @@ export function createPapiProvider(
         case 'chainHead_v1_unpin': {
           const [followSubId, hashOrHashes] = params as [string, HexString | HexString[]];
           const hashes = Array.isArray(hashOrHashes) ? hashOrHashes : [hashOrHashes];
-          hostApi
+          facade
             .chainHeadUnpin({
               genesisHash,
               followSubscriptionId: followSubId,
@@ -346,7 +346,7 @@ export function createPapiProvider(
         // -- chainHead_v1_continue ------------------------------------------
         case 'chainHead_v1_continue': {
           const [followSubId, operationId] = params as [string, string];
-          hostApi
+          facade
             .chainHeadContinue({
               genesisHash,
               followSubscriptionId: followSubId,
@@ -362,7 +362,7 @@ export function createPapiProvider(
         // -- chainHead_v1_stopOperation -------------------------------------
         case 'chainHead_v1_stopOperation': {
           const [followSubId, operationId] = params as [string, string];
-          hostApi
+          facade
             .chainHeadStopOperation({
               genesisHash,
               followSubscriptionId: followSubId,
@@ -377,7 +377,7 @@ export function createPapiProvider(
 
         // -- chainSpec_v1_genesisHash ---------------------------------------
         case 'chainSpec_v1_genesisHash': {
-          hostApi.chainSpecGenesisHash(genesisHash).match(
+          facade.chainSpecGenesisHash(genesisHash).match(
             result => sendJsonRpcResponse(id, result),
             error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
           );
@@ -386,7 +386,7 @@ export function createPapiProvider(
 
         // -- chainSpec_v1_chainName -----------------------------------------
         case 'chainSpec_v1_chainName': {
-          hostApi.chainSpecChainName(genesisHash).match(
+          facade.chainSpecChainName(genesisHash).match(
             result => sendJsonRpcResponse(id, result),
             error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
           );
@@ -395,7 +395,7 @@ export function createPapiProvider(
 
         // -- chainSpec_v1_properties ----------------------------------------
         case 'chainSpec_v1_properties': {
-          hostApi.chainSpecProperties(genesisHash).match(
+          facade.chainSpecProperties(genesisHash).match(
             result => {
               try {
                 sendJsonRpcResponse(id, JSON.parse(result));
@@ -411,7 +411,7 @@ export function createPapiProvider(
         // -- transaction_v1_broadcast ---------------------------------------
         case 'transaction_v1_broadcast': {
           const [transaction] = params as [HexString];
-          hostApi.chainTransactionBroadcast({ genesisHash, transaction }).match(
+          facade.chainTransactionBroadcast({ genesisHash, transaction }).match(
             result => {
               const opId = result;
               if (opId !== undefined) {
@@ -428,7 +428,7 @@ export function createPapiProvider(
         case 'transaction_v1_stop': {
           const [operationId] = params as [string];
           activeBroadcasts.delete(operationId);
-          hostApi.chainTransactionStop({ genesisHash, operationId }).match(
+          facade.chainTransactionStop({ genesisHash, operationId }).match(
             () => sendJsonRpcResponse(id, null),
             error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
           );
@@ -457,7 +457,7 @@ export function createPapiProvider(
 
         // Stop all active broadcasts
         for (const operationId of activeBroadcasts) {
-          hostApi.chainTransactionStop({ genesisHash, operationId }).match(
+          facade.chainTransactionStop({ genesisHash, operationId }).match(
             () => {
               /* fire-and-forget on disconnect */
             },
@@ -476,10 +476,10 @@ export function createPapiProvider(
   // -------------------------------------------------------------------------
 
   function checkIfReady(): Promise<boolean> {
-    return hostApi
+    return facade
       .whenReady()
       .then(() =>
-        hostApi.featureSupported({ tag: 'Chain' as const, value: genesisHash }).match(
+        facade.featureSupported({ tag: 'Chain' as const, value: genesisHash }).match(
           supported => supported,
           () => false,
         ),

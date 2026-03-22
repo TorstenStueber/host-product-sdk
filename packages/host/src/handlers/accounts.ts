@@ -8,12 +8,12 @@
  * - accountConnectionStatusSubscribe: tracks auth state
  */
 
-import type { ProtocolHandler } from '@polkadot/host-api';
+import type { HostFacade } from '@polkadot/api-protocol';
 import type { HandlersConfig } from './registry.js';
 import { deriveProductPublicKey } from '../auth/crypto.js';
-import { okAsync, errAsync } from '@polkadot/host-api';
+import { okAsync, errAsync } from '@polkadot/api-protocol';
 
-export function wireAccountHandlers(container: ProtocolHandler, config: HandlersConfig): (() => void)[] {
+export function wireAccountHandlers(container: HostFacade, config: HandlersConfig): (() => void)[] {
   const cleanups: (() => void)[] = [];
 
   // Account get - derives product-specific key from session

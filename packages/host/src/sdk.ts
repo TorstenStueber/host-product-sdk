@@ -8,7 +8,7 @@
 
 import { createAuthManager } from './auth/authManager.js';
 import type { UserSession, Identity } from './auth/authManager.js';
-import { createProtocolHandler } from '@polkadot/host-api';
+import { createHostFacade } from '@polkadot/api-protocol';
 import { wireAllHandlers } from './handlers/registry.js';
 import type { HandlersConfig } from './handlers/registry.js';
 import type { HostSdkConfig, HostSdk, EmbeddedProduct } from './types.js';
@@ -84,7 +84,7 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
     embed(iframe: HTMLIFrameElement, url: string): EmbeddedProduct {
       iframe.src = url;
       const storagePrefix = config.storagePrefix ?? `${config.appId}:`;
-      const container = createProtocolHandler({
+      const container = createHostFacade({
         messaging: { type: 'window', target: () => iframe.contentWindow },
       });
 

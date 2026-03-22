@@ -22,18 +22,18 @@ export type {
   AuthState,
   UserSession,
   Identity,
-  ProtocolHandler,
+  HostFacade,
   HandlersConfig,
   UserSessionInfo,
   StorageAdapter,
 } from './types.js';
 
 // ---------------------------------------------------------------------------
-// ProtocolHandler
+// HostFacade
 // ---------------------------------------------------------------------------
 
-export { createProtocolHandler } from '@polkadot/host-api';
-export type { CreateProtocolHandlerOptions } from '@polkadot/host-api';
+export { createHostFacade } from '@polkadot/api-protocol';
+export type { CreateHostFacadeOptions } from '@polkadot/api-protocol';
 
 // ---------------------------------------------------------------------------
 // Webview port acquisition
@@ -58,9 +58,6 @@ export { createLocalStorageAdapter } from './storage/localStorage.js';
 // ---------------------------------------------------------------------------
 // Chain
 // ---------------------------------------------------------------------------
-
-export { createChainConnectionManager } from '@polkadot/host-api';
-export type { ChainConnectionManager } from '@polkadot/host-api';
 
 export { createRateLimiter, RATE_LIMITED_MESSAGE } from './chain/rateLimiter.js';
 export type {

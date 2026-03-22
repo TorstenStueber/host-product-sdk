@@ -6,7 +6,7 @@
  * all handler modules.
  */
 
-import type { HexString, RequestParams } from '@polkadot/host-api';
+import type { HexString, RequestParams } from '@polkadot/api-protocol';
 import type {
   Feature,
   DevicePermissionRequest,
@@ -16,10 +16,10 @@ import type {
   SigningRawRequest,
   SigningResult,
   ResponseOk,
-} from '@polkadot/host-api';
+} from '@polkadot/api-protocol';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 
-import type { ProtocolHandler } from '@polkadot/host-api';
+import type { HostFacade } from '@polkadot/api-protocol';
 import { wireHostHandlers } from './host.js';
 import { wirePermissionHandlers } from './permissions.js';
 import { wireStorageHandlers } from './storage.js';
@@ -106,7 +106,7 @@ export type HandlersConfig = {
 // Wire everything
 // ---------------------------------------------------------------------------
 
-export function wireAllHandlers(container: ProtocolHandler, config: HandlersConfig): () => void {
+export function wireAllHandlers(container: HostFacade, config: HandlersConfig): () => void {
   const allCleanups: (() => void)[] = [];
 
   allCleanups.push(...wireHostHandlers(container, config));

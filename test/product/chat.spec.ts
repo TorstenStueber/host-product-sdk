@@ -10,8 +10,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createTransport, createMessagePortProvider, createHostApi } from '@polkadot/host-api';
-import type { Transport, HostApi } from '@polkadot/host-api';
+import { createTransport, createMessagePortProvider, createProductFacade } from '@polkadot/api-protocol';
+import type { Transport, ProductFacade } from '@polkadot/api-protocol';
 import { handleCustomMessageRendering } from '@polkadot/product';
 
 function flush(): Promise<void> {
@@ -21,7 +21,7 @@ function flush(): Promise<void> {
 describe('handleCustomMessageRendering', () => {
   let channel: MessageChannel;
   let hostTransport: Transport;
-  let hostApi: HostApi;
+  let facade: ProductFacade;
 
   beforeEach(() => {
     channel = new MessageChannel();
@@ -30,7 +30,7 @@ describe('handleCustomMessageRendering', () => {
       handshake: 'respond',
       idPrefix: 'h:',
     });
-    hostApi = createHostApi({
+    facade = createProductFacade({
       messaging: { type: 'messagePort', port: channel.port1 },
     });
   });
@@ -44,7 +44,7 @@ describe('handleCustomMessageRendering', () => {
   });
 
   it('registers a handler and receives rendering requests from the host', async () => {
-    await hostApi.whenReady();
+    await facade.whenReady();
 
     const rendererCalls: { messageId: string; messageType: string }[] = [];
     const cleanupFn = vi.fn();
@@ -55,7 +55,7 @@ describe('handleCustomMessageRendering', () => {
         messageType: params.messageType,
       });
       return cleanupFn;
-    }, hostApi);
+    }, facade);
 
     hostTransport.subscribe(
       'product_chat_custom_message_render_subscribe',
@@ -79,14 +79,14 @@ describe('handleCustomMessageRendering', () => {
   });
 
   it('provides a render function to the callback', async () => {
-    await hostApi.whenReady();
+    await facade.whenReady();
 
     let renderFn: ((node: unknown) => void) | undefined;
 
     handleCustomMessageRendering((_params, render) => {
       renderFn = render;
       return () => {};
-    }, hostApi);
+    }, facade);
 
     hostTransport.subscribe(
       'product_chat_custom_message_render_subscribe',
@@ -107,9 +107,9 @@ describe('handleCustomMessageRendering', () => {
   });
 
   it('returns an unsubscribe function that deregisters the handler', async () => {
-    await hostApi.whenReady();
+    await facade.whenReady();
 
-    const unsub = handleCustomMessageRendering(() => () => {}, hostApi);
+    const unsub = handleCustomMessageRendering(() => () => {}, facade);
 
     expect(typeof unsub).toBe('function');
     unsub();

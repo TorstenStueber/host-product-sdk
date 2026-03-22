@@ -1,11 +1,11 @@
 /**
- * ProtocolHandler factory.
+ * HostFacade factory.
  *
- * Creates a ProtocolHandler that bridges host and product via a Transport.
+ * Creates a HostFacade that bridges host and product via a Transport.
  * Each handler method translates between the versioned wire format
  * (v1 tagged enums with Ok/Err results) and plain TypeScript types.
  *
- * Ported from triangle-js-sdks host-container/createProtocolHandler.ts,
+ * Ported from triangle-js-sdks host-container/createHostFacade.ts,
  * simplified to use plain Result objects instead of neverthrow.
  */
 
@@ -35,7 +35,7 @@ import { structuredCloneCodecAdapter } from '../shared/codec/structured/index.js
 import type { ResultAsync } from 'neverthrow';
 
 import { createChainConnectionManager } from './connectionManager.js';
-import type { ProtocolHandler } from './types.js';
+import type { HostFacade } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Wire format helpers
@@ -74,10 +74,10 @@ function genericError(reason: string) {
 }
 
 // ---------------------------------------------------------------------------
-// ProtocolHandler options
+// HostFacade options
 // ---------------------------------------------------------------------------
 
-export type CreateProtocolHandlerOptions = {
+export type CreateHostFacadeOptions = {
   /** How the host communicates with the product. */
   messaging: { type: 'window'; target: WindowRef } | { type: 'messagePort'; port: MessagePort | Promise<MessagePort> };
 
@@ -93,7 +93,7 @@ export type CreateProtocolHandlerOptions = {
 // Factory
 // ---------------------------------------------------------------------------
 
-export function createProtocolHandler(options: CreateProtocolHandlerOptions): ProtocolHandler {
+export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
   const { messaging, allowCodecUpgrade = true } = options;
 
   const provider =
@@ -228,9 +228,9 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
     });
   }
 
-  // -- ProtocolHandler implementation ---------------------------------------------
+  // -- HostFacade implementation ---------------------------------------------
 
-  const container: ProtocolHandler = {
+  const container: HostFacade = {
     transport,
 
     // -- Core / lifecycle ---------------------------------------------------

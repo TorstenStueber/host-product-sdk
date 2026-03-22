@@ -1,15 +1,15 @@
 /**
  * Accounts provider for the product SDK.
  *
- * Wraps HostApi account methods into a convenient interface for getting
+ * Wraps ProductFacade account methods into a convenient interface for getting
  * product accounts, non-product accounts, creating ring VRF proofs, and
  * subscribing to account connection status changes.
  *
  * Ported from product-sdk/accounts.ts, adapted to use plain TS types
- * and the HostApi facade from @polkadot/host-api.
+ * and the ProductFacade from @polkadot/api-protocol.
  */
 
-import type { HostApi } from '@polkadot/host-api';
+import type { ProductFacade } from '@polkadot/api-protocol';
 import type { AccountConnectionStatus, HexString, ProductAccount, RingLocation } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -32,36 +32,36 @@ function fromHex(hex: string): Uint8Array {
 /**
  * Create an accounts provider.
  *
- * @param hostApi - The HostApi instance to use. Defaults to the singleton.
+ * @param facade - The ProductFacade instance to use.
  */
-export const createAccountsProvider = (hostApi: HostApi) => {
+export const createAccountsProvider = (facade: ProductFacade) => {
   return {
     /**
      * Get the product account for a given dotNs identifier and derivation index.
      */
     getProductAccount(dotNsIdentifier: string, derivationIndex = 0) {
-      return hostApi.accountGet([dotNsIdentifier, derivationIndex]);
+      return facade.accountGet([dotNsIdentifier, derivationIndex]);
     },
 
     /**
      * Get the contextual alias for a product account.
      */
     getProductAccountAlias(dotNsIdentifier: string, derivationIndex = 0) {
-      return hostApi.accountGetAlias([dotNsIdentifier, derivationIndex]);
+      return facade.accountGetAlias([dotNsIdentifier, derivationIndex]);
     },
 
     /**
      * Get all non-product (external) accounts connected to the host.
      */
     getNonProductAccounts() {
-      return hostApi.getNonProductAccounts(undefined);
+      return facade.getNonProductAccounts(undefined);
     },
 
     /**
      * Create a ring VRF proof for a product account.
      */
     createRingVRFProof(dotNsIdentifier: string, derivationIndex = 0, location: RingLocation, message: Uint8Array) {
-      return hostApi.accountCreateProof([[dotNsIdentifier, derivationIndex], location, message]);
+      return facade.accountCreateProof([[dotNsIdentifier, derivationIndex], location, message]);
     },
 
     /**
@@ -72,7 +72,7 @@ export const createAccountsProvider = (hostApi: HostApi) => {
      * transport layer.
      */
     getProductAccountSigner(account: ProductAccount) {
-      return createSignerForAccount(hostApi, account);
+      return createSignerForAccount(facade, account);
     },
 
     /**
@@ -82,14 +82,14 @@ export const createAccountsProvider = (hostApi: HostApi) => {
      * through the non-product account signing flow.
      */
     getNonProductAccountSigner(account: ProductAccount) {
-      return createSignerForAccount(hostApi, account);
+      return createSignerForAccount(facade, account);
     },
 
     /**
      * Subscribe to account connection status changes.
      */
     subscribeAccountConnectionStatus(callback: (status: AccountConnectionStatus) => void) {
-      return hostApi.accountConnectionStatusSubscribe(undefined, status => {
+      return facade.accountConnectionStatusSubscribe(undefined, status => {
         callback(status);
       });
     },
@@ -100,7 +100,7 @@ export const createAccountsProvider = (hostApi: HostApi) => {
 // Signer helper
 // ---------------------------------------------------------------------------
 
-function createSignerForAccount(hostApi: HostApi, account: ProductAccount) {
+function createSignerForAccount(facade: ProductFacade, account: ProductAccount) {
   return {
     publicKey: account.publicKey,
 
@@ -139,7 +139,7 @@ function createSignerForAccount(hostApi: HostApi, account: ProductAccount) {
         withSignedTransaction: payload.withSignedTransaction,
       };
 
-      const response = await hostApi.signPayload(codecPayload);
+      const response = await facade.signPayload(codecPayload);
 
       return response.match(
         result => {
@@ -168,7 +168,7 @@ function createSignerForAccount(hostApi: HostApi, account: ProductAccount) {
             : { tag: 'Payload' as const, value: raw.data },
       };
 
-      const response = await hostApi.signRaw(payload);
+      const response = await facade.signRaw(payload);
 
       return response.match(
         result => {
