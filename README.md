@@ -1,15 +1,24 @@
-# host-product-sdk
+# polkadot-host-protocol
 
-This project is experimental. It serves as a playground for exploring the architecture of the Product SDK and Host SDK
-in interaction with the Host API.
+A **host** application (like dot.li) embeds third-party **product** dApps inside iframes. The two sides communicate over
+`window.postMessage`. The product asks the host for accounts, signatures, storage, chain data. The host responds.
 
-The three packages in this repo map to the three layers of the Host-Product architecture:
+This project defines the protocol between them and provides typed SDKs for both sides.
 
-- `packages/host-api`: Host API protocol, codecs, transport, protocol handler, and product facade
-- `packages/host`: Host SDK (handlers, auth, storage, SDK entry point)
-- `packages/product`: Product SDK (domain modules: accounts, chain, chat, storage, etc.)
+## Project structure
 
-For a detailed walkthrough of the code in this repo, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+Three packages, each with a clear role:
+
+| Package                                                       | Purpose                                                                                                                        |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| [`@polkadot/api-protocol`](./packages/api-protocol/README.md) | The protocol itself: API definition, SCALE codecs, transport, and a typed facade for each side (`HostFacade`, `ProductFacade`) |
+| `@polkadot/host`                                              | Host SDK: handler implementations, auth, storage adapters, SDK entry point (`createHostSdk`)                                   |
+| `@polkadot/product`                                           | Product SDK: domain modules (accounts, chain, chat, storage, extension) that consume the `ProductFacade`                       |
+
+The protocol package is the shared foundation. The host and product packages add domain logic on top of it — neither
+touches the transport directly.
+
+For a detailed walkthrough of every file, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## Host API Differences from [triangle-js-sdks](https://github.com/paritytech/triangle-js-sdks)
 
