@@ -13,7 +13,6 @@
 
 import { createProtocolHandler } from '@polkadot/host-api';
 import { wireAllHandlers, type HandlersConfig } from '../handlers/registry.js';
-import { createWindowProvider } from '@polkadot/host-api';
 
 function isUint8ArrayLike(data: unknown): data is Uint8Array {
   if (data instanceof Uint8Array) return true;
@@ -58,8 +57,9 @@ export function setupNestedBridgeDetector(options: NestedBridgeDetectorOptions):
     const nestedId = String(knownWindows.size);
     console.warn(`[${label}] Nested dApp #${nestedId} detected, creating bridge`);
 
-    const provider = createWindowProvider(event.source as Window);
-    const handler = createProtocolHandler({ provider });
+    const handler = createProtocolHandler({
+      messaging: { type: 'window', target: event.source as Window },
+    });
     const config = createConfig(nestedId);
     const cleanup = wireAllHandlers(handler, config);
 

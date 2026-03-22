@@ -1,16 +1,15 @@
 /**
- * Electron webview-based provider (host side).
+ * Electron webview MessagePort acquisition.
  *
  * Creates a MessageChannel, injects one end into the webview via
- * `executeJavaScript`, and wraps the other end with the shared
- * `createMessagePortProvider`.
+ * `executeJavaScript`, and returns the other end as a `Promise<MessagePort>`.
+ * The returned port can be passed directly to `createProtocolHandler`
+ * via `messaging: { type: 'messagePort', port }`.
  *
  * Ported from triangle-js-sdks host-container/createWebviewProvider.ts.
  */
 
-import type { Provider } from '../shared/transport/provider.js';
-import { createMessagePortProvider } from '../shared/transport/messagePortProvider.js';
-import { createIdFactory } from '../shared/util/idFactory.js';
+import { createIdFactory } from '@polkadot/host-api';
 
 const nextPortId = createIdFactory('port:');
 
@@ -28,17 +27,25 @@ export type WebviewTag = HTMLElement & {
   contentWindow: Window;
 };
 
-export type CreateHostWebviewProviderParams = {
+export type AcquireWebviewPortOptions = {
   webview: WebviewTag;
   openDevTools?: boolean;
 };
 
 /**
  * Acquire a MessagePort by injecting the other end into an Electron
- * `<webview>` tag.  Resolves once the webview's DOM is ready and the
+ * `<webview>` tag. Resolves once the webview's DOM is ready and the
  * port has been transferred.
+ *
+ * Usage:
+ * ```ts
+ * const port = acquireWebviewPort({ webview });
+ * const handler = createProtocolHandler({
+ *   messaging: { type: 'messagePort', port },
+ * });
+ * ```
  */
-function acquireWebviewPort(webview: WebviewTag, openDevTools?: boolean): Promise<MessagePort> {
+export function acquireWebviewPort({ webview, openDevTools }: AcquireWebviewPortOptions): Promise<MessagePort> {
   return new Promise<MessagePort>((resolve, reject) => {
     webview.addEventListener('did-fail-load', ((e: { errorDescription: string }) => {
       reject(new Error(e.errorDescription));
@@ -72,8 +79,4 @@ function acquireWebviewPort(webview: WebviewTag, openDevTools?: boolean): Promis
       resolve(port1);
     }) as (...args: unknown[]) => void);
   });
-}
-
-export function createHostWebviewProvider({ webview, openDevTools }: CreateHostWebviewProviderParams): Provider {
-  return createMessagePortProvider(acquireWebviewPort(webview, openDevTools));
 }

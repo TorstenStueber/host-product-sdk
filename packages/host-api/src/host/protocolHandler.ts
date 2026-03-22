@@ -9,8 +9,6 @@
  * simplified to use plain Result objects instead of neverthrow.
  */
 
-import type { CodecAdapterMap } from '../shared/codec/negotiation.js';
-import type { Provider } from '../shared/transport/provider.js';
 import type { HexString } from '../shared/codec/scale/primitives.js';
 import type {
   RequestMethod,
@@ -28,7 +26,12 @@ import type {
   SubscriptionPayload,
 } from '../shared/codec/scale/protocol.js';
 import { createTransport } from '../shared/transport/transport.js';
+import { createWindowProvider } from '../shared/transport/windowProvider.js';
+import type { WindowRef } from '../shared/transport/windowProvider.js';
+import { createMessagePortProvider } from '../shared/transport/messagePortProvider.js';
 import { handleCodecUpgrade } from '../shared/codec/negotiation.js';
+import { scaleCodecAdapter } from '../shared/codec/scale/protocol.js';
+import { structuredCloneCodecAdapter } from '../shared/codec/structured/index.js';
 import type { ResultAsync } from 'neverthrow';
 
 import { createChainConnectionManager } from './connectionManager.js';
@@ -75,18 +78,15 @@ function genericError(reason: string) {
 // ---------------------------------------------------------------------------
 
 export type CreateProtocolHandlerOptions = {
-  provider: Provider;
+  /** How the host communicates with the product. */
+  messaging: { type: 'window'; target: WindowRef } | { type: 'messagePort'; port: MessagePort | Promise<MessagePort> };
 
   /**
-   * Codec adapters the host supports for upgrade negotiation.
-   *
-   * When the product requests a codec upgrade after handshake, the host
-   * picks the best format from this map. If omitted, codec upgrade
-   * requests are ignored (the connection stays on the initial codec).
-   *
-   * Example: `{ structured_clone: new StructuredCloneCodecAdapter(), scale: scaleCodecAdapter }`
+   * Whether to allow the product to upgrade the codec after handshake.
+   * When `true` (the default), the host registers a codec upgrade handler
+   * that negotiates structured clone as the preferred format.
    */
-  supportedCodecs?: CodecAdapterMap;
+  allowCodecUpgrade?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -94,7 +94,10 @@ export type CreateProtocolHandlerOptions = {
 // ---------------------------------------------------------------------------
 
 export function createProtocolHandler(options: CreateProtocolHandlerOptions): ProtocolHandler {
-  const { provider, supportedCodecs } = options;
+  const { messaging, allowCodecUpgrade = true } = options;
+
+  const provider =
+    messaging.type === 'window' ? createWindowProvider(messaging.target) : createMessagePortProvider(messaging.port);
 
   const transport = createTransport({
     provider,
@@ -102,10 +105,13 @@ export function createProtocolHandler(options: CreateProtocolHandlerOptions): Pr
     idPrefix: 'h:',
   });
 
-  // Auto-register codec upgrade handler if the host supports multiple codecs.
+  // Auto-register codec upgrade handler.
   let cleanupCodecUpgrade: (() => void) | undefined;
-  if (supportedCodecs && Object.keys(supportedCodecs).length > 0) {
-    cleanupCodecUpgrade = handleCodecUpgrade(transport, supportedCodecs);
+  if (allowCodecUpgrade) {
+    cleanupCodecUpgrade = handleCodecUpgrade(transport, {
+      scale: scaleCodecAdapter,
+      structured_clone: structuredCloneCodecAdapter,
+    });
   }
 
   // -- Request handler wiring helper ----------------------------------------

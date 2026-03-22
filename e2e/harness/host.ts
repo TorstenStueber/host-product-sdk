@@ -11,14 +11,7 @@
  */
 import { createProtocolHandler } from '@polkadot/host';
 import type { ProtocolHandler } from '@polkadot/host';
-import {
-  structuredCloneCodecAdapter,
-  scaleCodecAdapter,
-  createWindowProvider,
-  okAsync,
-  errAsync,
-} from '@polkadot/host-api';
-import type { CodecAdapterMap } from '@polkadot/host-api';
+import { okAsync, errAsync } from '@polkadot/host-api';
 
 type HostE2E = {
   ready: boolean;
@@ -30,13 +23,6 @@ type HostE2E = {
 };
 
 const codecParam = new URLSearchParams(location.search).get('codec') ?? 'structured_clone';
-
-// For the 'upgrade' and 'structured_clone' tests, register codec support
-// so the product can negotiate an upgrade from SCALE to structured clone.
-const supportedCodecs: CodecAdapterMap | undefined =
-  codecParam === 'upgrade' || codecParam === 'structured_clone'
-    ? { scale: scaleCodecAdapter, structured_clone: structuredCloneCodecAdapter }
-    : undefined;
 
 const e2e: HostE2E = {
   ready: false,
@@ -50,8 +36,13 @@ const e2e: HostE2E = {
 
 const iframe = document.getElementById('product-frame') as HTMLIFrameElement;
 iframe.src = `/product.html?codec=${codecParam}`;
-const provider = createWindowProvider(() => iframe.contentWindow);
-const container = createProtocolHandler({ provider, supportedCodecs });
+
+// For the 'scale' test, disable codec upgrade so the connection stays on SCALE.
+const allowCodecUpgrade = codecParam !== 'scale';
+const container = createProtocolHandler({
+  messaging: { type: 'window', target: () => iframe.contentWindow },
+  allowCodecUpgrade,
+});
 e2e.container = container;
 
 // --- Feature supported ---

@@ -2,7 +2,7 @@
  * @polkadot/host -- Public API.
  *
  * Main entry point for the host package. Exports the SDK factory,
- * container, providers, handlers, storage, chain, auth, and nested bridge.
+ * protocol handler, handlers, storage, chain, auth, and nested bridge.
  */
 
 // ---------------------------------------------------------------------------
@@ -36,11 +36,11 @@ export { createProtocolHandler } from '@polkadot/host-api';
 export type { CreateProtocolHandlerOptions } from '@polkadot/host-api';
 
 // ---------------------------------------------------------------------------
-// Providers
+// Webview port acquisition
 // ---------------------------------------------------------------------------
 
-export { createHostWebviewProvider } from '@polkadot/host-api';
-export type { CreateHostWebviewProviderParams, WebviewTag } from '@polkadot/host-api';
+export { acquireWebviewPort } from './webviewPort.js';
+export type { AcquireWebviewPortOptions, WebviewTag } from './webviewPort.js';
 
 // ---------------------------------------------------------------------------
 // Handlers
@@ -88,5 +88,3 @@ export type { PappAdapter, PappAdapterConfig, PairingStatus, AttestationStatus }
 
 export { setupNestedBridgeDetector } from './nested/detector.js';
 export type { NestedBridgeDetectorOptions } from './nested/detector.js';
-
-export { createWindowProvider } from '@polkadot/host-api';

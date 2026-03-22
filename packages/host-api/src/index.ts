@@ -203,9 +203,6 @@ export { createProtocolHandler } from './host/protocolHandler.js';
 export type { CreateProtocolHandlerOptions } from './host/protocolHandler.js';
 export type { ProtocolHandler } from './host/types.js';
 
-export { createHostWebviewProvider } from './host/webviewProvider.js';
-export type { CreateHostWebviewProviderParams, WebviewTag } from './host/webviewProvider.js';
-
 export { createChainConnectionManager } from './host/connectionManager.js';
 export type { ChainConnectionManager } from './host/connectionManager.js';
 

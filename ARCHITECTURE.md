@@ -232,14 +232,12 @@ Two concrete provider implementations live in shared as neutral building blocks:
 **`transport/windowProvider.ts`**: `createWindowProvider(target: WindowRef)`: the generic `postMessage` provider.
 Accepts either a direct `Window` reference or a lazy getter `() => Window | null`. Validates incoming messages (accepts
 both Uint8Array for SCALE and protocol message objects for structured clone), manages subscribers, handles Uint8Array
-buffer transfer. When the getter returns null, outgoing messages are silently dropped. Used by the host for iframes
-(`createWindowProvider(() => iframe.contentWindow)`) and for nested dApps, and by the product for the iframe path
-(`createWindowProvider(window.top)`).
+buffer transfer. When the getter returns null, outgoing messages are silently dropped. Used internally by
+`createProtocolHandler` and `createHostApi` when `messaging.type` is `'window'`.
 
 **`transport/messagePortProvider.ts`**: `createMessagePortProvider(port: MessagePort | Promise<MessagePort>)`:
 communicates over a MessagePort. Accepts a ready port or a Promise (for async acquisition). Same message validation as
-`createWindowProvider`. Used by both the host webview provider (which injects a port into an Electron webview) and the
-product webview path (which polls for the injected port).
+`createWindowProvider`. Used internally when `messaging.type` is `'messagePort'`.
 
 ### 1.9 Transport (`transport/transport.ts`)
 
@@ -360,26 +358,29 @@ Host-side protocol handler, providers, and chain connection manager. These live 
 are the host's interface to the transport -- the bridge between the protocol layer and the handler implementations in
 `@polkadot/host`.
 
-### 1b.1 Providers
+### 1b.1 ProtocolHandler (`host/protocolHandler.ts`)
 
-**`webviewProvider.ts`**: `createHostWebviewProvider({ webview })`: the only host-specific provider. Acquires a
-MessagePort by creating a `MessageChannel`, injecting one end into an Electron `<webview>` via `executeJavaScript` on
-`dom-ready`, and passing the other end to `createMessagePortProvider` from shared. The port acquisition logic (listening
-for `dom-ready`, `did-fail-load`, injecting JS) is inherently host-side; once the port is obtained, all communication is
-handled by the neutral `createMessagePortProvider`.
+`createProtocolHandler(options)` builds the host-side communication stack:
 
-For iframes, the host uses `createWindowProvider(() => iframe.contentWindow)` from shared directly -- no host-specific
-wrapper needed. The `sdk.ts` `embed()` method sets `iframe.src` itself and creates the provider inline.
+```typescript
+const handler = createProtocolHandler({
+  messaging: { type: 'window', target: () => iframe.contentWindow },
+  allowCodecUpgrade: true, // default
+});
+```
 
-### 1b.2 ProtocolHandler (`host/protocolHandler.ts`)
+The `messaging` option determines the underlying provider (same tagged union as `createHostApi` on the product side, but
+`WindowRef` supports lazy getters `() => Window | null` for iframes where `contentWindow` may not be available
+immediately):
 
-`createProtocolHandler({ provider, supportedCodecs? })`:
+- `{ type: 'window', target }` -> `createWindowProvider(target)` (iframe communication)
+- `{ type: 'messagePort', port }` -> `createMessagePortProvider(port)` (webview communication)
 
-1. Creates a Transport with `handshake: 'respond'` and `idPrefix: 'h:'` (always starts with SCALE, auto-detects
-   structured clone)
-2. If `supportedCodecs` provided, auto-registers codec upgrade handler
-3. Returns ProtocolHandler with 41 methods (40 `handle*()` for product-initiated requests/subscriptions, plus one
-   host-initiated method: `renderChatCustomMessage`)
+`allowCodecUpgrade` (default `true`) registers a codec upgrade handler with hardcoded `scale` and `structured_clone`
+adapters.
+
+Internally creates a Transport with `handshake: 'respond'` and `idPrefix: 'h:'`. Returns ProtocolHandler with 41 methods
+(40 `handle*()` for product-initiated requests/subscriptions, plus one host-initiated method: `renderChatCustomMessage`)
 
 The internal helpers `wireRequest(method, handlers, defaultError)` and `wireSubscription(method, handlers)` take a
 **version handler map**: an object keyed by version tag, each value a handler for that version:
@@ -546,12 +547,18 @@ junctions `['product', productId, derivationIndex]`.
 
 **`pappAdapter.ts`**: Stub interface for QR-code pairing (to be ported from old host-papp).
 
-### 2.5 Nested Bridge (`nested/`)
+### 2.5 Webview Port (`webviewPort.ts`)
+
+`acquireWebviewPort({ webview, openDevTools? })` acquires a `MessagePort` by creating a `MessageChannel`, injecting one
+end into an Electron `<webview>` via `executeJavaScript` on `dom-ready`, and returning the other end. The returned port
+is passed to `createProtocolHandler` via `messaging: { type: 'messagePort', port }`.
+
+### 2.6 Nested Bridge (`nested/`)
 
 **`detector.ts`**: `setupNestedBridgeDetector()`: listens for postMessage from windows OTHER than the primary iframe.
-Auto-creates `createWindowProvider` + `createProtocolHandler` + `wireAllHandlers` bridge for each nested dApp.
+Auto-creates `createProtocolHandler` + `wireAllHandlers` bridge for each nested dApp.
 
-### 2.6 SDK Entry Point (`sdk.ts`)
+### 2.7 SDK Entry Point (`sdk.ts`)
 
 ```typescript
 const sdk = createHostSdk({
@@ -565,9 +572,9 @@ product.dispose();
 sdk.dispose();
 ```
 
-Creates AuthManager, then `embed()` sets `iframe.src`, creates `createWindowProvider(() => iframe.contentWindow)` ->
-`createProtocolHandler()` -> `wireAllHandlers()`. On dispose, clears `iframe.src`. Also exposes `setSession()` /
-`clearSession()` for external auth management.
+Creates AuthManager, then `embed()` sets `iframe.src`, creates
+`createProtocolHandler({ messaging: { type: 'window', target: () => iframe.contentWindow } })` -> `wireAllHandlers()`.
+On dispose, clears `iframe.src`. Also exposes `setSession()` / `clearSession()` for external auth management.
 
 **`types.ts`**: `HostSdkConfig` with all options: `appId`, `chainProvider`, signing callbacks, permission callbacks, UI
 callbacks.
