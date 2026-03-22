@@ -9,7 +9,6 @@
  * simplified to use plain Result objects instead of neverthrow.
  */
 
-import type { HexString } from '../shared/codec/scale/primitives.js';
 import type {
   RequestMethod,
   SubscriptionMethod,
@@ -59,12 +58,12 @@ function wrap<V extends string, T>(version: V, value: T): { tag: V; value: T } {
 }
 
 /** Extract the inner value from a versioned envelope for a specific version tag. */
-function unwrap<M extends { tag: string; value: unknown }>(
+function unwrap<M extends { tag: string; value: unknown }, V extends M['tag']>(
   message: M,
-  version: string,
-): { ok: true; value: M['value'] } | { ok: false } {
+  version: V,
+): { ok: true; value: Extract<M, { tag: V }>['value'] } | { ok: false } {
   if (message.tag === version) {
-    return { ok: true, value: message.value };
+    return { ok: true, value: message.value as Extract<M, { tag: V }>['value'] };
   }
   return { ok: false };
 }
@@ -530,7 +529,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
             interrupt();
             return () => {};
           }
-          const { genesisHash, withRuntime } = unwrapped.value as { genesisHash: HexString; withRuntime: boolean };
+          const { genesisHash, withRuntime } = unwrapped.value;
 
           const entry = manager.getOrCreateChain(genesisHash);
           if (!entry) {
@@ -561,7 +560,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
        */
       function wireChainRequest<M extends RequestMethod>(
         method: M,
-        handler: (value: unknown) => Promise<unknown>,
+        handler: (value: RequestParams<M, 'v1'>) => Promise<unknown>,
       ): void {
         cleanups.push(
           transport.handleRequest(method, async (message): Promise<ResponseCodecType<M>> => {
@@ -570,7 +569,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
               return errorResult(UNSUPPORTED_MESSAGE_FORMAT_ERROR) as ResponseCodecType<M>;
             }
             try {
-              return (await handler(unwrapped.value)) as ResponseCodecType<M>;
+              return (await handler(unwrapped.value as RequestParams<M, 'v1'>)) as ResponseCodecType<M>;
             } catch (e) {
               return errorResult(String(e)) as ResponseCodecType<M>;
             }
@@ -580,7 +579,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
 
       // Header
       wireChainRequest('remote_chain_head_header', async value => {
-        const { genesisHash, hash } = value as { genesisHash: HexString; hash: HexString };
+        const { genesisHash, hash } = value;
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
         const result = await manager.sendRequest(genesisHash, 'chainHead_v1_header', [realSubId, hash]);
@@ -589,7 +588,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
 
       // Body
       wireChainRequest('remote_chain_head_body', async value => {
-        const { genesisHash, hash } = value as { genesisHash: HexString; hash: HexString };
+        const { genesisHash, hash } = value;
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
         const result = await manager.sendRequest(genesisHash, 'chainHead_v1_body', [realSubId, hash]);
@@ -598,12 +597,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
 
       // Storage
       wireChainRequest('remote_chain_head_storage', async value => {
-        const { genesisHash, hash, items, childTrie } = value as {
-          genesisHash: HexString;
-          hash: HexString;
-          items: { key: HexString; type: string }[];
-          childTrie: HexString | undefined;
-        };
+        const { genesisHash, hash, items, childTrie } = value;
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
 
@@ -623,26 +617,20 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
 
       // Call
       wireChainRequest('remote_chain_head_call', async value => {
-        const params = value as {
-          genesisHash: HexString;
-          hash: HexString;
-          function: string;
-          callParameters: HexString;
-        };
-        const realSubId = manager.getChainFollowSubId(params.genesisHash);
+        const realSubId = manager.getChainFollowSubId(value.genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
-        const result = await manager.sendRequest(params.genesisHash, 'chainHead_v1_call', [
+        const result = await manager.sendRequest(value.genesisHash, 'chainHead_v1_call', [
           realSubId,
-          params.hash,
-          params.function,
-          params.callParameters,
+          value.hash,
+          value.function,
+          value.callParameters,
         ]);
         return wrapOk(version, manager.convertOperationStartedResult(result));
       });
 
       // Unpin
       wireChainRequest('remote_chain_head_unpin', async value => {
-        const { genesisHash, hashes } = value as { genesisHash: HexString; hashes: HexString[] };
+        const { genesisHash, hashes } = value;
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
         await manager.sendRequest(genesisHash, 'chainHead_v1_unpin', [realSubId, hashes]);
@@ -651,7 +639,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
 
       // Continue
       wireChainRequest('remote_chain_head_continue', async value => {
-        const { genesisHash, operationId } = value as { genesisHash: HexString; operationId: string };
+        const { genesisHash, operationId } = value;
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
         await manager.sendRequest(genesisHash, 'chainHead_v1_continue', [realSubId, operationId]);
@@ -660,7 +648,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
 
       // StopOperation
       wireChainRequest('remote_chain_head_stop_operation', async value => {
-        const { genesisHash, operationId } = value as { genesisHash: HexString; operationId: string };
+        const { genesisHash, operationId } = value;
         const realSubId = manager.getChainFollowSubId(genesisHash);
         if (!realSubId) return errorResult('No active follow for this chain');
         await manager.sendRequest(genesisHash, 'chainHead_v1_stopOperation', [realSubId, operationId]);
@@ -669,7 +657,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
 
       // ChainSpec: genesis hash
       wireChainRequest('remote_chain_spec_genesis_hash', async value => {
-        const genesisHash = value as HexString;
+        const genesisHash = value;
         const entry = manager.getOrCreateChain(genesisHash);
         if (!entry) return errorResult('Chain not supported');
         try {
@@ -684,7 +672,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
 
       // ChainSpec: chain name
       wireChainRequest('remote_chain_spec_chain_name', async value => {
-        const genesisHash = value as HexString;
+        const genesisHash = value;
         const entry = manager.getOrCreateChain(genesisHash);
         if (!entry) return errorResult('Chain not supported');
         try {
@@ -699,7 +687,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
 
       // ChainSpec: properties
       wireChainRequest('remote_chain_spec_properties', async value => {
-        const genesisHash = value as HexString;
+        const genesisHash = value;
         const entry = manager.getOrCreateChain(genesisHash);
         if (!entry) return errorResult('Chain not supported');
         try {
@@ -714,7 +702,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
 
       // Transaction broadcast
       wireChainRequest('remote_chain_transaction_broadcast', async value => {
-        const { genesisHash, transaction } = value as { genesisHash: HexString; transaction: HexString };
+        const { genesisHash, transaction } = value;
         const entry = manager.getOrCreateChain(genesisHash);
         if (!entry) return errorResult('Chain not supported');
         try {
@@ -729,7 +717,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
 
       // Transaction stop
       wireChainRequest('remote_chain_transaction_stop', async value => {
-        const { genesisHash, operationId } = value as { genesisHash: HexString; operationId: string };
+        const { genesisHash, operationId } = value;
         const entry = manager.getOrCreateChain(genesisHash);
         if (!entry) return errorResult('Chain not supported');
         try {
