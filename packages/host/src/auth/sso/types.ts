@@ -24,3 +24,6 @@ export type {
   RemoteSignRawRequest,
   RemoteSignResult,
 } from './signing.js';
+
+export type { PairingExecutorConfig } from './pairingExecutor.js';
+export type { SignRequestExecutorConfig } from './signRequestExecutor.js';

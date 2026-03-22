@@ -28,6 +28,10 @@ Three npm packages:
 
 Runtime dependencies of api-protocol: `scale-ts`, `nanoevents`, `neverthrow`, `@polkadot-api/json-rpc-provider`.
 
+Runtime dependencies of host (in addition to api-protocol): `@noble/ciphers`, `@noble/hashes`, `@noble/curves`
+(AES-GCM, HKDF, blake2b, P-256 ECDH), `@scure/sr25519` (sr25519 signing), `@polkadot-labs/hdkd-helpers` (BIP-39
+mnemonics, HDKD), `@polkadot-api/substrate-bindings` (AccountId SS58 codec).
+
 ---
 
 ## Part 1: `@polkadot/api-protocol`
@@ -601,12 +605,38 @@ wallet:
   publish to the statement-store topic, wait for the wallet's signed response, and decrypt it.
 - `RemoteSigner` can be wired as the `onSignPayload`/`onSignRaw` callbacks in `HandlersConfig`.
 
+**`sso/crypto.ts`**: SSO cryptographic primitives — all wire-compatible with triangle-js-sdks:
+
+- `createEncryption(sharedSecret)`: AES-GCM with HKDF-SHA256 key derivation (32-byte key, 12-byte nonce,
+  wire format `[nonce || ciphertext]`).
+- `khash(secret, message)`: blake2b-256 with key — used for topic and session ID derivation.
+- `createSr25519Secret(entropy, derivation?)`: sr25519 key from BIP-39 entropy with optional HDKD path.
+- `createP256Secret(entropy)`, `getP256PublicKey(secret)`, `createP256SharedSecret(secret, publicKey)`: P-256 ECDH
+  for the pairing handshake. Shared secret = x-coordinate only (32 bytes).
+- `createAccountId(publicKey)`: blake2b-256 of sr25519 public key.
+- `deriveHandshakeTopic(accountId, encrPublicKey)`: derives the statement-store topic for pairing.
+
+**`sso/codecs.ts`**: SCALE codecs for SSO messages — must be byte-identical to triangle-js-sdks:
+
+- `HandshakeData` / `HandshakeResponsePayload` / `HandshakeResponseSensitiveData`: pairing handshake messages.
+- `SigningPayloadRequestCodec` / `SigningRawRequestCodec` / `SigningResponseCodec`: signing request/response.
+- `RemoteMessageCodec`: versioned envelope `{ messageId, data: v1 { Disconnected | SignRequest | SignResponse } }`.
+
+**`sso/pairingExecutor.ts`**: `createPairingExecutor(config)` — concrete `PairingExecutor` implementing the full
+QR-code handshake: generates mnemonic, derives sr25519 at `//wallet//sso` + P-256 keys, builds SCALE-encoded
+`HandshakeData`, publishes to statement-store topic, waits for mobile response, performs P-256 ECDH to decrypt
+session credentials.
+
+**`sso/signRequestExecutor.ts`**: `createSignRequestExecutor(config)` — concrete `SignRequestExecutor` implementing
+encrypted sign request round-trips: SCALE-encodes `RemoteMessage` with `SignRequest`, encrypts with AES-GCM session
+key, publishes to session topic, waits for `SignResponse` matching the message ID, decrypts and returns signature.
+
 **`identity/types.ts`**: `IdentityProvider` interface (`getIdentity(accountIdHex)`) and `ResolvedIdentity` type
 (liteUsername, fullUsername, avatarUrl, chainIdentity). Implementations query a chain (e.g. People parachain's
 `Resources.Consumers` storage) and return structured identity data.
 
-**`identity/resolver.ts`**: `createIdentityResolver(provider)` — wraps an `IdentityProvider` with in-memory caching
-and concurrent-request deduplication. Failed requests are not cached so transient errors are retried. Supports
+**`identity/resolver.ts`**: `createIdentityResolver(provider)` — wraps an `IdentityProvider` with in-memory caching and
+concurrent-request deduplication. Failed requests are not cached so transient errors are retried. Supports
 `invalidate(accountId)` and `invalidateAll()` for cache control.
 
 ### 2.5 Webview Port (`webviewPort.ts`)
@@ -724,7 +754,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 ## Part 4: Tests
 
-### 4.1 Unit Tests (19 files, 228 tests)
+### 4.1 Unit Tests (20 files, 254 tests)
 
 **Test helper** (`test/helpers/mockProvider.ts`): creates connected mock Provider pairs (async and sync variants).
 
@@ -741,7 +771,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 - `protocol.spec.ts` (18 tests): all methods present in hostApiProtocol, correct types, error type construction
 - `util.spec.ts` (24 tests): logger, createIdFactory, delay, promiseWithResolvers, composeAction, toHexString
 
-**Host** (9 files):
+**Host** (10 files):
 
 - `handlers.spec.ts` (14 tests): featureSupported, navigateTo, pushNotification, permissions, storage
 - `authManager.spec.ts` (14 tests): full state machine, subscribe/unsubscribe
@@ -755,8 +785,11 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
   failure handling, session persistence, session restore, dispose, subscribe/unsubscribe
 - `ssoSigning.spec.ts` (9 tests): paired guard, signPayload/signRaw delegation, timeout, executor error propagation,
   signedTransaction passthrough
-- `identityResolver.spec.ts` (10 tests): delegation, caching (hit/miss/undefined), invalidation (single/all),
-  concurrent deduplication, error propagation, transient error retry
+- `identityResolver.spec.ts` (10 tests): delegation, caching (hit/miss/undefined), invalidation (single/all), concurrent
+  deduplication, error propagation, transient error retry
+- `ssoCrypto.spec.ts` (26 tests): AES-GCM encryption round-trip (empty/large/wrong key), khash determinism,
+  accountId derivation, handshake topic, sr25519 key derivation (base/derived paths), P-256 ECDH symmetry,
+  mnemonic generation, SCALE codec round-trips (HandshakeData, RemoteMessage, disconnect)
 
 **Product** (4 files):
 
