@@ -97,9 +97,16 @@ export type {
   SsoManagerConfig,
   PairingExecutor,
   PairingResult,
+  RemoteSigner,
+  RemoteSigningConfig,
+  SignRequestExecutor,
+  RemoteSignPayloadRequest,
+  RemoteSignRawRequest,
+  RemoteSignResult,
 } from './auth/sso/types.js';
 
 export { createSsoManager } from './auth/sso/manager.js';
+export { createRemoteSigner } from './auth/sso/signing.js';
 export { createSsoSessionStore } from './auth/sso/sessionStore.js';
 export { createMemoryTransportBus } from './auth/sso/memoryTransport.js';
 

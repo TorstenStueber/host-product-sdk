@@ -591,6 +591,16 @@ same bus see each other's statements. Topic matching uses byte-level comparison.
 - `PairingExecutor` is the pluggable crypto protocol — implementations handle mnemonic generation, P-256 ECDH,
   statement-store key exchange, and attestation. The manager only drives the state machine and persistence.
 
+**`sso/signing.ts`**: `createRemoteSigner(config)` — routes sign requests through the SSO transport to the paired
+mobile wallet:
+
+- `signPayload(request)` / `signRaw(request)`: guards that the manager is paired, delegates to an injected
+  `SignRequestExecutor` (which handles AES encryption, statement framing, and response correlation), and applies a
+  configurable timeout (default 90s).
+- `SignRequestExecutor` is the pluggable crypto layer — implementations encrypt the payload with the session key,
+  publish to the statement-store topic, wait for the wallet's signed response, and decrypt it.
+- `RemoteSigner` can be wired as the `onSignPayload`/`onSignRaw` callbacks in `HandlersConfig`.
+
 ### 2.5 Webview Port (`webviewPort.ts`)
 
 `acquireWebviewPort({ webview, openDevTools? })` acquires a `MessagePort` by creating a `MessageChannel`, injecting one
@@ -706,7 +716,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 ## Part 4: Tests
 
-### 4.1 Unit Tests (17 files, 209 tests)
+### 4.1 Unit Tests (18 files, 218 tests)
 
 **Test helper** (`test/helpers/mockProvider.ts`): creates connected mock Provider pairs (async and sync variants).
 
@@ -723,7 +733,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 - `protocol.spec.ts` (18 tests): all methods present in hostApiProtocol, correct types, error type construction
 - `util.spec.ts` (24 tests): logger, createIdFactory, delay, promiseWithResolvers, composeAction, toHexString
 
-**Host** (7 files):
+**Host** (8 files):
 
 - `handlers.spec.ts` (14 tests): featureSupported, navigateTo, pushNotification, permissions, storage
 - `authManager.spec.ts` (14 tests): full state machine, subscribe/unsubscribe
@@ -735,6 +745,8 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
   multi-subscriber), session store (CRUD, round-trip serialization, reactive subscriptions, Uint8Array preservation)
 - `ssoManager.spec.ts` (17 tests): state machine lifecycle (idle -> pairing -> awaiting_scan -> paired), cancellation,
   failure handling, session persistence, session restore, dispose, subscribe/unsubscribe
+- `ssoSigning.spec.ts` (9 tests): paired guard, signPayload/signRaw delegation, timeout, executor error propagation,
+  signedTransaction passthrough
 
 **Product** (4 files):
 

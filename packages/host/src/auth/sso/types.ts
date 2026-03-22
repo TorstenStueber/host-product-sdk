@@ -15,3 +15,12 @@ export type {
 } from './transport.js';
 
 export type { SsoState, SsoManager, SsoManagerConfig, PairingExecutor, PairingResult } from './manager.js';
+
+export type {
+  RemoteSigner,
+  RemoteSigningConfig,
+  SignRequestExecutor,
+  RemoteSignPayloadRequest,
+  RemoteSignRawRequest,
+  RemoteSignResult,
+} from './signing.js';
