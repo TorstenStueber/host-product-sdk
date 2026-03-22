@@ -10,3 +10,13 @@ export type StorageAdapter = {
   write(key: string, value: Uint8Array): Promise<void>;
   clear(key: string): Promise<void>;
 };
+
+/**
+ * Reactive storage adapter.
+ *
+ * Extends StorageAdapter with change notifications per key.
+ * Used by the SSO session manager to watch for session changes.
+ */
+export type ReactiveStorageAdapter = StorageAdapter & {
+  subscribe(key: string, callback: (value: Uint8Array | undefined) => void): () => void;
+};

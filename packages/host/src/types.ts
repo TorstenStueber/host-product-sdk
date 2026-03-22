@@ -120,4 +120,4 @@ export type HostSdk = {
 export type { AuthState, UserSession, Identity } from './auth/authManager.js';
 export type { HostFacade } from '@polkadot/api-protocol';
 export type { HandlersConfig, UserSessionInfo } from './handlers/registry.js';
-export type { StorageAdapter } from './storage/types.js';
+export type { StorageAdapter, ReactiveStorageAdapter } from './storage/types.js';

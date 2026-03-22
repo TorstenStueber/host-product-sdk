@@ -2,10 +2,10 @@
  * Host storage adapter tests.
  *
  * Tests for createMemoryStorageAdapter: read/write/clear,
- * missing keys, and prefix isolation.
+ * missing keys, prefix isolation, and reactive subscriptions.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { createMemoryStorageAdapter } from '@polkadot/host';
 
 describe('createMemoryStorageAdapter', () => {
@@ -134,5 +134,107 @@ describe('createMemoryStorageAdapter', () => {
     const result = await store.read('large');
 
     expect(result).toEqual(large);
+  });
+
+  // -----------------------------------------------------------------------
+  // Reactive subscriptions
+  // -----------------------------------------------------------------------
+
+  it('subscribe is notified on write', async () => {
+    const store = createMemoryStorageAdapter();
+    const callback = vi.fn();
+
+    store.subscribe('key', callback);
+    await store.write('key', new Uint8Array([1, 2, 3]));
+
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith(new Uint8Array([1, 2, 3]));
+  });
+
+  it('subscribe is notified with undefined on clear', async () => {
+    const store = createMemoryStorageAdapter();
+    const callback = vi.fn();
+
+    await store.write('key', new Uint8Array([1]));
+    store.subscribe('key', callback);
+    await store.clear('key');
+
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith(undefined);
+  });
+
+  it('subscribe is not notified for other keys', async () => {
+    const store = createMemoryStorageAdapter();
+    const callback = vi.fn();
+
+    store.subscribe('key-a', callback);
+    await store.write('key-b', new Uint8Array([1]));
+
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it('multiple subscribers on the same key all fire', async () => {
+    const store = createMemoryStorageAdapter();
+    const cb1 = vi.fn();
+    const cb2 = vi.fn();
+
+    store.subscribe('key', cb1);
+    store.subscribe('key', cb2);
+    await store.write('key', new Uint8Array([42]));
+
+    expect(cb1).toHaveBeenCalledTimes(1);
+    expect(cb2).toHaveBeenCalledTimes(1);
+  });
+
+  it('unsubscribe stops notifications', async () => {
+    const store = createMemoryStorageAdapter();
+    const callback = vi.fn();
+
+    const unsub = store.subscribe('key', callback);
+    await store.write('key', new Uint8Array([1]));
+    expect(callback).toHaveBeenCalledTimes(1);
+
+    unsub();
+    await store.write('key', new Uint8Array([2]));
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it('unsubscribe one listener does not affect others', async () => {
+    const store = createMemoryStorageAdapter();
+    const cb1 = vi.fn();
+    const cb2 = vi.fn();
+
+    const unsub1 = store.subscribe('key', cb1);
+    store.subscribe('key', cb2);
+
+    unsub1();
+    await store.write('key', new Uint8Array([1]));
+
+    expect(cb1).not.toHaveBeenCalled();
+    expect(cb2).toHaveBeenCalledTimes(1);
+  });
+
+  it('subscribe fires on each write with the latest value', async () => {
+    const store = createMemoryStorageAdapter();
+    const values: (Uint8Array | undefined)[] = [];
+
+    store.subscribe('key', v => values.push(v));
+    await store.write('key', new Uint8Array([1]));
+    await store.write('key', new Uint8Array([2]));
+    await store.clear('key');
+    await store.write('key', new Uint8Array([3]));
+
+    expect(values).toEqual([new Uint8Array([1]), new Uint8Array([2]), undefined, new Uint8Array([3])]);
+  });
+
+  it('clear on nonexistent key still notifies subscribers', async () => {
+    const store = createMemoryStorageAdapter();
+    const callback = vi.fn();
+
+    store.subscribe('key', callback);
+    await store.clear('key');
+
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith(undefined);
   });
 });

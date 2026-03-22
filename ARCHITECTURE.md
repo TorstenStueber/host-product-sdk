@@ -546,8 +546,12 @@ up to max, process as tokens refill).
 
 `StorageAdapter` interface: async `read(key)`, `write(key, value)`, `clear(key)` for Uint8Array values.
 
-- `createMemoryStorageAdapter()`: Map-backed, for testing
-- `createLocalStorageAdapter(prefix)`: browser localStorage, base64, prefix-scoped
+`ReactiveStorageAdapter` extends `StorageAdapter` with `subscribe(key, callback)` for per-key change notifications.
+Listeners fire synchronously on `write` (with the new value) and `clear` (with `undefined`). Used by the SSO session
+manager to watch for session changes.
+
+- `createMemoryStorageAdapter()`: Map-backed, for testing. Returns `ReactiveStorageAdapter`.
+- `createLocalStorageAdapter(prefix)`: browser localStorage, base64, prefix-scoped. Returns `ReactiveStorageAdapter`.
 
 ### 2.4 Auth (`auth/`)
 
@@ -675,7 +679,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 ## Part 4: Tests
 
-### 4.1 Unit Tests (15 files, 169 tests)
+### 4.1 Unit Tests (15 files, 177 tests)
 
 **Test helper** (`test/helpers/mockProvider.ts`): creates connected mock Provider pairs (async and sync variants).
 
@@ -696,7 +700,8 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 - `handlers.spec.ts` (14 tests): featureSupported, navigateTo, pushNotification, permissions, storage
 - `authManager.spec.ts` (14 tests): full state machine, subscribe/unsubscribe
-- `storage.spec.ts` (11 tests): memory adapter CRUD, prefix isolation
+- `storage.spec.ts` (19 tests): memory adapter CRUD, prefix isolation, reactive subscriptions (write/clear
+  notifications, unsubscribe, multiple listeners, key isolation)
 - `rateLimiter.spec.ts` (10 tests): drop/queue strategies
 - `sdk.spec.ts` (7 tests): construction, session management
 

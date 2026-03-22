@@ -26,6 +26,7 @@ export type {
   HandlersConfig,
   UserSessionInfo,
   StorageAdapter,
+  ReactiveStorageAdapter,
 } from './types.js';
 
 // ---------------------------------------------------------------------------
