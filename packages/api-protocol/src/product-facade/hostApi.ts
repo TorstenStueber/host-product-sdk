@@ -155,10 +155,6 @@ export function createProductFacade(options: CreateProductFacadeOptions) {
 
     // -- Core / lifecycle ---------------------------------------------------
 
-    handshake(payload: RequestParams<'host_handshake', 'v1'>) {
-      return makeRequest(transport, 'host_handshake', 'v1', payload);
-    },
-
     featureSupported(payload: RequestParams<'host_feature_supported', 'v1'>) {
       return makeRequest(transport, 'host_feature_supported', 'v1', payload);
     },
