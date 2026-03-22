@@ -18,7 +18,7 @@ import { createNanoEvents } from 'nanoevents';
 
 import type { CodecAdapter, ProtocolMessage } from '../codec/adapter.js';
 import { structuredCloneCodecAdapter } from '../codec/structured/index.js';
-import { scaleCodecAdapter } from '../codec/scale/protocol.js';
+import { scaleCodecAdapter } from '../codec/scale/adapter.js';
 import type {
   RequestMethod,
   SubscriptionMethod,
@@ -27,7 +27,7 @@ import type {
   ResponseCodecType,
   StartCodecType,
   ReceiveCodecType,
-} from '../codec/scale/protocol.js';
+} from '../../api/protocol.js';
 import { composeAction, delay, promiseWithResolvers } from '../util/helpers.js';
 import { createIdFactory } from '../util/idFactory.js';
 import type { Provider } from './provider.js';

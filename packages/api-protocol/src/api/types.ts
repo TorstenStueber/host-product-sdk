@@ -21,7 +21,7 @@ export type {
   RingLocationHintType as RingLocationHint,
   RingLocationType as RingLocation,
   AccountConnectionStatusType as AccountConnectionStatus,
-} from '../codec/scale/v1/accounts.js';
+} from '../shared/codec/scale/v1/accounts.js';
 
 // RingVrfProof and RingVrfAlias are plain Uint8Array aliases with no
 // dedicated codec constant -- keep them as manual type aliases.
@@ -37,7 +37,7 @@ export type {
   RawPayloadType as RawPayload,
   SigningRawPayloadType as SigningRawRequest,
   SigningPayloadType as SigningPayloadRequest,
-} from '../codec/scale/v1/sign.js';
+} from '../shared/codec/scale/v1/sign.js';
 
 // ---------------------------------------------------------------------------
 // Create transaction
@@ -48,13 +48,16 @@ export type {
   TxPayloadContextType as TxPayloadContext,
   TxPayloadV1Type as TxPayloadV1,
   VersionedTxPayloadType as VersionedTxPayload,
-} from '../codec/scale/v1/createTransaction.js';
+} from '../shared/codec/scale/v1/createTransaction.js';
 
 // ---------------------------------------------------------------------------
 // Local storage
 // ---------------------------------------------------------------------------
 
-export type { StorageKeyType as StorageKey, StorageValueType as StorageValue } from '../codec/scale/v1/localStorage.js';
+export type {
+  StorageKeyType as StorageKey,
+  StorageValueType as StorageValue,
+} from '../shared/codec/scale/v1/localStorage.js';
 
 // ---------------------------------------------------------------------------
 // Chat
@@ -83,7 +86,7 @@ export type {
   ChatCommandType as ChatCommand,
   ChatActionPayloadType as ChatActionPayload,
   ReceivedChatActionType as ReceivedChatAction,
-} from '../codec/scale/v1/chat.js';
+} from '../shared/codec/scale/v1/chat.js';
 
 // ---------------------------------------------------------------------------
 // Chain interaction
@@ -100,14 +103,14 @@ export type {
   StorageResultItemType as StorageResultItem,
   OperationStartedResultType as OperationStartedResult,
   ChainHeadEventType as ChainHeadEvent,
-} from '../codec/scale/v1/chainInteraction.js';
+} from '../shared/codec/scale/v1/chainInteraction.js';
 
 // ---------------------------------------------------------------------------
 // Permissions
 // ---------------------------------------------------------------------------
 
-export type { DevicePermissionRequestType as DevicePermissionRequest } from '../codec/scale/v1/devicePermission.js';
-export type { RemotePermissionRequestType as RemotePermissionRequest } from '../codec/scale/v1/remotePermission.js';
+export type { DevicePermissionRequestType as DevicePermissionRequest } from '../shared/codec/scale/v1/devicePermission.js';
+export type { RemotePermissionRequestType as RemotePermissionRequest } from '../shared/codec/scale/v1/remotePermission.js';
 
 // ---------------------------------------------------------------------------
 // Navigation
@@ -119,7 +122,7 @@ export type { RemotePermissionRequestType as RemotePermissionRequest } from '../
 // Notification
 // ---------------------------------------------------------------------------
 
-export type { PushNotificationType as PushNotification } from '../codec/scale/v1/notification.js';
+export type { PushNotificationType as PushNotification } from '../shared/codec/scale/v1/notification.js';
 
 // ---------------------------------------------------------------------------
 // Statement store
@@ -136,22 +139,25 @@ export type {
   StatementProofType as StatementProof,
   StatementType as Statement,
   SignedStatementType as SignedStatement,
-} from '../codec/scale/v1/statementStore.js';
+} from '../shared/codec/scale/v1/statementStore.js';
 
 // ---------------------------------------------------------------------------
 // Preimage
 // ---------------------------------------------------------------------------
 
-export type { PreimageKeyType as PreimageKey, PreimageValueType as PreimageValue } from '../codec/scale/v1/preimage.js';
+export type {
+  PreimageKeyType as PreimageKey,
+  PreimageValueType as PreimageValue,
+} from '../shared/codec/scale/v1/preimage.js';
 
 // ---------------------------------------------------------------------------
 // Custom renderer
 // ---------------------------------------------------------------------------
 
-export type { CustomRendererNodeType as CustomRendererNode } from '../codec/scale/v1/customRenderer.js';
+export type { CustomRendererNodeType as CustomRendererNode } from '../shared/codec/scale/v1/customRenderer.js';
 
 // ---------------------------------------------------------------------------
 // Feature
 // ---------------------------------------------------------------------------
 
-export type { FeatureType as Feature } from '../codec/scale/v1/feature.js';
+export type { FeatureType as Feature } from '../shared/codec/scale/v1/feature.js';

@@ -24,8 +24,8 @@ import type {
   ResponseErr,
   SubscriptionParams,
   SubscriptionPayload,
-} from '../shared/codec/scale/protocol.js';
-import { scaleCodecAdapter } from '../shared/codec/scale/protocol.js';
+} from '../api/protocol.js';
+import { scaleCodecAdapter } from '../shared/codec/scale/adapter.js';
 import { structuredCloneCodecAdapter } from '../shared/codec/structured/index.js';
 import { requestCodecUpgrade } from '../shared/codec/negotiation.js';
 import { createTransport } from '../shared/transport/transport.js';

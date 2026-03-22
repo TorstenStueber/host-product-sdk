@@ -7,7 +7,7 @@
  */
 
 import type { HexString } from '../shared/codec/scale/primitives.js';
-import type { ChainHeadEvent, OperationStartedResult, RuntimeType } from '../shared/protocol/types.js';
+import type { ChainHeadEvent, OperationStartedResult, RuntimeType } from '../api/types.js';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 
 // ---------------------------------------------------------------------------
@@ -35,8 +35,6 @@ type ChainEntry = {
 // ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
-
-type ChainConnectionManager = ReturnType<typeof createChainConnectionManager>;
 
 let instanceCounter = 0;
 

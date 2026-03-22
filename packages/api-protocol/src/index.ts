@@ -109,20 +109,13 @@ export type {
 
   // Feature
   Feature,
-} from './shared/protocol/types.js';
+} from './api/types.js';
 
 // ===========================================================================
-// Shared: codec
+// API protocol definition
 // ===========================================================================
 
-export type { CodecAdapter, PostMessageData, ProtocolMessage } from './shared/codec/adapter.js';
-export {
-  createScaleCodecAdapter,
-  scaleCodecAdapter,
-  Message,
-  MessagePayload,
-  hostApiProtocol,
-} from './shared/codec/scale/protocol.js';
+export { hostApiProtocol, Message, MessagePayload } from './api/protocol.js';
 export type {
   RequestMethod,
   SubscriptionMethod,
@@ -140,7 +133,14 @@ export type {
   ResponseErr,
   SubscriptionParams,
   SubscriptionPayload,
-} from './shared/codec/scale/protocol.js';
+} from './api/protocol.js';
+
+// ===========================================================================
+// Shared: codec adapters
+// ===========================================================================
+
+export type { CodecAdapter, PostMessageData, ProtocolMessage } from './shared/codec/adapter.js';
+export { createScaleCodecAdapter, scaleCodecAdapter } from './shared/codec/scale/adapter.js';
 export { structuredCloneCodecAdapter } from './shared/codec/structured/index.js';
 export { UPGRADE_TIMEOUT, requestCodecUpgrade, handleCodecUpgrade } from './shared/codec/negotiation.js';
 export type {

@@ -30,9 +30,15 @@ Runtime dependencies of api-protocol: `scale-ts`, `nanoevents`, `neverthrow`, `@
 
 ---
 
-## Part 1: `@polkadot/api-protocol`: Shared layer (`src/shared/`)
+## Part 1: `@polkadot/api-protocol`
 
-Everything both sides depend on. Read bottom-up: utilities, then codec, then transport, then protocol types.
+The protocol package has three top-level directories:
+
+- `src/api/`: the API definition (`hostApiProtocol` registry, derived types, domain types) — the core of the project
+- `src/shared/`: codec adapters, transport, utilities — infrastructure that supports the API
+- `src/host-facade/` and `src/product-facade/`: typed facades for each side (see Parts 1b and 1c)
+
+Read bottom-up: utilities, then codec, then transport, then API definition.
 
 ### 1.1 Utilities (`util/`)
 
@@ -133,7 +139,7 @@ background, border, sizes, fill flags). Uses `lazy()` for recursive children.
 **Other v1 files**: `localStorage.ts`, `navigation.ts`, `notification.ts`, `feature.ts`, `devicePermission.ts`,
 `remotePermission.ts`, `createTransaction.ts`, `statementStore.ts`, `preimage.ts`, `handshake.ts`.
 
-### 1.6 Protocol Assembly (`codec/scale/protocol.ts`)
+### 1.6 API Protocol Definition (`api/protocol.ts`)
 
 Imports building-block codecs from the v1 files and composes them inline into a flat, explicit registry with no helper
 functions:
@@ -195,10 +201,11 @@ The `MessagePayload` enum is built by flattening all entries (concatenating meth
 `host_handshake_request`). For subscriptions, `_stop` and `_interrupt` default to `_void` if omitted. Then:
 
 - `Message = Struct({ requestId: str, payload: MessagePayload })`: the top-level wire format
-- `createScaleCodecAdapter(messageCodec)`: wraps any scale-ts Codec into a CodecAdapter
-- `scaleCodecAdapter`: ready-to-use instance
 
-### 1.7 Protocol Types (`protocol/types.ts`)
+The SCALE codec adapter (`createScaleCodecAdapter`, `scaleCodecAdapter`) lives separately in
+`shared/codec/scale/adapter.ts` — it wraps the `Message` codec into a `CodecAdapter` for the transport layer.
+
+### 1.7 API Types (`api/types.ts`)
 
 Re-exports data types (params, results, structs) derived from SCALE codecs via `CodecType<>`:
 
@@ -314,8 +321,8 @@ product's request hangs until the 1s timeout. With our code, the not-supported c
 
 ### 1.11 Main Entry Point (`index.ts`)
 
-Single flat file re-exporting from all three layers: `shared/` (protocol, codecs, transport, utilities), `host/`
-(protocol handler, providers, connection manager), and `product/` (ProductFacade, sandbox transport). No barrel chains.
+Single flat file re-exporting from all layers: `api/` (protocol definition, domain types), `shared/` (codec adapters,
+transport, utilities), `host-facade/` (HostFacade), and `product-facade/` (ProductFacade). No barrel chains.
 
 ### 1.12 Error Representation
 
@@ -407,7 +414,7 @@ The handler's params, ok, and err types are derived from the protocol codecs via
 **Adding a new version**: when a method needs a v2, three changes are needed:
 
 1. **`codec/scale/v1/` (or new `v2/`)**: define the new v2 building-block codecs.
-2. **`codec/scale/protocol.ts`**: extend the method's enum inline:
+2. **`api/protocol.ts`**: extend the method's enum inline:
    `_request: Enum({ v1: ProductAccountId, v2: NewAccountGetV2Codec })`. The `RequestVersions<M>` type automatically
    becomes `'v1' | 'v2'`, and `RequestParams<M, 'v2'>` derives the v2 types.
 3. **`protocolHandler.ts`**: add the v2 handler to the map:

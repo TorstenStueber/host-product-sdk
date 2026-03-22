@@ -1,33 +1,35 @@
 /**
- * Protocol codec registry.
+ * API protocol definition.
  *
- * Assembles all v1 SCALE codecs into the MessagePayload enum and
- * the top-level Message struct used on the wire.
+ * This is the core of the entire project: the definition of what methods
+ * exist in the host-product API and what their argument/return types are.
  *
- * Each method's request/response (or start/receive) codecs are wrapped
- * in a versioned enum: `Enum({ v1: codec })`. This matches the original
- * triangle-js-sdks wire format. When a v2 is added for a method, it
- * becomes `Enum({ v1: codec1, v2: codec2 })` — each method versions
- * its types independently.
+ * `hostApiProtocol` is the registry of all protocol methods with their
+ * versioned SCALE codec pairs. Types are defined as SCALE codecs (not just
+ * TypeScript types) so the wire format is the single source of truth.
+ * TypeScript types are derived from the codecs via `CodecType<>`.
  *
- * Subscriptions may omit `_stop` and `_interrupt` — they default to
- * `_void` in the MessagePayload enum.
+ * `MessagePayload` and `Message` define the top-level wire envelope.
+ *
+ * The derived mapped types (`RequestMethod`, `RequestCodecType<M>`,
+ * `RequestParams<M,V>`, `ResponseOk<M,V>`, etc.) are used by both
+ * facades and the transport layer for end-to-end type safety.
  */
 
-import { Enum, Hex } from './primitives.js';
-import type { Codec, StringRecord } from 'scale-ts';
+import { Enum, Hex } from '../shared/codec/scale/primitives.js';
+import type { Codec, CodecType, StringRecord } from 'scale-ts';
 import { Bytes, Option, Result, Struct, Tuple, Vector, bool, str, u8, _void } from 'scale-ts';
 
 // -- v1 building-block codec imports ------------------------------------------
 
-import { GenesisHash, GenericErr } from './v1/commonCodecs.js';
-import { HandshakeErr } from './v1/handshake.js';
-import { Feature } from './v1/feature.js';
-import { PushNotification } from './v1/notification.js';
-import { NavigateToErr } from './v1/navigation.js';
-import { DevicePermissionRequest } from './v1/devicePermission.js';
-import { RemotePermissionRequest } from './v1/remotePermission.js';
-import { StorageKey, StorageValue, StorageErr } from './v1/localStorage.js';
+import { GenesisHash, GenericErr } from '../shared/codec/scale/v1/commonCodecs.js';
+import { HandshakeErr } from '../shared/codec/scale/v1/handshake.js';
+import { Feature } from '../shared/codec/scale/v1/feature.js';
+import { PushNotification } from '../shared/codec/scale/v1/notification.js';
+import { NavigateToErr } from '../shared/codec/scale/v1/navigation.js';
+import { DevicePermissionRequest } from '../shared/codec/scale/v1/devicePermission.js';
+import { RemotePermissionRequest } from '../shared/codec/scale/v1/remotePermission.js';
+import { StorageKey, StorageValue, StorageErr } from '../shared/codec/scale/v1/localStorage.js';
 import {
   ProductAccountId,
   Account,
@@ -37,9 +39,9 @@ import {
   RequestCredentialsErr,
   CreateProofErr,
   AccountConnectionStatus,
-} from './v1/accounts.js';
-import { CreateTransactionErr, VersionedTxPayload } from './v1/createTransaction.js';
-import { SigningRawPayload, SigningPayload, SigningResult, SigningErr } from './v1/sign.js';
+} from '../shared/codec/scale/v1/accounts.js';
+import { CreateTransactionErr, VersionedTxPayload } from '../shared/codec/scale/v1/createTransaction.js';
+import { SigningRawPayload, SigningPayload, SigningResult, SigningErr } from '../shared/codec/scale/v1/sign.js';
 import {
   ChatRoomRequest,
   ChatRoomRegistrationResult,
@@ -52,17 +54,23 @@ import {
   ChatPostMessageResult,
   ChatMessagePostingErr,
   ReceivedChatAction,
-} from './v1/chat.js';
-import { CustomRendererNode } from './v1/customRenderer.js';
-import { Topic, SignedStatement, Statement, StatementProof, StatementProofErr } from './v1/statementStore.js';
-import { PreimageKey, PreimageValue, PreimageSubmitErr } from './v1/preimage.js';
+} from '../shared/codec/scale/v1/chat.js';
+import { CustomRendererNode } from '../shared/codec/scale/v1/customRenderer.js';
+import {
+  Topic,
+  SignedStatement,
+  Statement,
+  StatementProof,
+  StatementProofErr,
+} from '../shared/codec/scale/v1/statementStore.js';
+import { PreimageKey, PreimageValue, PreimageSubmitErr } from '../shared/codec/scale/v1/preimage.js';
 import {
   BlockHash,
   OperationId,
   StorageQueryItem,
   OperationStartedResult,
   ChainHeadEvent,
-} from './v1/chainInteraction.js';
+} from '../shared/codec/scale/v1/chainInteraction.js';
 
 // -- Protocol registry --------------------------------------------------------
 
@@ -322,12 +330,6 @@ type SubscriptionSuffix = 'start' | 'receive' | 'stop' | 'interrupt';
 export type ActionString = `${RequestMethod}_${RequestSuffix}` | `${SubscriptionMethod}_${SubscriptionSuffix}`;
 
 // -- Derived per-method per-version types -------------------------------------
-//
-// These utility types extract the inner request params, response Ok/Err, and
-// subscription params/payload types from hostApiProtocol, parameterized by
-// method name and version tag (e.g. 'v1').
-
-import type { CodecType } from 'scale-ts';
 
 /** Full decoded type of a request method's _request codec (versioned envelope). */
 export type RequestCodecType<M extends RequestMethod> = CodecType<Protocol[M]['_request']>;
@@ -376,7 +378,7 @@ export type SubscriptionParams<M extends SubscriptionMethod, V extends string> =
 /** Subscription receive payload type for method M at version V. */
 export type SubscriptionPayload<M extends SubscriptionMethod, V extends string> = VersionValue<ReceiveCodecType<M>, V>;
 
-// -- Build MessagePayload enum ------------------------------------------------
+// -- Wire envelope ------------------------------------------------------------
 
 function buildMessagePayload(): Codec<{ tag: string; value: unknown }> {
   const fields: Record<string, Codec<any>> = {};
@@ -401,26 +403,3 @@ export const Message: Codec<{ requestId: string; payload: { tag: string; value: 
   requestId: str,
   payload: MessagePayload,
 }) as unknown as Codec<{ requestId: string; payload: { tag: string; value: unknown } }>;
-
-// -- SCALE codec adapter ------------------------------------------------------
-
-import type { CodecAdapter, PostMessageData, ProtocolMessage } from '../adapter.js';
-
-export function createScaleCodecAdapter(
-  messageCodec: Codec<{ requestId: string; payload: { tag: string; value: unknown } }>,
-): CodecAdapter {
-  return {
-    encode(message: ProtocolMessage): PostMessageData {
-      return messageCodec.enc(message) as Uint8Array;
-    },
-    decode(data: PostMessageData): ProtocolMessage {
-      if (!(data instanceof Uint8Array)) {
-        throw new Error('SCALE codec expects Uint8Array input');
-      }
-      return messageCodec.dec(data);
-    },
-  };
-}
-
-/** Ready-to-use SCALE codec adapter for the full protocol. */
-export const scaleCodecAdapter = createScaleCodecAdapter(Message);

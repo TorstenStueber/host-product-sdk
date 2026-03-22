@@ -24,13 +24,13 @@ import type {
   ResponseErr,
   SubscriptionParams,
   SubscriptionPayload,
-} from '../shared/codec/scale/protocol.js';
+} from '../api/protocol.js';
 import { createTransport } from '../shared/transport/transport.js';
 import { createWindowProvider } from '../shared/transport/windowProvider.js';
 import type { WindowRef } from '../shared/transport/windowProvider.js';
 import { createMessagePortProvider } from '../shared/transport/messagePortProvider.js';
 import { handleCodecUpgrade } from '../shared/codec/negotiation.js';
-import { scaleCodecAdapter } from '../shared/codec/scale/protocol.js';
+import { scaleCodecAdapter } from '../shared/codec/scale/adapter.js';
 import { structuredCloneCodecAdapter } from '../shared/codec/structured/index.js';
 import type { ResultAsync } from 'neverthrow';
 
