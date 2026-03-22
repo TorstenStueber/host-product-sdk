@@ -28,6 +28,7 @@ import type {
 import { scaleCodecAdapter } from '../shared/codec/scale/adapter.js';
 import { structuredCloneCodecAdapter } from '../shared/codec/structured/index.js';
 import { requestCodecUpgrade } from '../shared/codec/negotiation.js';
+import type { Messaging } from '../shared/transport/provider.js';
 import { createTransport } from '../shared/transport/transport.js';
 import { createWindowProvider } from '../shared/transport/windowProvider.js';
 import { createMessagePortProvider } from '../shared/transport/messagePortProvider.js';
@@ -40,7 +41,7 @@ import { extractErrorMessage } from '../shared/util/helpers.js';
 
 export type CreateProductFacadeOptions = {
   /** How the product communicates with the host. */
-  messaging: { type: 'window'; target: Window } | { type: 'messagePort'; port: MessagePort | Promise<MessagePort> };
+  messaging: Messaging;
 
   /** Protocol version for handshake validation. Defaults to 1. */
   protocolVersionId?: number;

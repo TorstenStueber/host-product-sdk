@@ -85,7 +85,7 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
       iframe.src = url;
       const storagePrefix = config.storagePrefix ?? `${config.appId}:`;
       const container = createHostFacade({
-        messaging: { type: 'window', target: () => iframe.contentWindow },
+        messaging: { type: 'window', target: iframe.contentWindow! },
       });
 
       const handlersConfig = buildHandlersConfig(storagePrefix);

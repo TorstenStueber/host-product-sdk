@@ -40,7 +40,7 @@ iframe.src = `/product.html?codec=${codecParam}`;
 // For the 'scale' test, disable codec upgrade so the connection stays on SCALE.
 const allowCodecUpgrade = codecParam !== 'scale';
 const container = createHostFacade({
-  messaging: { type: 'window', target: () => iframe.contentWindow },
+  messaging: { type: 'window', target: iframe.contentWindow! },
   allowCodecUpgrade,
 });
 e2e.container = container;

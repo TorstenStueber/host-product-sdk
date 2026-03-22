@@ -230,17 +230,24 @@ type Provider = {
   subscribe(callback: (message: Uint8Array | unknown) => void): () => void;
   dispose(): void;
 };
+
+type Messaging =
+  | { type: 'window'; target: Window | Promise<Window> }
+  | { type: 'messagePort'; port: MessagePort | Promise<MessagePort> };
 ```
+
+The `Messaging` type is used by both `createHostFacade` and `createProductFacade` to describe how to reach the other
+side. Both `window` and `messagePort` variants accept a direct value or a Promise for async acquisition.
 
 Knows nothing about protocol methods, IDs, or codecs.
 
 Two concrete provider implementations live in shared as neutral building blocks:
 
-**`transport/windowProvider.ts`**: `createWindowProvider(target: WindowRef)`: the generic `postMessage` provider.
-Accepts either a direct `Window` reference or a lazy getter `() => Window | null`. Validates incoming messages (accepts
-both Uint8Array for SCALE and protocol message objects for structured clone), manages subscribers, handles Uint8Array
-buffer transfer. When the getter returns null, outgoing messages are silently dropped. Used internally by
-`createHostFacade` and `createProductFacade` when `messaging.type` is `'window'`.
+**`transport/windowProvider.ts`**: `createWindowProvider(target: Window | Promise<Window>)`: the generic `postMessage`
+provider. Accepts either a direct `Window` reference or a Promise (for async acquisition). Validates incoming messages
+(accepts both Uint8Array for SCALE and protocol message objects for structured clone), manages subscribers, handles
+Uint8Array buffer transfer. Messages sent before the promise resolves are delivered once the window becomes available.
+Used internally by `createHostFacade` and `createProductFacade` when `messaging.type` is `'window'`.
 
 **`transport/messagePortProvider.ts`**: `createMessagePortProvider(port: MessagePort | Promise<MessagePort>)`:
 communicates over a MessagePort. Accepts a ready port or a Promise (for async acquisition). Same message validation as
@@ -371,14 +378,13 @@ in `@polkadot/host`.
 
 ```typescript
 const handler = createHostFacade({
-  messaging: { type: 'window', target: () => iframe.contentWindow },
+  messaging: { type: 'window', target: iframe.contentWindow },
   allowCodecUpgrade: true, // default
 });
 ```
 
 The `messaging` option determines the underlying provider (same tagged union as `createProductFacade` on the product
-side, but `WindowRef` supports lazy getters `() => Window | null` for iframes where `contentWindow` may not be available
-immediately):
+side):
 
 - `{ type: 'window', target }` -> `createWindowProvider(target)` (iframe communication)
 - `{ type: 'messagePort', port }` -> `createMessagePortProvider(port)` (webview communication)
@@ -580,8 +586,8 @@ sdk.dispose();
 ```
 
 Creates AuthManager, then `embed()` sets `iframe.src`, creates
-`createHostFacade({ messaging: { type: 'window', target: () => iframe.contentWindow } })` -> `wireAllHandlers()`. On
-dispose, clears `iframe.src`. Also exposes `setSession()` / `clearSession()` for external auth management.
+`createHostFacade({ messaging: { type: 'window', target: iframe.contentWindow } })` -> `wireAllHandlers()`. On dispose,
+clears `iframe.src`. Also exposes `setSession()` / `clearSession()` for external auth management.
 
 **`types.ts`**: `HostSdkConfig` with all options: `appId`, `chainProvider`, signing callbacks, permission callbacks, UI
 callbacks.

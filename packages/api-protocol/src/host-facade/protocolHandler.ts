@@ -25,9 +25,9 @@ import type {
   SubscriptionParams,
   SubscriptionPayload,
 } from '../api/protocol.js';
+import type { Messaging } from '../shared/transport/provider.js';
 import { createTransport } from '../shared/transport/transport.js';
 import { createWindowProvider } from '../shared/transport/windowProvider.js';
-import type { WindowRef } from '../shared/transport/windowProvider.js';
 import { createMessagePortProvider } from '../shared/transport/messagePortProvider.js';
 import { handleCodecUpgrade } from '../shared/codec/negotiation.js';
 import { scaleCodecAdapter } from '../shared/codec/scale/adapter.js';
@@ -79,7 +79,7 @@ function genericError(reason: string) {
 
 export type CreateHostFacadeOptions = {
   /** How the host communicates with the product. */
-  messaging: { type: 'window'; target: WindowRef } | { type: 'messagePort'; port: MessagePort | Promise<MessagePort> };
+  messaging: Messaging;
 
   /**
    * Whether to allow the product to upgrade the codec after handshake.

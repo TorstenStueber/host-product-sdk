@@ -171,7 +171,7 @@ export type {
 export type { Provider } from './shared/transport/provider.js';
 
 export { createWindowProvider } from './shared/transport/windowProvider.js';
-export type { WindowRef } from './shared/transport/windowProvider.js';
+export type { Messaging } from './shared/transport/provider.js';
 
 export { createMessagePortProvider } from './shared/transport/messagePortProvider.js';
 

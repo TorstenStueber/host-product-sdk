@@ -10,6 +10,16 @@
  * negotiation.
  */
 
+/**
+ * Describes how to reach the other side.
+ *
+ * Both `createHostFacade` and `createProductFacade` accept this type and
+ * build the appropriate Provider internally.
+ */
+export type Messaging =
+  | { type: 'window'; target: Window | Promise<Window> }
+  | { type: 'messagePort'; port: MessagePort | Promise<MessagePort> };
+
 export type Provider = {
   /**
    * Send data to the other side.

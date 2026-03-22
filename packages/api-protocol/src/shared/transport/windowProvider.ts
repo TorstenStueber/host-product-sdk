@@ -4,11 +4,9 @@
  * Implements the Provider interface targeting a Window reference,
  * using `window.postMessage` for bidirectional communication.
  *
- * Accepts either a direct Window reference or a getter that resolves
- * lazily (e.g. `() => iframe.contentWindow`). When the getter returns
- * null, outgoing messages are silently dropped and incoming messages
- * that can't be validated are ignored — the transport's handshake
- * retry handles reconnection.
+ * Accepts either a direct Window reference or a Promise that resolves
+ * to one (e.g. when the iframe hasn't loaded yet). Messages sent before
+ * the promise resolves are delivered once the window becomes available.
  */
 
 import type { Provider } from './provider.js';
@@ -22,9 +20,9 @@ function isProtocolMessage(data: unknown): boolean {
   );
 }
 
-function isValidMessage(event: MessageEvent, sourceWindow: Window | null, currentWindow: Window): boolean {
+function isValidMessage(event: MessageEvent, sourceWindow: Window | undefined, currentWindow: Window): boolean {
   return (
-    sourceWindow !== null &&
+    sourceWindow !== undefined &&
     event.source !== currentWindow &&
     event.source === sourceWindow &&
     event.data != null &&
@@ -34,19 +32,32 @@ function isValidMessage(event: MessageEvent, sourceWindow: Window | null, curren
   );
 }
 
-export type WindowRef = Window | (() => Window | null);
-
-function resolveWindow(ref: WindowRef): Window | null {
-  return typeof ref === 'function' ? ref() : ref;
-}
-
-export function createWindowProvider(target: WindowRef): Provider {
+export function createWindowProvider(targetOrPromise: Window | Promise<Window>): Provider {
   let disposed = false;
+  let targetWindow: Window | undefined;
   const subscribers = new Set<(message: Uint8Array | unknown) => void>();
+
+  const targetReady: Promise<Window> =
+    targetOrPromise instanceof Promise ? targetOrPromise : Promise.resolve(targetOrPromise);
+
+  targetReady.then(w => {
+    if (disposed) return;
+    targetWindow = w;
+  });
+
+  function withWindow(fn: (w: Window) => void): void {
+    if (targetWindow) {
+      fn(targetWindow);
+    } else {
+      targetReady.then(w => {
+        if (!disposed) fn(w);
+      });
+    }
+  }
 
   const messageHandler = (event: MessageEvent): void => {
     if (disposed) return;
-    if (!isValidMessage(event, resolveWindow(target), window)) return;
+    if (!isValidMessage(event, targetWindow, window)) return;
 
     for (const subscriber of subscribers) {
       subscriber(event.data);
@@ -58,14 +69,14 @@ export function createWindowProvider(target: WindowRef): Provider {
   return {
     postMessage(message) {
       if (disposed) return;
-      const targetWindow = resolveWindow(target);
-      if (!targetWindow) return;
-
-      if (message instanceof Uint8Array) {
-        targetWindow.postMessage(message, '*', [message.buffer]);
-      } else {
-        targetWindow.postMessage(message, '*');
-      }
+      withWindow(w => {
+        if (disposed) return;
+        if (message instanceof Uint8Array) {
+          w.postMessage(message, '*', [message.buffer]);
+        } else {
+          w.postMessage(message, '*');
+        }
+      });
     },
 
     subscribe(callback) {
