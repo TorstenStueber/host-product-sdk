@@ -393,9 +393,8 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
 
     renderChatCustomMessage(params, callback) {
       return transport.subscribe('product_chat_custom_message_render_subscribe', { tag: 'v1', value: params }, data => {
-        const tagged = data as { tag: string; value: unknown };
-        if (tagged.tag === 'v1') {
-          callback(tagged.value as Parameters<typeof callback>[0]);
+        if (data.tag === 'v1') {
+          callback(data.value);
         }
       });
     },
