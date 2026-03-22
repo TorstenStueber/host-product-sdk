@@ -682,10 +682,10 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 **Product** (4 files):
 
-- `hostApi.spec.ts` (3 tests): HostApi transport proxy methods: whenReady, handleHostSubscription registration and
-  unsubscribe
-- `chat.spec.ts` (3 tests): handleCustomMessageRendering: handler registration, render function delivery, unsubscribe
-  deregistration
+- `hostApi.spec.ts` (3 tests): HostApi transport proxy methods via real MessageChannel: whenReady,
+  handleHostSubscription registration and unsubscribe
+- `chat.spec.ts` (3 tests): handleCustomMessageRendering via real MessageChannel: handler registration, render function
+  delivery, unsubscribe deregistration
 - `constants.spec.ts` (13 tests): all chains present, hex format
 - `storage.spec.ts` (3 tests): API shape verification
 
