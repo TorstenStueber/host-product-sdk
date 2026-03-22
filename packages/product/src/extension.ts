@@ -51,7 +51,7 @@ interface SignerResult {
 
 import { SpektrExtensionName } from './constants.js';
 import type { HostApi } from '@polkadot/host-api';
-import { productLogger } from '@polkadot/host-api';
+import { productLogger } from './logger.js';
 import type { HexString, VersionedTxPayload } from './types.js';
 
 // ---------------------------------------------------------------------------

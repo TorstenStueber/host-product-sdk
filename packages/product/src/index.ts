@@ -33,6 +33,9 @@ export { createPreimageManager } from './preimage.js';
 // -- Extension injection (legacy polkadot-js compat) ------------------------
 export { injectSpektrExtension, createNonProductExtensionEnableFactory } from './extension.js';
 
+// -- Logger -----------------------------------------------------------------
+export { productLogger, setProductLogger } from './logger.js';
+
 // -- Transport --------------------------------------------------------------
 export { sandboxProvider, sandboxTransport } from '@polkadot/host-api';
 

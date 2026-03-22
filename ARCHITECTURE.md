@@ -491,10 +491,6 @@ domain modules never need a `Transport` reference:
 - `handleHostSubscription(method, handler)`: registers a handler for the one host-initiated subscription (custom chat
   message rendering)
 
-**Product logger**: `productLogger` is a standalone singleton exported from `product/logger.ts` (not part of `HostApi`
-or `Provider`). Product code that needs to log imports it directly. `setProductLogger(logger)` swaps the backing
-implementation -- useful for routing log output to a debug UI overlay instead of the console.
-
 ---
 
 ## Part 2: `@polkadot/host`
@@ -582,6 +578,10 @@ callbacks.
 
 Domain modules that run inside the iframe. Every module takes a required `HostApi` parameter (from
 `@polkadot/host-api`). No module imports `Transport` directly.
+
+**Product logger** (`logger.ts`): `productLogger` is a standalone singleton that any product code imports directly.
+`setProductLogger(logger)` swaps the backing implementation -- useful for routing log output to a debug UI overlay
+instead of the console.
 
 ### 3.1 Accounts (`accounts.ts`)
 

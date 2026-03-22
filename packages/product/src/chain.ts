@@ -15,7 +15,7 @@ import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 import { getSyncProvider } from '@polkadot-api/json-rpc-provider-proxy';
 
 import type { HostApi } from '@polkadot/host-api';
-import { productLogger } from '@polkadot/host-api';
+import { productLogger } from './logger.js';
 import type { HexString } from './types.js';
 
 /**

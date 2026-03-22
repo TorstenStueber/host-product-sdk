@@ -6,8 +6,8 @@
  * (e.g. one that routes messages to a debug UI overlay).
  */
 
-import type { Logger } from '../shared/util/logger.js';
-import { createDefaultLogger } from '../shared/util/logger.js';
+import type { Logger } from '@polkadot/host-api';
+import { createDefaultLogger } from '@polkadot/host-api';
 
 let current: Logger = createDefaultLogger('Product');
 
