@@ -31,7 +31,7 @@ export function wireStorageHandlers(container: HostFacade, config: HandlersConfi
   cleanups.push(
     container.handleLocalStorageWrite(([key, value]) => {
       try {
-        const b64 = btoa(String.fromCharCode(...value));
+        const b64 = btoa(Array.from(value, byte => String.fromCharCode(byte)).join(''));
         localStorage.setItem(prefix + key, b64);
         return okAsync(undefined);
       } catch {

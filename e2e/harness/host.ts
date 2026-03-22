@@ -91,7 +91,7 @@ container.handleLocalStorageWrite(params => {
   }
   const fullKey = storagePrefix + key;
   storageData[fullKey] = value;
-  e2e.storageBacking[fullKey] = btoa(String.fromCharCode(...value));
+  e2e.storageBacking[fullKey] = btoa(Array.from(value, byte => String.fromCharCode(byte)).join(''));
   return okAsync(undefined);
 });
 

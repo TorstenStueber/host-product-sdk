@@ -17,7 +17,7 @@ export function createLocalStorageAdapter(prefix: string): StorageAdapter {
     },
 
     async write(key: string, value: Uint8Array): Promise<void> {
-      const b64 = btoa(String.fromCharCode(...value));
+      const b64 = btoa(Array.from(value, byte => String.fromCharCode(byte)).join(''));
       localStorage.setItem(withPrefix(key), b64);
     },
 
