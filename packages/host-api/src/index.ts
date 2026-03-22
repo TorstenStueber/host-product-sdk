@@ -214,4 +214,4 @@ export type { ChainConnectionManager } from './host/connectionManager.js';
 // ===========================================================================
 
 export { createHostApi } from './product/hostApi.js';
-export type { HostApi, CreateHostApiOptions, CreateHostApiFromTransportOptions } from './product/hostApi.js';
+export type { HostApi, CreateHostApiOptions } from './product/hostApi.js';

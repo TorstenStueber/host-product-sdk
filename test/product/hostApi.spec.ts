@@ -3,28 +3,34 @@
  *
  * Verifies that the HostApi facade correctly delegates transport lifecycle
  * methods (whenReady, handleHostSubscription) to the underlying transport.
+ *
+ * Uses a real MessageChannel so the full provider → transport → facade
+ * stack is exercised.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createHostApi, createTransport } from '@polkadot/host-api';
-import type { Transport } from '@polkadot/host-api';
-import { createMockProviderPair } from '../helpers/mockProvider.js';
-import type { MockProvider } from '../helpers/mockProvider.js';
+import { createHostApi, createTransport, createMessagePortProvider } from '@polkadot/host-api';
+import type { HostApi, Transport } from '@polkadot/host-api';
 
 function flush(): Promise<void> {
   return new Promise(r => setTimeout(r, 0));
 }
 
 describe('HostApi transport proxies', () => {
-  let hostProvider: MockProvider;
-  let productProvider: MockProvider;
+  let channel: MessageChannel;
   let hostTransport: Transport;
-  let productTransport: Transport;
+  let hostApi: HostApi;
 
   beforeEach(() => {
-    [hostProvider, productProvider] = createMockProviderPair();
-    hostTransport = createTransport({ provider: hostProvider, handshake: 'respond', idPrefix: 'h:' });
-    productTransport = createTransport({ provider: productProvider, handshake: 'initiate', idPrefix: 'p:' });
+    channel = new MessageChannel();
+    hostTransport = createTransport({
+      provider: createMessagePortProvider(channel.port2),
+      handshake: 'respond',
+      idPrefix: 'h:',
+    });
+    hostApi = createHostApi({
+      messaging: { type: 'messagePort', port: channel.port1 },
+    });
   });
 
   afterEach(() => {
@@ -33,32 +39,22 @@ describe('HostApi transport proxies', () => {
     } catch {
       /* */
     }
-    try {
-      productTransport?.destroy();
-    } catch {
-      /* */
-    }
   });
 
-  it('whenReady delegates to transport and resolves after handshake', async () => {
-    const hostApi = createHostApi({ transport: productTransport });
+  it('whenReady resolves after handshake', async () => {
     await hostApi.whenReady();
   });
 
   it('handleHostSubscription registers a handler on the transport', async () => {
-    const hostApi = createHostApi({ transport: productTransport });
     await hostApi.whenReady();
 
     const receivedValues: unknown[] = [];
 
-    // Register a handler for a subscription method on the product side.
-    // The host will initiate this subscription.
     hostApi.handleHostSubscription('product_chat_custom_message_render_subscribe', (params, send, interrupt) => {
       receivedValues.push(params);
       return () => {};
     });
 
-    // Host subscribes to the product's handler
     hostTransport.subscribe(
       'product_chat_custom_message_render_subscribe',
       {
@@ -76,12 +72,11 @@ describe('HostApi transport proxies', () => {
   });
 
   it('handleHostSubscription returns an unsubscribe function', async () => {
-    const hostApi = createHostApi({ transport: productTransport });
     await hostApi.whenReady();
 
     const unsub = hostApi.handleHostSubscription('product_chat_custom_message_render_subscribe', () => () => {});
 
     expect(typeof unsub).toBe('function');
-    unsub(); // Should not throw
+    unsub();
   });
 });

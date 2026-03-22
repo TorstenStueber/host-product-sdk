@@ -46,15 +46,6 @@ export type CreateHostApiOptions = {
   protocolVersionId?: number;
 };
 
-/**
- * Internal options for testing — accepts a pre-built transport directly.
- * @internal
- */
-export type CreateHostApiFromTransportOptions = {
-  /** A pre-built transport (bypasses provider/handshake/codec-upgrade setup). */
-  transport: Transport;
-};
-
 // ---------------------------------------------------------------------------
 // Internal: generic request / subscribe wrappers
 // ---------------------------------------------------------------------------
@@ -109,40 +100,29 @@ function makeSubscription<M extends SubscriptionMethod, V extends string>(
  * Builds the full stack internally: creates the appropriate provider from
  * `messaging`, creates a transport with `handshake: 'initiate'`, and wraps
  * it with automatic codec upgrade negotiation.
- *
- * For testing, accepts `{ transport }` to bypass provider/handshake/codec setup.
  */
-export function createHostApi(options: CreateHostApiOptions | CreateHostApiFromTransportOptions) {
-  let transport: Transport;
-  let readyPromise: Promise<void>;
+export function createHostApi(options: CreateHostApiOptions) {
+  const { messaging, protocolVersionId } = options;
 
-  if ('transport' in options) {
-    // Testing path: use pre-built transport directly.
-    transport = options.transport;
-    readyPromise = transport.whenReady();
-  } else {
-    const { messaging, protocolVersionId } = options;
+  // Build provider from messaging option.
+  const provider =
+    messaging.type === 'window' ? createWindowProvider(messaging.target) : createMessagePortProvider(messaging.port);
 
-    // Build provider from messaging option.
-    const provider =
-      messaging.type === 'window' ? createWindowProvider(messaging.target) : createMessagePortProvider(messaging.port);
+  // Build transport with eager handshake.
+  const transport = createTransport({
+    provider,
+    handshake: 'initiate',
+    idPrefix: 'p:',
+    protocolVersionId,
+  });
 
-    // Build transport with eager handshake.
-    transport = createTransport({
-      provider,
-      handshake: 'initiate',
-      idPrefix: 'p:',
-      protocolVersionId,
+  // Auto-upgrade codec after handshake.
+  const readyPromise = transport.whenReady().then(async () => {
+    await requestCodecUpgrade(transport, {
+      scale: scaleCodecAdapter,
+      structured_clone: structuredCloneCodecAdapter,
     });
-
-    // Auto-upgrade codec after handshake.
-    readyPromise = transport.whenReady().then(async () => {
-      await requestCodecUpgrade(transport, {
-        scale: scaleCodecAdapter,
-        structured_clone: structuredCloneCodecAdapter,
-      });
-    });
-  }
+  });
   // Suppress unhandled rejection if no one awaits whenReady().
   readyPromise.catch(() => {});
 

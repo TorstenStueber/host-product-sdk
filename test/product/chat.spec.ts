@@ -4,30 +4,35 @@
  * Tests handleCustomMessageRendering as a standalone function, verifying
  * that it registers a handler on the transport and dispatches rendering
  * requests to the callback.
+ *
+ * Uses a real MessageChannel so the full provider → transport → facade
+ * stack is exercised.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createTransport } from '@polkadot/host-api';
-import type { Transport } from '@polkadot/host-api';
-import { createHostApi } from '@polkadot/host-api';
+import { createTransport, createMessagePortProvider, createHostApi } from '@polkadot/host-api';
+import type { Transport, HostApi } from '@polkadot/host-api';
 import { handleCustomMessageRendering } from '@polkadot/product';
-import { createMockProviderPair } from '../helpers/mockProvider.js';
-import type { MockProvider } from '../helpers/mockProvider.js';
 
 function flush(): Promise<void> {
   return new Promise(r => setTimeout(r, 0));
 }
 
 describe('handleCustomMessageRendering', () => {
-  let hostProvider: MockProvider;
-  let productProvider: MockProvider;
+  let channel: MessageChannel;
   let hostTransport: Transport;
-  let productTransport: Transport;
+  let hostApi: HostApi;
 
   beforeEach(() => {
-    [hostProvider, productProvider] = createMockProviderPair();
-    hostTransport = createTransport({ provider: hostProvider, handshake: 'respond', idPrefix: 'h:' });
-    productTransport = createTransport({ provider: productProvider, handshake: 'initiate', idPrefix: 'p:' });
+    channel = new MessageChannel();
+    hostTransport = createTransport({
+      provider: createMessagePortProvider(channel.port2),
+      handshake: 'respond',
+      idPrefix: 'h:',
+    });
+    hostApi = createHostApi({
+      messaging: { type: 'messagePort', port: channel.port1 },
+    });
   });
 
   afterEach(() => {
@@ -36,15 +41,9 @@ describe('handleCustomMessageRendering', () => {
     } catch {
       /* */
     }
-    try {
-      productTransport?.destroy();
-    } catch {
-      /* */
-    }
   });
 
   it('registers a handler and receives rendering requests from the host', async () => {
-    const hostApi = createHostApi({ transport: productTransport });
     await hostApi.whenReady();
 
     const rendererCalls: { messageId: string; messageType: string }[] = [];
@@ -58,7 +57,6 @@ describe('handleCustomMessageRendering', () => {
       return cleanupFn;
     }, hostApi);
 
-    // Host initiates a custom message rendering subscription
     hostTransport.subscribe(
       'product_chat_custom_message_render_subscribe',
       {
@@ -81,7 +79,6 @@ describe('handleCustomMessageRendering', () => {
   });
 
   it('provides a render function to the callback', async () => {
-    const hostApi = createHostApi({ transport: productTransport });
     await hostApi.whenReady();
 
     let renderFn: ((node: unknown) => void) | undefined;
@@ -105,14 +102,11 @@ describe('handleCustomMessageRendering', () => {
     );
 
     await vi.waitFor(() => {
-      expect(renderFn).not.toBeNull();
+      expect(typeof renderFn).toBe('function');
     });
-
-    expect(typeof renderFn).toBe('function');
   });
 
   it('returns an unsubscribe function that deregisters the handler', async () => {
-    const hostApi = createHostApi({ transport: productTransport });
     await hostApi.whenReady();
 
     const unsub = handleCustomMessageRendering(() => () => {}, hostApi);
