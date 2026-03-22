@@ -1,52 +1,58 @@
-# @polkadot/host-api
+# @polkadot/api-protocol
 
-The Host API package defines the protocol layer for host-product communication. It contains everything needed to
-establish a connection between a host application and an embedded product (dApp), exchange typed messages, and negotiate
-codecs.
+The protocol package defines the API between host and product, the transport layer for exchanging typed messages, and a
+facade for each side. It is the shared foundation that both `@polkadot/host` and `@polkadot/product` depend on.
 
 ## Structure
 
-The package is organised into three layers:
+### `api/` — API definition
 
-### `shared/` -- Protocol, codecs, transport, utilities
+The core of the project. Defines _what_ the protocol is:
 
-The foundation that both sides depend on:
+- **`protocol.ts`** — `hostApiProtocol`: the registry of all 45 versioned protocol methods, each with SCALE codec pairs
+  (`_request`/`_response` or `_start`/`_receive`). Also defines `MessagePayload`, `Message` (the wire envelope), and all
+  derived mapped types (`RequestMethod`, `RequestCodecType<M>`, `RequestParams<M,V>`, `ResponseOk<M,V>`, etc.) that
+  provide end-to-end type safety.
+- **`types.ts`** — Domain types (Account, SigningResult, ChainHeadEvent, etc.) derived from the SCALE codecs via
+  `CodecType<>`. The single source of truth for all handler and facade signatures.
 
-- **Protocol codecs** (`codec/`) -- SCALE and structured clone encoders/decoders, codec negotiation logic, and the
-  `hostApiProtocol` registry that defines all ~44 versioned protocol methods.
-- **Transport** (`transport/`) -- The `Transport` engine (request/response correlation, subscription multiplexing,
-  handshake, not-supported catch-all) and two neutral `Provider` implementations: `createWindowProvider` (postMessage to
-  a Window) and `createMessagePortProvider` (communicate over a MessagePort).
-- **Protocol types** (`protocol/`) -- TypeScript types derived from the SCALE codec definitions. Single source of truth
-  for all handler signatures.
-- **Utilities** (`util/`) -- Logger, ID factory, helpers.
+### `shared/` — Transport and codec infrastructure
 
-### `host/` -- Host-side protocol handler
+The machinery that moves messages between host and product:
 
-Code that runs on the host page to bridge protocol messages to handler implementations:
+- **Codec adapters** (`codec/`) — `CodecAdapter` interface, SCALE adapter (`codec/scale/adapter.ts`), structured clone
+  adapter (`codec/structured/`), and codec negotiation logic (`codec/negotiation.ts`).
+- **SCALE primitives** (`codec/scale/primitives.ts`) — Inlined codec helpers (`Hex`, `Status`, `lazy`, `OptionBool`).
+- **V1 building-block codecs** (`codec/scale/v1/`) — 16 files defining the domain-specific SCALE codecs that
+  `api/protocol.ts` composes into the protocol registry.
+- **Transport** (`transport/`) — The `Transport` engine (request/response correlation, subscription multiplexing,
+  handshake with `'initiate'`/`'respond'` roles, not-supported catch-all) and two `Provider` implementations:
+  `createWindowProvider` (postMessage to a Window) and `createMessagePortProvider` (MessagePort).
+- **Utilities** (`util/`) — Logger, ID factory, helpers.
 
-- **`protocolHandler.ts`** -- Creates a `Transport`, wires the `wireRequest`/`wireSubscription` version-dispatch
-  helpers, and exposes the `ProtocolHandler` interface with ~40 `handle*()` methods.
-- **`types.ts`** -- The `ProtocolHandler` type definition, with handler signatures derived from the protocol codecs.
-- **`webviewProvider.ts`** -- `createHostWebviewProvider`: acquires a MessagePort by injecting into an Electron webview,
-  then delegates to `createMessagePortProvider`.
-- **`connectionManager.ts`** -- Manages real JSON-RPC connections per chain (connection pooling, follow multiplexing,
-  request correlation).
+### `host-facade/` — Host-side facade
 
-### `product/` -- Product-side facade
+`createHostFacade(options)` builds the host-side communication stack. Takes a `messaging` option
+(`{ type: 'window', target }` or `{ type: 'messagePort', port }`) and an optional `allowCodecUpgrade` boolean. Returns a
+`HostFacade` with ~40 `handle*()` methods for product-initiated requests/subscriptions, plus `renderChatCustomMessage`
+for the one host-initiated subscription.
 
-Code that runs inside the embedded iframe/webview:
+Internally creates a provider, transport (`handshake: 'respond'`, `idPrefix: 'h:'`), and wires version dispatch via
+`wireRequest`/`wireSubscription` helpers. Also includes `connectionManager.ts` for managing real JSON-RPC connections
+per chain.
 
-- **`hostApi.ts`** -- The `HostApi` facade: wraps every protocol method with version tagging/untagging, returns
-  `ResultAsync` for requests and `Subscription` for subscriptions. Also proxies transport lifecycle (`isReady`,
-  `isCorrectEnvironment`, `logger`, `handleHostSubscription`) so that downstream domain modules never need a `Transport`
-  reference.
-- **`sandboxTransport.ts`** -- Detects the environment (iframe or webview), creates the appropriate provider from shared
-  building blocks, and sets up the transport singleton with automatic codec upgrade after handshake.
+### `product-facade/` — Product-side facade
+
+`createProductFacade(options)` builds the product-side communication stack. Takes the same `messaging` option. Returns a
+`ProductFacade` that wraps every protocol method with version tagging/untagging, returns `ResultAsync` for requests and
+`Subscription` for subscriptions. `whenReady()` resolves when the handshake and codec upgrade are complete.
+
+Internally creates a provider, transport (`handshake: 'initiate'`, `idPrefix: 'p:'`), and automatically attempts a codec
+upgrade to structured clone after the handshake.
 
 ## Relationship to other packages
 
-- **`@polkadot/host`** imports from `@polkadot/host-api` and adds the SDK entry point (`createHostSdk`), handler
-  implementations, auth, storage adapters, and the nested bridge.
-- **`@polkadot/product`** imports from `@polkadot/host-api` and adds domain modules (accounts, chain, chat, storage,
-  etc.) that consume the `HostApi` facade exclusively.
+- **`@polkadot/host`** imports from `@polkadot/api-protocol` and adds the SDK entry point (`createHostSdk`), handler
+  implementations, auth, storage adapters, webview port acquisition, and the nested bridge.
+- **`@polkadot/product`** imports from `@polkadot/api-protocol` and adds domain modules (accounts, chain, chat, storage,
+  extension) that consume the `ProductFacade` exclusively.
