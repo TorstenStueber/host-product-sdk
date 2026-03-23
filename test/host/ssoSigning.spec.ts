@@ -10,7 +10,7 @@ import {
   createSsoManager,
   createSsoSessionStore,
   createMemoryStorageAdapter,
-  createMemoryTransportBus,
+  createMemoryStatementStore,
 } from '@polkadot/host';
 import type {
   PairingExecutor,
@@ -112,10 +112,10 @@ function hangingSignExecutor(): SignRequestExecutor {
 async function createPairedSetup(signExecutor?: SignRequestExecutor) {
   const storage = createMemoryStorageAdapter();
   const sessionStore = createSsoSessionStore(storage);
-  const bus = createMemoryTransportBus();
-  const transport = bus.createTransport();
+  const bus = createMemoryStatementStore();
+  const adapter = bus.createAdapter();
   const manager = createSsoManager({
-    transport,
+    statementStore: adapter,
     sessionStore,
     pairingExecutor: immediateExecutor(),
   });
@@ -125,12 +125,12 @@ async function createPairedSetup(signExecutor?: SignRequestExecutor) {
 
   const signer = createRemoteSigner({
     manager,
-    transport,
+    statementStore: adapter,
     executor: signExecutor ?? immediateSignExecutor(),
     timeoutMs: 500,
   });
 
-  return { manager, signer, transport };
+  return { manager, signer, statementStore: adapter };
 }
 
 // ---------------------------------------------------------------------------
@@ -143,17 +143,17 @@ describe('createRemoteSigner', () => {
   it('signPayload throws when manager is not paired', async () => {
     const storage = createMemoryStorageAdapter();
     const sessionStore = createSsoSessionStore(storage);
-    const bus = createMemoryTransportBus();
-    const transport = bus.createTransport();
+    const bus = createMemoryStatementStore();
+    const adapter = bus.createAdapter();
     const manager = createSsoManager({
-      transport,
+      statementStore: adapter,
       sessionStore,
       pairingExecutor: immediateExecutor(),
     });
 
     const signer = createRemoteSigner({
       manager,
-      transport,
+      statementStore: adapter,
       executor: immediateSignExecutor(),
     });
 
@@ -163,17 +163,17 @@ describe('createRemoteSigner', () => {
   it('signRaw throws when manager is not paired', async () => {
     const storage = createMemoryStorageAdapter();
     const sessionStore = createSsoSessionStore(storage);
-    const bus = createMemoryTransportBus();
-    const transport = bus.createTransport();
+    const bus = createMemoryStatementStore();
+    const adapter = bus.createAdapter();
     const manager = createSsoManager({
-      transport,
+      statementStore: adapter,
       sessionStore,
       pairingExecutor: immediateExecutor(),
     });
 
     const signer = createRemoteSigner({
       manager,
-      transport,
+      statementStore: adapter,
       executor: immediateSignExecutor(),
     });
 

@@ -10,7 +10,7 @@ import {
   createSsoManager,
   createSsoSessionStore,
   createMemoryStorageAdapter,
-  createMemoryTransportBus,
+  createMemoryStatementStore,
 } from '@polkadot/host';
 import type { PairingExecutor, PairingResult, PersistedSessionMeta, SsoState } from '@polkadot/host';
 
@@ -93,9 +93,13 @@ function failingExecutor(message: string): PairingExecutor {
 function createTestManager(executor: PairingExecutor) {
   const storage = createMemoryStorageAdapter();
   const sessionStore = createSsoSessionStore(storage);
-  const bus = createMemoryTransportBus();
-  const transport = bus.createTransport();
-  return { manager: createSsoManager({ transport, sessionStore, pairingExecutor: executor }), storage, sessionStore };
+  const bus = createMemoryStatementStore();
+  const adapter = bus.createAdapter();
+  return {
+    manager: createSsoManager({ statementStore: adapter, sessionStore, pairingExecutor: executor }),
+    storage,
+    sessionStore,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -241,13 +245,13 @@ describe('createSsoManager', () => {
   it('restoreSession transitions to paired if session exists', async () => {
     const storage = createMemoryStorageAdapter();
     const sessionStore = createSsoSessionStore(storage);
-    const bus = createMemoryTransportBus();
+    const bus = createMemoryStatementStore();
 
     // Pre-persist a session
     await sessionStore.save(makeMeta('restored'));
 
     const manager = createSsoManager({
-      transport: bus.createTransport(),
+      statementStore: bus.createAdapter(),
       sessionStore,
       pairingExecutor: immediateExecutor(makeResult()),
     });
@@ -270,12 +274,12 @@ describe('createSsoManager', () => {
   it('restoreSession is no-op when already paired', async () => {
     const storage = createMemoryStorageAdapter();
     const sessionStore = createSsoSessionStore(storage);
-    const bus = createMemoryTransportBus();
+    const bus = createMemoryStatementStore();
 
     await sessionStore.save(makeMeta('stored'));
 
     const manager = createSsoManager({
-      transport: bus.createTransport(),
+      statementStore: bus.createAdapter(),
       sessionStore,
       pairingExecutor: immediateExecutor(makeResult('from-pairing')),
     });

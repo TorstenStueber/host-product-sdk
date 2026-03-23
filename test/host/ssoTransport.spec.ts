@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { createMemoryTransportBus, createSsoSessionStore, createMemoryStorageAdapter } from '@polkadot/host';
+import { createMemoryStatementStore, createSsoSessionStore, createMemoryStorageAdapter } from '@polkadot/host';
 import type { SignedStatement, PersistedSessionMeta } from '@polkadot/host';
 
 // ---------------------------------------------------------------------------
@@ -24,8 +24,11 @@ function makeStatement(topicId: number, data: Uint8Array): SignedStatement {
     topics: [topic(topicId)],
     data,
     proof: {
-      publicKey: new Uint8Array(32).fill(1),
-      signature: new Uint8Array(64).fill(2),
+      tag: 'sr25519',
+      value: {
+        signature: new Uint8Array(64).fill(2),
+        signer: new Uint8Array(32).fill(1),
+      },
     },
   };
 }
@@ -44,10 +47,10 @@ function makeMeta(id: string = 'session-1'): PersistedSessionMeta {
 // Memory transport bus
 // ---------------------------------------------------------------------------
 
-describe('createMemoryTransportBus', () => {
+describe('createMemoryStatementStore', () => {
   it('delivers statements to matching subscribers', async () => {
-    const bus = createMemoryTransportBus();
-    const transport = bus.createTransport();
+    const bus = createMemoryStatementStore();
+    const transport = bus.createAdapter();
     const callback = vi.fn();
 
     transport.subscribe([topic(1)], callback);
@@ -59,8 +62,8 @@ describe('createMemoryTransportBus', () => {
   });
 
   it('does not deliver statements to non-matching subscribers', async () => {
-    const bus = createMemoryTransportBus();
-    const transport = bus.createTransport();
+    const bus = createMemoryStatementStore();
+    const transport = bus.createAdapter();
     const callback = vi.fn();
 
     transport.subscribe([topic(1)], callback);
@@ -70,9 +73,9 @@ describe('createMemoryTransportBus', () => {
   });
 
   it('delivers across transports on the same bus', async () => {
-    const bus = createMemoryTransportBus();
-    const host = bus.createTransport();
-    const wallet = bus.createTransport();
+    const bus = createMemoryStatementStore();
+    const host = bus.createAdapter();
+    const wallet = bus.createAdapter();
     const callback = vi.fn();
 
     wallet.subscribe([topic(1)], callback);
@@ -83,22 +86,22 @@ describe('createMemoryTransportBus', () => {
   });
 
   it('unsubscribe stops delivery', async () => {
-    const bus = createMemoryTransportBus();
-    const transport = bus.createTransport();
+    const bus = createMemoryStatementStore();
+    const transport = bus.createAdapter();
     const callback = vi.fn();
 
-    const sub = transport.subscribe([topic(1)], callback);
+    const unsub = transport.subscribe([topic(1)], callback);
     await transport.submit(makeStatement(1, new Uint8Array([1])));
     expect(callback).toHaveBeenCalledTimes(1);
 
-    sub.unsubscribe();
+    unsub();
     await transport.submit(makeStatement(1, new Uint8Array([2])));
     expect(callback).toHaveBeenCalledTimes(1);
   });
 
   it('multiple subscribers on same topic all receive', async () => {
-    const bus = createMemoryTransportBus();
-    const transport = bus.createTransport();
+    const bus = createMemoryStatementStore();
+    const transport = bus.createAdapter();
     const cb1 = vi.fn();
     const cb2 = vi.fn();
 
@@ -111,20 +114,23 @@ describe('createMemoryTransportBus', () => {
   });
 
   it('preserves proof public key in delivered statements', async () => {
-    const bus = createMemoryTransportBus();
-    const transport = bus.createTransport();
+    const bus = createMemoryStatementStore();
+    const transport = bus.createAdapter();
     const callback = vi.fn();
 
     transport.subscribe([topic(1)], callback);
     await transport.submit(makeStatement(1, new Uint8Array([1])));
 
     const received = callback.mock.calls[0][0][0];
-    expect(received.proofPublicKey).toEqual(new Uint8Array(32).fill(1));
+    expect(received.proof?.tag).toBe('sr25519');
+    if (received.proof?.tag === 'sr25519') {
+      expect(received.proof.value.signer).toEqual(new Uint8Array(32).fill(1));
+    }
   });
 
   it('subscriber with multiple topics matches any', async () => {
-    const bus = createMemoryTransportBus();
-    const transport = bus.createTransport();
+    const bus = createMemoryStatementStore();
+    const transport = bus.createAdapter();
     const callback = vi.fn();
 
     transport.subscribe([topic(1), topic(2)], callback);

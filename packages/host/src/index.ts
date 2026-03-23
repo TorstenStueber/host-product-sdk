@@ -89,17 +89,21 @@ export type { IdentityResolver } from './auth/identity/resolver.js';
 export { createIdentityResolver } from './auth/identity/resolver.js';
 
 // ---------------------------------------------------------------------------
-// SSO transport
+// Statement store
+// ---------------------------------------------------------------------------
+
+export type { StatementStoreAdapter, Statement, SignedStatement, StatementProof } from './statementStore/types.js';
+export { createStatementStoreAdapter } from './statementStore/adapter.js';
+export { createMemoryStatementStore } from './statementStore/memory.js';
+
+// ---------------------------------------------------------------------------
+// SSO
 // ---------------------------------------------------------------------------
 
 export type {
-  SsoTransport,
-  SsoSubscription,
   SsoSigner,
   SsoSessionStore,
   PersistedSessionMeta,
-  Statement,
-  SignedStatement,
   SsoState,
   SsoManager,
   SsoManagerConfig,
@@ -111,14 +115,13 @@ export type {
   RemoteSignPayloadRequest,
   RemoteSignRawRequest,
   RemoteSignResult,
+  PairingExecutorConfig,
+  SignRequestExecutorConfig,
 } from './auth/sso/types.js';
-
-export type { PairingExecutorConfig, SignRequestExecutorConfig } from './auth/sso/types.js';
 
 export { createSsoManager } from './auth/sso/manager.js';
 export { createRemoteSigner } from './auth/sso/signing.js';
 export { createSsoSessionStore } from './auth/sso/sessionStore.js';
-export { createMemoryTransportBus } from './auth/sso/memoryTransport.js';
 export { createPairingExecutor } from './auth/sso/pairingExecutor.js';
 export { createSignRequestExecutor } from './auth/sso/signRequestExecutor.js';
 

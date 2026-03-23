@@ -8,7 +8,7 @@
  * since it depends on the session key established during pairing.
  */
 
-import type { SsoTransport } from './transport.js';
+import type { StatementStoreAdapter } from '../../statementStore/types.js';
 import type { SsoManager } from './manager.js';
 
 // ---------------------------------------------------------------------------
@@ -57,12 +57,12 @@ export type RemoteSignResult = {
  */
 export type SignRequestExecutor = {
   signPayload(
-    transport: SsoTransport,
+    store: StatementStoreAdapter,
     request: RemoteSignPayloadRequest,
     signal: AbortSignal,
   ): Promise<RemoteSignResult>;
 
-  signRaw(transport: SsoTransport, request: RemoteSignRawRequest, signal: AbortSignal): Promise<RemoteSignResult>;
+  signRaw(store: StatementStoreAdapter, request: RemoteSignRawRequest, signal: AbortSignal): Promise<RemoteSignResult>;
 };
 
 // ---------------------------------------------------------------------------
@@ -71,7 +71,7 @@ export type SignRequestExecutor = {
 
 export type RemoteSigningConfig = {
   manager: SsoManager;
-  transport: SsoTransport;
+  statementStore: StatementStoreAdapter;
   executor: SignRequestExecutor;
   /** Timeout in ms for the wallet to respond. Default: 90_000 (90 seconds). */
   timeoutMs?: number;
@@ -85,7 +85,7 @@ export type RemoteSigner = {
 const DEFAULT_TIMEOUT_MS = 90_000;
 
 export function createRemoteSigner(config: RemoteSigningConfig): RemoteSigner {
-  const { manager, transport, executor, timeoutMs = DEFAULT_TIMEOUT_MS } = config;
+  const { manager, statementStore, executor, timeoutMs = DEFAULT_TIMEOUT_MS } = config;
 
   function ensurePaired(): void {
     const state = manager.getState();
@@ -124,13 +124,13 @@ export function createRemoteSigner(config: RemoteSigningConfig): RemoteSigner {
     async signPayload(request: RemoteSignPayloadRequest): Promise<RemoteSignResult> {
       ensurePaired();
       const controller = new AbortController();
-      return withTimeout(executor.signPayload(transport, request, controller.signal), controller.signal);
+      return withTimeout(executor.signPayload(statementStore, request, controller.signal), controller.signal);
     },
 
     async signRaw(request: RemoteSignRawRequest): Promise<RemoteSignResult> {
       ensurePaired();
       const controller = new AbortController();
-      return withTimeout(executor.signRaw(transport, request, controller.signal), controller.signal);
+      return withTimeout(executor.signRaw(statementStore, request, controller.signal), controller.signal);
     },
   };
 }

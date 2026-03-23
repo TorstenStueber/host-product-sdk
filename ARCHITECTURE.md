@@ -28,9 +28,10 @@ Three npm packages:
 
 Runtime dependencies of api-protocol: `scale-ts`, `nanoevents`, `neverthrow`, `@polkadot-api/json-rpc-provider`.
 
-Runtime dependencies of host (in addition to api-protocol): `@noble/ciphers`, `@noble/hashes`, `@noble/curves`
-(AES-GCM, HKDF, blake2b, P-256 ECDH), `@scure/sr25519` (sr25519 signing), `@polkadot-labs/hdkd-helpers` (BIP-39
-mnemonics, HDKD), `@polkadot-api/substrate-bindings` (AccountId SS58 codec).
+Runtime dependencies of host (in addition to api-protocol): `@noble/ciphers`, `@noble/hashes`, `@noble/curves` (AES-GCM,
+HKDF, blake2b, P-256 ECDH), `@scure/sr25519` (sr25519 signing), `@polkadot-labs/hdkd-helpers` (BIP-39 mnemonics, HDKD),
+`@polkadot-api/substrate-bindings` (AccountId SS58 codec), `@novasamatech/sdk-statement` (statement-store parachain
+RPC client).
 
 ---
 
@@ -568,21 +569,17 @@ junctions `['product', productId, derivationIndex]`.
 
 **`pappAdapter.ts`**: Stub interface for QR-code pairing (to be ported from old host-papp).
 
-**`sso/transport.ts`**: SSO transport interfaces modelled after the Rust host-sdk's trait-injection pattern:
+**`sso/transport.ts`**: SSO adapter interfaces:
 
-- `SsoTransport`: topic-keyed publish/subscribe (`subscribe(topics, callback)`, `submit(statement)`) for exchanging
-  encrypted messages with the mobile wallet. Canonical implementation wraps the statement-store parachain; the in-memory
-  implementation is for testing.
 - `SsoSigner`: sr25519 signing for statement proofs (`publicKey`, `sign(message)`).
 - `SsoSessionStore`: persistence for session metadata (`save`, `load`, `clear`, `subscribe`).
 - `PersistedSessionMeta`: minimal session data surviving page reloads (sessionId, address, displayName, remote keys).
-- `Statement` / `SignedStatement`: wire types for the transport.
+
+The statement store transport is now in `statementStore/` (section 2.5) as a unified adapter serving both SSO and
+the host API statement store handlers.
 
 **`sso/sessionStore.ts`**: `createSsoSessionStore(storage)` — backed by a `ReactiveStorageAdapter`. Serializes
 `PersistedSessionMeta` to JSON bytes. Subscriptions delegate to the underlying reactive storage.
-
-**`sso/memoryTransport.ts`**: `createMemoryTransportBus()` — in-memory transport for testing. All transports from the
-same bus see each other's statements. Topic matching uses byte-level comparison.
 
 **`sso/manager.ts`**: `createSsoManager(config)` — drives the QR-based pairing lifecycle:
 
@@ -607,12 +604,12 @@ wallet:
 
 **`sso/crypto.ts`**: SSO cryptographic primitives — all wire-compatible with triangle-js-sdks:
 
-- `createEncryption(sharedSecret)`: AES-GCM with HKDF-SHA256 key derivation (32-byte key, 12-byte nonce,
-  wire format `[nonce || ciphertext]`).
+- `createEncryption(sharedSecret)`: AES-GCM with HKDF-SHA256 key derivation (32-byte key, 12-byte nonce, wire format
+  `[nonce || ciphertext]`).
 - `khash(secret, message)`: blake2b-256 with key — used for topic and session ID derivation.
 - `createSr25519Secret(entropy, derivation?)`: sr25519 key from BIP-39 entropy with optional HDKD path.
-- `createP256Secret(entropy)`, `getP256PublicKey(secret)`, `createP256SharedSecret(secret, publicKey)`: P-256 ECDH
-  for the pairing handshake. Shared secret = x-coordinate only (32 bytes).
+- `createP256Secret(entropy)`, `getP256PublicKey(secret)`, `createP256SharedSecret(secret, publicKey)`: P-256 ECDH for
+  the pairing handshake. Shared secret = x-coordinate only (32 bytes).
 - `createAccountId(publicKey)`: blake2b-256 of sr25519 public key.
 - `deriveHandshakeTopic(accountId, encrPublicKey)`: derives the statement-store topic for pairing.
 
@@ -622,14 +619,13 @@ wallet:
 - `SigningPayloadRequestCodec` / `SigningRawRequestCodec` / `SigningResponseCodec`: signing request/response.
 - `RemoteMessageCodec`: versioned envelope `{ messageId, data: v1 { Disconnected | SignRequest | SignResponse } }`.
 
-**`sso/pairingExecutor.ts`**: `createPairingExecutor(config)` — concrete `PairingExecutor` implementing the full
-QR-code handshake: generates mnemonic, derives sr25519 at `//wallet//sso` + P-256 keys, builds SCALE-encoded
-`HandshakeData`, publishes to statement-store topic, waits for mobile response, performs P-256 ECDH to decrypt
-session credentials.
+**`sso/pairingExecutor.ts`**: `createPairingExecutor(config)` — concrete `PairingExecutor` implementing the full QR-code
+handshake: generates mnemonic, derives sr25519 at `//wallet//sso` + P-256 keys, builds SCALE-encoded `HandshakeData`,
+publishes to statement-store topic, waits for mobile response, performs P-256 ECDH to decrypt session credentials.
 
 **`sso/signRequestExecutor.ts`**: `createSignRequestExecutor(config)` — concrete `SignRequestExecutor` implementing
-encrypted sign request round-trips: SCALE-encodes `RemoteMessage` with `SignRequest`, encrypts with AES-GCM session
-key, publishes to session topic, waits for `SignResponse` matching the message ID, decrypts and returns signature.
+encrypted sign request round-trips: SCALE-encodes `RemoteMessage` with `SignRequest`, encrypts with AES-GCM session key,
+publishes to session topic, waits for `SignResponse` matching the message ID, decrypts and returns signature.
 
 **`identity/types.ts`**: `IdentityProvider` interface (`getIdentity(accountIdHex)`) and `ResolvedIdentity` type
 (liteUsername, fullUsername, avatarUrl, chainIdentity). Implementations query a chain (e.g. People parachain's
@@ -639,7 +635,21 @@ key, publishes to session topic, waits for `SignResponse` matching the message I
 concurrent-request deduplication. Failed requests are not cached so transient errors are retried. Supports
 `invalidate(accountId)` and `invalidateAll()` for cache control.
 
-### 2.5 Webview Port (`webviewPort.ts`)
+### 2.5 Statement Store (`statementStore/`)
+
+Unified statement-store parachain adapter used by both SSO (pairing/signing) and the host API statement store handlers.
+
+**`statementStore/types.ts`**: `StatementStoreAdapter` interface with `subscribe(topics, callback)`, `submit(statement)`,
+and `query(topics)`. `Statement` and `SignedStatement` types with tagged `StatementProof` union (sr25519/ed25519/ecdsa).
+
+**`statementStore/adapter.ts`**: `createStatementStoreAdapter(rpc)` — wraps `@novasamatech/sdk-statement` into the
+`StatementStoreAdapter` interface. Accepts `StatementStoreRpcFunctions` (request + subscribe from a polkadot-api client)
+rather than a full provider, keeping WebSocket lifecycle out of the package.
+
+**`statementStore/memory.ts`**: `createMemoryStatementStore()` — in-memory adapter for testing. All adapters from the
+same bus see each other's statements.
+
+### 2.6 Webview Port
 
 `acquireWebviewPort({ webview, openDevTools? })` acquires a `MessagePort` by creating a `MessageChannel`, injecting one
 end into an Electron `<webview>` via `executeJavaScript` on `dom-ready`, and returning the other end. The returned port
@@ -787,9 +797,9 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
   signedTransaction passthrough
 - `identityResolver.spec.ts` (10 tests): delegation, caching (hit/miss/undefined), invalidation (single/all), concurrent
   deduplication, error propagation, transient error retry
-- `ssoCrypto.spec.ts` (26 tests): AES-GCM encryption round-trip (empty/large/wrong key), khash determinism,
-  accountId derivation, handshake topic, sr25519 key derivation (base/derived paths), P-256 ECDH symmetry,
-  mnemonic generation, SCALE codec round-trips (HandshakeData, RemoteMessage, disconnect)
+- `ssoCrypto.spec.ts` (26 tests): AES-GCM encryption round-trip (empty/large/wrong key), khash determinism, accountId
+  derivation, handshake topic, sr25519 key derivation (base/derived paths), P-256 ECDH symmetry, mnemonic generation,
+  SCALE codec round-trips (HandshakeData, RemoteMessage, disconnect)
 
 **Product** (4 files):
 

@@ -10,7 +10,8 @@
  * adapted for TypeScript's async/callback model.
  */
 
-import type { SsoTransport, SsoSessionStore, PersistedSessionMeta } from './transport.js';
+import type { StatementStoreAdapter } from '../../statementStore/types.js';
+import type { SsoSessionStore, PersistedSessionMeta } from './transport.js';
 
 // ---------------------------------------------------------------------------
 // SSO state
@@ -48,13 +49,13 @@ export type PairingExecutor = {
   /**
    * Start the pairing handshake.
    *
-   * @param transport - The statement-store transport for messaging.
+   * @param statementStore - The statement store adapter for messaging.
    * @param onQrPayload - Called when the QR payload is ready for display.
    * @param signal - Abort signal for cancellation.
    * @returns The pairing result, or undefined if the pairing was aborted.
    */
   execute(
-    transport: SsoTransport,
+    statementStore: StatementStoreAdapter,
     onQrPayload: (payload: string) => void,
     signal: AbortSignal,
   ): Promise<PairingResult | undefined>;
@@ -65,8 +66,8 @@ export type PairingExecutor = {
 // ---------------------------------------------------------------------------
 
 export type SsoManagerConfig = {
-  /** Statement-store transport for messaging. */
-  transport: SsoTransport;
+  /** Statement store adapter for messaging. */
+  statementStore: StatementStoreAdapter;
   /** Session persistence. */
   sessionStore: SsoSessionStore;
   /** Pairing protocol implementation. */
@@ -112,7 +113,7 @@ export type SsoManager = {
 };
 
 export function createSsoManager(config: SsoManagerConfig): SsoManager {
-  const { transport, sessionStore, pairingExecutor } = config;
+  const { statementStore, sessionStore, pairingExecutor } = config;
 
   let currentState: SsoState = { status: 'idle' };
   const listeners = new Set<(state: SsoState) => void>();
@@ -147,7 +148,7 @@ export function createSsoManager(config: SsoManagerConfig): SsoManager {
 
     void pairingExecutor
       .execute(
-        transport,
+        statementStore,
         qrPayload => {
           if (!signal.aborted) {
             setState({ status: 'awaiting_scan', qrPayload });

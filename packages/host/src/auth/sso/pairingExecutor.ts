@@ -6,7 +6,7 @@
  * publishes the handshake payload, and waits for the mobile wallet's response.
  */
 
-import type { SsoTransport } from './transport.js';
+import type { StatementStoreAdapter } from '../../statementStore/types.js';
 import type { PairingExecutor, PairingResult } from './manager.js';
 import type { PersistedSessionMeta } from './transport.js';
 import { HandshakeData, HandshakeResponsePayload, HandshakeResponseSensitiveData } from './codecs.js';
@@ -64,7 +64,7 @@ export function createPairingExecutor(config: PairingExecutorConfig): PairingExe
 
   return {
     async execute(
-      transport: SsoTransport,
+      statementStore: StatementStoreAdapter,
       onQrPayload: (payload: string) => void,
       signal: AbortSignal,
     ): Promise<PairingResult | undefined> {
@@ -103,9 +103,9 @@ export function createPairingExecutor(config: PairingExecutorConfig): PairingExe
 
       // 6. Subscribe to handshake topic and wait for mobile response
       const result = await new Promise<PairingResult | undefined>(resolve => {
-        const sub = transport.subscribe([topic], statements => {
+        const unsub = statementStore.subscribe([topic], statements => {
           if (signal.aborted) {
-            sub.unsubscribe();
+            unsub();
             resolve(undefined);
             return;
           }
@@ -143,7 +143,7 @@ export function createPairingExecutor(config: PairingExecutorConfig): PairingExe
                 remoteAccountId: pappAccountId,
               };
 
-              sub.unsubscribe();
+              unsub();
               resolve({
                 session,
                 sessionKey: sharedSecret,
@@ -156,7 +156,7 @@ export function createPairingExecutor(config: PairingExecutorConfig): PairingExe
         });
 
         signal.addEventListener('abort', () => {
-          sub.unsubscribe();
+          unsub();
           resolve(undefined);
         });
       });

@@ -1,91 +1,11 @@
 /**
- * SSO transport interface.
+ * SSO adapter interfaces.
  *
- * Abstracts the topic-keyed publish/subscribe channel used by the SSO
- * manager to communicate with the mobile wallet. The canonical implementation
- * wraps the statement-store parachain, but any message bus works (WebSocket
- * relay, in-memory for tests, etc.).
- *
- * Modelled after the Rust host-sdk's SsoTransport trait.
+ * Defines the signer, session store, and session metadata types used by
+ * the SSO manager. The statement store transport is now in
+ * `statementStore/types.ts` as a unified adapter serving both SSO and
+ * the host API statement store handlers.
  */
-
-// ---------------------------------------------------------------------------
-// Statement
-// ---------------------------------------------------------------------------
-
-/**
- * A statement received from the transport.
- *
- * Mirrors the statement-store parachain's statement format. Only the fields
- * the SSO manager needs are included; the transport implementation handles
- * proof verification and decryption key extraction internally.
- */
-export type Statement = {
-  /** Opaque proof public key (sr25519, 32 bytes). */
-  proofPublicKey?: Uint8Array;
-  /** Statement topics (each 32 bytes). */
-  topics: Uint8Array[];
-  /** Encrypted or plaintext payload. */
-  data: Uint8Array;
-};
-
-/**
- * A statement to be submitted to the transport.
- */
-export type SignedStatement = {
-  /** Decryption key hint (32 bytes, optional). */
-  decryptionKey?: Uint8Array;
-  /** Logical channel (32 bytes). */
-  channel: Uint8Array;
-  /** Topics to publish under (each 32 bytes, max 4). */
-  topics: Uint8Array[];
-  /** Payload (encrypted). */
-  data: Uint8Array;
-  /** Sr25519 proof — signature over the statement. */
-  proof: {
-    publicKey: Uint8Array;
-    signature: Uint8Array;
-  };
-};
-
-// ---------------------------------------------------------------------------
-// Transport interface
-// ---------------------------------------------------------------------------
-
-/**
- * Subscription handle returned by `subscribe()`.
- */
-export type SsoSubscription = {
-  /** Stop receiving statements for this subscription. */
-  unsubscribe(): void;
-};
-
-/**
- * Topic-keyed publish/subscribe transport for SSO communication.
- *
- * Implementations connect to the statement-store parachain (or a test stub).
- * The SSO manager uses this to exchange encrypted messages with the mobile
- * wallet during pairing and signing.
- */
-export type SsoTransport = {
-  /**
-   * Subscribe to statements matching the given topics.
-   *
-   * @param topics - Array of 32-byte topic filters. Statements matching
-   *   any of these topics are delivered to the callback.
-   * @param callback - Invoked with each batch of matching statements.
-   * @returns A subscription handle with an `unsubscribe()` method.
-   */
-  subscribe(topics: Uint8Array[], callback: (statements: Statement[]) => void): SsoSubscription;
-
-  /**
-   * Submit a signed statement to the transport.
-   *
-   * @returns Resolves when the statement has been accepted, or rejects
-   *   with an error describing the failure (e.g. data too large, bad proof).
-   */
-  submit(statement: SignedStatement): Promise<void>;
-};
 
 // ---------------------------------------------------------------------------
 // Signer interface
@@ -95,8 +15,8 @@ export type SsoTransport = {
  * Sr25519 signer for statement proofs.
  *
  * The SSO manager needs to sign statements before submitting them to the
- * transport. The host app provides a signer derived at the appropriate path
- * (e.g. `//wallet//sso`).
+ * statement store. The host app provides a signer derived at the appropriate
+ * path (e.g. `//wallet//sso`).
  */
 export type SsoSigner = {
   /** The sr25519 public key (32 bytes). */

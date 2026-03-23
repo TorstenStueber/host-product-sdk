@@ -12,7 +12,6 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { blake2b } from '@noble/hashes/blake2.js';
 import { randomBytes } from '@noble/hashes/utils.js';
 import { p256 } from '@noble/curves/p256.js';
-// @ts-expect-error — @polkadot-labs/hdkd-helpers has no type declarations
 import { entropyToMiniSecret, generateMnemonic, mnemonicToEntropy } from '@polkadot-labs/hdkd-helpers';
 import {
   HDKD,

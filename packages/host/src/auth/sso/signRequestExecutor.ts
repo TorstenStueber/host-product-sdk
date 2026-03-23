@@ -7,7 +7,8 @@
  * and waits for the mobile wallet's signed response.
  */
 
-import type { SsoTransport, SsoSigner } from './transport.js';
+import type { StatementStoreAdapter, Statement } from '../../statementStore/types.js';
+import type { SsoSigner } from './transport.js';
 import type {
   SignRequestExecutor,
   RemoteSignPayloadRequest,
@@ -61,7 +62,7 @@ export function createSignRequestExecutor(config: SignRequestExecutorConfig): Si
   const sessionTopic = khash(config.localAccountId, concatBytes(config.remoteAccountId, textEncoder.encode('session')));
 
   async function sendAndWait(
-    transport: SsoTransport,
+    store: StatementStoreAdapter,
     messageId: string,
     encodedMessage: Uint8Array,
     signal: AbortSignal,
@@ -70,9 +71,9 @@ export function createSignRequestExecutor(config: SignRequestExecutorConfig): Si
 
     // Subscribe for response BEFORE sending the request
     return new Promise<RemoteSignResult>((resolve, reject) => {
-      const sub = transport.subscribe([sessionTopic], statements => {
+      const unsub = store.subscribe([sessionTopic], (statements: Statement[]) => {
         if (signal.aborted) {
-          sub.unsubscribe();
+          unsub();
           reject(new Error('Sign request aborted'));
           return;
         }
@@ -91,7 +92,7 @@ export function createSignRequestExecutor(config: SignRequestExecutorConfig): Si
             const response = decoded.data.value.value;
             if (response.respondingTo !== messageId) continue;
 
-            sub.unsubscribe();
+            unsub();
 
             if (response.payload.success) {
               resolve({
@@ -109,7 +110,7 @@ export function createSignRequestExecutor(config: SignRequestExecutorConfig): Si
       });
 
       signal.addEventListener('abort', () => {
-        sub.unsubscribe();
+        unsub();
         reject(new Error('Sign request aborted'));
       });
 
@@ -117,13 +118,16 @@ export function createSignRequestExecutor(config: SignRequestExecutorConfig): Si
       config.signer
         .sign(encrypted)
         .then(signature =>
-          transport.submit({
+          store.submit({
             channel: sessionTopic,
             topics: [sessionTopic],
             data: encrypted,
             proof: {
-              publicKey: config.signer.publicKey,
-              signature,
+              tag: 'sr25519',
+              value: {
+                signer: config.signer.publicKey,
+                signature,
+              },
             },
           }),
         )
@@ -133,7 +137,7 @@ export function createSignRequestExecutor(config: SignRequestExecutorConfig): Si
 
   return {
     async signPayload(
-      transport: SsoTransport,
+      store: StatementStoreAdapter,
       request: RemoteSignPayloadRequest,
       signal: AbortSignal,
     ): Promise<RemoteSignResult> {
@@ -152,11 +156,11 @@ export function createSignRequestExecutor(config: SignRequestExecutorConfig): Si
           },
         },
       });
-      return sendAndWait(transport, messageId, encoded, signal);
+      return sendAndWait(store, messageId, encoded, signal);
     },
 
     async signRaw(
-      transport: SsoTransport,
+      store: StatementStoreAdapter,
       request: RemoteSignRawRequest,
       signal: AbortSignal,
     ): Promise<RemoteSignResult> {
@@ -174,7 +178,7 @@ export function createSignRequestExecutor(config: SignRequestExecutorConfig): Si
           },
         },
       });
-      return sendAndWait(transport, messageId, encoded, signal);
+      return sendAndWait(store, messageId, encoded, signal);
     },
   };
 }
