@@ -7,6 +7,7 @@
 
 import type { HostFacade } from '@polkadot/api-protocol';
 import { errAsync, okAsync } from '@polkadot/api-protocol';
+import { ResultAsync } from 'neverthrow';
 import type { StatementStoreAdapter } from '../statementStore/types.js';
 import type { SsoSigner } from '../auth/sso/transport.js';
 
@@ -54,15 +55,26 @@ export function wireStatementStoreHandlers(
     }),
   );
 
-  // Create proof
+  // Create proof — signs a statement with the sr25519 key to produce a proof
   cleanups.push(
-    container.handleStatementStoreCreateProof(_params => {
+    container.handleStatementStoreCreateProof(params => {
       if (!config?.signer) {
         return errAsync({ tag: 'Unknown', value: { reason: 'No signer configured' } });
       }
-      // Proof creation requires signing the statement with the sr25519 key
-      // For now, return the signer's public key as the proof
-      return errAsync({ tag: 'Unknown', value: { reason: 'Statement proof creation not yet implemented' } });
+
+      const s = config.signer;
+      // params is [ProductAccountId, Statement] — extract the statement data
+      const statement = (params as [unknown, { data?: Uint8Array }])[1];
+      const dataToSign = statement?.data ?? new Uint8Array(0);
+
+      // Sign the statement data and return the proof
+      return ResultAsync.fromPromise(
+        s.sign(dataToSign).then(signature => ({
+          tag: 'Sr25519' as const,
+          value: { signature, signer: s.publicKey },
+        })),
+        () => ({ tag: 'Unknown' as const, value: { reason: 'Signing failed' } }),
+      );
     }),
   );
 

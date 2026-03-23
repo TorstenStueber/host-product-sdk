@@ -8,6 +8,7 @@
 
 import type { HexString, RequestParams } from '@polkadot/api-protocol';
 import type { StatementStoreAdapter } from '../statementStore/types.js';
+import type { SsoSigner } from '../auth/sso/transport.js';
 import type {
   Feature,
   DevicePermissionRequest,
@@ -105,6 +106,9 @@ export type HandlersConfig = {
   // -- Statement store -------------------------------------------------------
   /** Statement store adapter for product-facing statement operations. */
   statementStore?: StatementStoreAdapter;
+
+  /** Sr25519 signer for statement proofs. */
+  ssoSigner?: SsoSigner;
 };
 
 // ---------------------------------------------------------------------------
@@ -121,7 +125,12 @@ export function wireAllHandlers(container: HostFacade, config: HandlersConfig): 
   allCleanups.push(...wireSigningHandlers(container, config));
   allCleanups.push(...wireChainHandlers(container, config));
   allCleanups.push(...wireChatHandlers(container));
-  allCleanups.push(...wireStatementStoreHandlers(container, { statementStore: config.statementStore }));
+  allCleanups.push(
+    ...wireStatementStoreHandlers(container, {
+      statementStore: config.statementStore,
+      signer: config.ssoSigner,
+    }),
+  );
   allCleanups.push(...wirePreimageHandlers(container));
 
   return () => {

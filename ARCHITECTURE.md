@@ -692,14 +692,21 @@ When `statementStoreEndpoints` is provided, `createHostSdk` internally creates:
 - Statement store handlers are wired to the `ChainClient`'s adapter
 
 The SSO manager auto-restores persisted sessions on creation. SSO state changes are synced to the `AuthManager`.
-Signing callbacks default to remote signing via SSO when not explicitly provided. `clearSession()` calls
-`ssoManager.unpair()` to clear both session metadata and secrets.
+
+On pairing success or session restore, the SDK builds a `RemoteSigner` from the persisted secrets (derives sr25519
+signer from `ssSecret`, uses `remotePublicKey` as AES session key). If the host app does not provide `onSignPayload` /
+`onSignRaw` callbacks, the SDK defaults to routing sign requests through the `RemoteSigner` → `SignRequestExecutor` →
+encrypted statement-store channel → mobile wallet.
+
+Statement store `handleStatementStoreCreateProof` is wired to sign with the sr25519 key when available.
+
+`clearSession()` calls `ssoManager.unpair()` to clear both session metadata and secrets.
 
 **`types.ts`**: `HostSdkConfig` with all options: `appId`, `statementStoreEndpoints`, `pairingMetadata`,
 `chainProvider`, signing callbacks, permission callbacks, UI callbacks.
 
-**`sso/secretStore.ts`**: `createSecretStore(storage)` — persists `{ ssSecret, encrSecret, entropy }` keyed by
-session ID. Used by the manager to persist secrets on pairing and load them on `restoreSession()`.
+**`sso/secretStore.ts`**: `createSecretStore(storage)` — persists `{ ssSecret, encrSecret, entropy }` keyed by session
+ID. Used by the manager to persist secrets on pairing and load them on `restoreSession()`.
 
 **`identity/chainProvider.ts`**: `createChainIdentityProvider(getUnsafeApi)` — concrete `IdentityProvider` that queries
 `Resources.Consumers` on the People parachain via polkadot-api's unsafe API.
