@@ -93,8 +93,10 @@ export { createIdentityResolver } from './auth/identity/resolver.js';
 // ---------------------------------------------------------------------------
 
 export type { StatementStoreAdapter, Statement, SignedStatement, StatementProof } from './statementStore/types.js';
-export { createStatementStoreAdapter } from './statementStore/adapter.js';
+export type { ChainClient } from './statementStore/chainClient.js';
+export { createChainClient } from './statementStore/chainClient.js';
 export { createMemoryStatementStore } from './statementStore/memory.js';
+export { PEOPLE_PARACHAIN_ENDPOINTS } from './statementStore/constants.js';
 
 // ---------------------------------------------------------------------------
 // SSO

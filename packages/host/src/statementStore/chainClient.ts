@@ -1,11 +1,15 @@
 /**
- * Statement store adapter backed by @novasamatech/sdk-statement.
+ * Lazy chain client for the People/statement-store parachain.
  *
- * Wraps the SDK's RPC-level API into our StatementStoreAdapter interface.
- * Accepts request/subscribe functions from a polkadot-api substrate client.
+ * Creates a single WebSocket connection on first use. Provides both
+ * the statement store adapter (for SSO and host API handlers) and
+ * raw RPC access (for identity resolution).
  */
 
+import { getWsProvider } from '@polkadot-api/ws-provider';
+import { createClient } from 'polkadot-api';
 import { createStatementSdk } from '@novasamatech/sdk-statement';
+
 import type { StatementStoreAdapter, Statement, SignedStatement } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -53,13 +57,7 @@ function fromSdkStatement(sdkStmt: Record<string, unknown>): Statement {
     const sig = proof.value.signature;
     const signer = proof.value.signer;
     if (sig && signer) {
-      stmt.proof = {
-        tag,
-        value: {
-          signature: hexToBytes(sig),
-          signer: hexToBytes(signer),
-        },
-      };
+      stmt.proof = { tag, value: { signature: hexToBytes(sig), signer: hexToBytes(signer) } };
     }
   }
   return stmt;
@@ -85,41 +83,64 @@ function toSdkStatement(statement: SignedStatement): Record<string, unknown> {
 }
 
 // ---------------------------------------------------------------------------
-// Factory
+// Chain client
 // ---------------------------------------------------------------------------
 
-/**
- * RPC functions needed from a polkadot-api substrate client.
- *
- * These are the `client._request` and subscription functions from
- * `createClient(provider)`. The host app obtains these from their
- * polkadot-api client connected to the statement-store parachain.
- */
-export type StatementStoreRpcFunctions = {
-  request: (method: string, params: unknown[]) => Promise<unknown>;
-  subscribe: (
-    method: string,
-    params: unknown[],
-    onMessage: (message: unknown) => void,
-    onError: (error: Error) => void,
-  ) => () => void;
+export type ChainClient = {
+  /** Statement store adapter for SSO and host API handlers. */
+  statementStore: StatementStoreAdapter;
+
+  /**
+   * Get the polkadot-api unsafe API for direct storage queries.
+   * Used by the identity resolver to query Resources.Consumers.
+   */
+  getUnsafeApi(): unknown;
+
+  /** Dispose the WebSocket connection and all resources. */
+  dispose(): void;
 };
 
 /**
- * Create a StatementStoreAdapter from RPC functions.
+ * Create a lazy chain client from WebSocket endpoints.
  *
- * @param rpc - Request and subscribe functions from a polkadot-api client
- *   connected to the statement-store parachain.
+ * The connection is established on first use (first subscribe, submit,
+ * query, or getUnsafeApi call). Both the statement store and identity
+ * resolution share this single connection.
+ *
+ * @param endpoints - WebSocket URLs for the People/statement-store parachain.
+ * @param options - Optional configuration.
  */
-export function createStatementStoreAdapter(rpc: StatementStoreRpcFunctions): StatementStoreAdapter {
-  const sdk = createStatementSdk(rpc.request as never, rpc.subscribe as never);
+export function createChainClient(endpoints: string[], options?: { heartbeatTimeout?: number }): ChainClient {
+  let client: ReturnType<typeof createClient> | undefined;
+  let sdk: ReturnType<typeof createStatementSdk> | undefined;
 
-  return {
+  function ensureClient(): ReturnType<typeof createClient> {
+    if (client) return client;
+    const provider = getWsProvider(endpoints, {
+      heartbeatTimeout: options?.heartbeatTimeout,
+    });
+    client = createClient(provider);
+    return client;
+  }
+
+  function ensureSdk(): ReturnType<typeof createStatementSdk> {
+    if (sdk) return sdk;
+    const c = ensureClient();
+    // polkadot-api's createClient exposes _request for raw RPC
+    const raw = c as unknown as {
+      _request: (...args: never[]) => Promise<never>;
+    };
+    sdk = createStatementSdk(raw._request.bind(raw) as never, raw._request.bind(raw) as never);
+    return sdk;
+  }
+
+  const statementStore: StatementStoreAdapter = {
     subscribe(topics: Uint8Array[], callback: (statements: Statement[]) => void): () => void {
+      const s = ensureSdk();
       const topicHexes = topics.map(bytesToHex);
       const filter = topicHexes.length > 0 ? { matchAny: topicHexes } : ('any' as const);
 
-      return sdk.subscribeStatements(
+      return s.subscribeStatements(
         filter as never,
         (sdkStmt: unknown) => {
           callback([fromSdkStatement(sdkStmt as Record<string, unknown>)]);
@@ -131,7 +152,8 @@ export function createStatementStoreAdapter(rpc: StatementStoreRpcFunctions): St
     },
 
     async submit(statement: SignedStatement): Promise<void> {
-      const result = await sdk.submit(toSdkStatement(statement) as never);
+      const s = ensureSdk();
+      const result = await s.submit(toSdkStatement(statement) as never);
       if (result.status === 'new' || result.status === 'known' || result.status === 'knownExpired') {
         return;
       }
@@ -141,10 +163,25 @@ export function createStatementStoreAdapter(rpc: StatementStoreRpcFunctions): St
     },
 
     async query(topics: Uint8Array[]): Promise<Statement[]> {
+      const s = ensureSdk();
       const topicHexes = topics.map(bytesToHex);
       const filter = topicHexes.length > 0 ? { matchAny: topicHexes } : ('any' as const);
-      const results = await sdk.getStatements(filter as never);
+      const results = await s.getStatements(filter as never);
       return results.map(r => fromSdkStatement(r as unknown as Record<string, unknown>));
+    },
+  };
+
+  return {
+    statementStore,
+
+    getUnsafeApi(): unknown {
+      return ensureClient().getUnsafeApi();
+    },
+
+    dispose() {
+      client?.destroy();
+      client = undefined;
+      sdk = undefined;
     },
   };
 }

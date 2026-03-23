@@ -30,8 +30,8 @@ Runtime dependencies of api-protocol: `scale-ts`, `nanoevents`, `neverthrow`, `@
 
 Runtime dependencies of host (in addition to api-protocol): `@noble/ciphers`, `@noble/hashes`, `@noble/curves` (AES-GCM,
 HKDF, blake2b, P-256 ECDH), `@scure/sr25519` (sr25519 signing), `@polkadot-labs/hdkd-helpers` (BIP-39 mnemonics, HDKD),
-`@polkadot-api/substrate-bindings` (AccountId SS58 codec), `@novasamatech/sdk-statement` (statement-store parachain
-RPC client).
+`@polkadot-api/substrate-bindings` (AccountId SS58 codec), `@novasamatech/sdk-statement` (statement-store parachain RPC
+client), `polkadot-api` + `@polkadot-api/ws-provider` (chain client and WebSocket transport).
 
 ---
 
@@ -575,8 +575,8 @@ junctions `['product', productId, derivationIndex]`.
 - `SsoSessionStore`: persistence for session metadata (`save`, `load`, `clear`, `subscribe`).
 - `PersistedSessionMeta`: minimal session data surviving page reloads (sessionId, address, displayName, remote keys).
 
-The statement store transport is now in `statementStore/` (section 2.5) as a unified adapter serving both SSO and
-the host API statement store handlers.
+The statement store transport is now in `statementStore/` (section 2.5) as a unified adapter serving both SSO and the
+host API statement store handlers.
 
 **`sso/sessionStore.ts`**: `createSsoSessionStore(storage)` — backed by a `ReactiveStorageAdapter`. Serializes
 `PersistedSessionMeta` to JSON bytes. Subscriptions delegate to the underlying reactive storage.
@@ -639,12 +639,21 @@ concurrent-request deduplication. Failed requests are not cached so transient er
 
 Unified statement-store parachain adapter used by both SSO (pairing/signing) and the host API statement store handlers.
 
-**`statementStore/types.ts`**: `StatementStoreAdapter` interface with `subscribe(topics, callback)`, `submit(statement)`,
-and `query(topics)`. `Statement` and `SignedStatement` types with tagged `StatementProof` union (sr25519/ed25519/ecdsa).
+**`statementStore/types.ts`**: `StatementStoreAdapter` interface with `subscribe(topics, callback)`,
+`submit(statement)`, and `query(topics)`. `Statement` and `SignedStatement` types with tagged `StatementProof` union
+(sr25519/ed25519/ecdsa).
 
-**`statementStore/adapter.ts`**: `createStatementStoreAdapter(rpc)` — wraps `@novasamatech/sdk-statement` into the
-`StatementStoreAdapter` interface. Accepts `StatementStoreRpcFunctions` (request + subscribe from a polkadot-api client)
-rather than a full provider, keeping WebSocket lifecycle out of the package.
+**`statementStore/chainClient.ts`**: `createChainClient(endpoints, options?)` — creates a lazy WebSocket connection to
+the People/statement-store parachain. The connection is established on first use. Returns `ChainClient` with:
+
+- `statementStore`: the `StatementStoreAdapter` (for SSO and host API handlers)
+- `getUnsafeApi()`: polkadot-api unsafe API (for identity resolution via `Resources.Consumers`)
+- `dispose()`: tears down the WebSocket connection
+
+The host app provides just the endpoint URLs (e.g. `['wss://pop3-testnet.parity-lab.parity.io/people']`). Internally
+wraps `@novasamatech/sdk-statement` for statement RPC and `polkadot-api` for typed/untyped storage queries.
+
+**`statementStore/constants.ts`**: `PEOPLE_PARACHAIN_ENDPOINTS` — default WebSocket endpoints for the People parachain.
 
 **`statementStore/memory.ts`**: `createMemoryStatementStore()` — in-memory adapter for testing. All adapters from the
 same bus see each other's statements.
