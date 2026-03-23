@@ -28,15 +28,30 @@ export type HostSdkConfig = {
   /** Storage key prefix. Defaults to `${appId}:`. */
   storagePrefix?: string;
 
+  // -- Statement store / SSO -------------------------------------------------
+  /**
+   * WebSocket endpoints for the People/statement-store parachain.
+   * When provided, the SDK creates a ChainClient and wires SSO pairing,
+   * remote signing, identity resolution, and statement store handlers
+   * automatically.
+   */
+  statementStoreEndpoints?: string[];
+
+  /** Heartbeat timeout for the statement store WebSocket. Default: 120000 (2 min). */
+  statementStoreHeartbeatTimeout?: number;
+
+  /** URL to the host metadata JSON (shown to the mobile wallet during pairing). */
+  pairingMetadata?: string;
+
   // -- Chain connection -----------------------------------------------------
   /** Factory that returns a JSON-RPC provider for a given genesis hash. */
   chainProvider?: (genesisHash: HexString) => JsonRpcProvider | undefined;
 
-  // -- Signing callbacks ----------------------------------------------------
-  /** Handle signing a structured payload. */
+  // -- Signing callbacks (optional — defaults to remote signing via SSO) -----
+  /** Handle signing a structured payload. If not set, uses remote signing via SSO. */
   onSignPayload?: (session: UserSession, payload: SigningPayloadRequest) => SigningResult | Promise<SigningResult>;
 
-  /** Handle signing raw data. */
+  /** Handle signing raw data. If not set, uses remote signing via SSO. */
   onSignRaw?: (session: UserSession, payload: SigningRawRequest) => SigningResult | Promise<SigningResult>;
 
   /** Handle creating a transaction. Must return the signed transaction hex. */

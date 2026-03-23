@@ -674,8 +674,9 @@ Auto-creates `createHostFacade` + `wireAllHandlers` bridge for each nested dApp.
 ```typescript
 const sdk = createHostSdk({
   appId: 'dot.li',
+  statementStoreEndpoints: ['wss://pop3-testnet.parity-lab.parity.io/people'],
+  pairingMetadata: 'https://dot.li/metadata.json',
   chainProvider: genesisHash => getSmoldotProvider(genesisHash),
-  onSignPayload: (session, payload) => showSignModal(session, payload),
 });
 
 const product = sdk.embed(iframeElement, 'https://dapp.example.com');
@@ -683,12 +684,25 @@ product.dispose();
 sdk.dispose();
 ```
 
-Creates AuthManager, then `embed()` sets `iframe.src`, creates
-`createHostFacade({ messaging: { type: 'window', target: iframe.contentWindow } })` -> `wireAllHandlers()`. On dispose,
-clears `iframe.src`. Also exposes `setSession()` / `clearSession()` for external auth management.
+When `statementStoreEndpoints` is provided, `createHostSdk` internally creates:
 
-**`types.ts`**: `HostSdkConfig` with all options: `appId`, `chainProvider`, signing callbacks, permission callbacks, UI
-callbacks.
+- `ChainClient` (single WebSocket connection to the People/statement-store parachain)
+- `SsoManager` with `PairingExecutor`, `SsoSessionStore`, and `SecretStore` (for session reconnection)
+- `IdentityResolver` backed by `createChainIdentityProvider` (queries `Resources.Consumers`)
+- Statement store handlers are wired to the `ChainClient`'s adapter
+
+The SSO manager auto-restores persisted sessions on creation. SSO state changes are synced to the `AuthManager`.
+Signing callbacks default to remote signing via SSO when not explicitly provided. `clearSession()` calls
+`ssoManager.unpair()` to clear both session metadata and secrets.
+
+**`types.ts`**: `HostSdkConfig` with all options: `appId`, `statementStoreEndpoints`, `pairingMetadata`,
+`chainProvider`, signing callbacks, permission callbacks, UI callbacks.
+
+**`sso/secretStore.ts`**: `createSecretStore(storage)` — persists `{ ssSecret, encrSecret, entropy }` keyed by
+session ID. Used by the manager to persist secrets on pairing and load them on `restoreSession()`.
+
+**`identity/chainProvider.ts`**: `createChainIdentityProvider(getUnsafeApi)` — concrete `IdentityProvider` that queries
+`Resources.Consumers` on the People parachain via polkadot-api's unsafe API.
 
 ---
 

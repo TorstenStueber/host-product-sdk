@@ -2,16 +2,14 @@
  * SSO manager.
  *
  * Drives the QR-based pairing lifecycle between a host application and a
- * mobile wallet. Manages state transitions, session persistence, and event
- * dispatch. The actual cryptographic pairing handshake is delegated to an
- * injected PairingExecutor.
- *
- * Modelled after the Rust host-sdk's SsoManager with trait-injection,
- * adapted for TypeScript's async/callback model.
+ * mobile wallet. Manages state transitions, session persistence, secret
+ * persistence, and event dispatch. The actual cryptographic pairing
+ * handshake is delegated to an injected PairingExecutor.
  */
 
 import type { StatementStoreAdapter } from '../../statementStore/types.js';
 import type { SsoSessionStore, PersistedSessionMeta } from './transport.js';
+import type { SecretStore, PersistedSecrets } from './secretStore.js';
 
 // ---------------------------------------------------------------------------
 // SSO state
@@ -34,26 +32,14 @@ export type SsoState =
 export type PairingResult = {
   /** Session metadata to persist. */
   session: PersistedSessionMeta;
-  /** AES session key for encrypting sign requests (not persisted). */
-  sessionKey: Uint8Array;
+  /** Cryptographic secrets to persist for session reconnection. */
+  secrets: PersistedSecrets;
 };
 
 /**
  * Pluggable pairing protocol.
- *
- * Implementations handle the cryptographic handshake (mnemonic generation,
- * P-256 ECDH, statement-store based key exchange, attestation). The SSO
- * manager drives the state machine and calls the executor at the right time.
  */
 export type PairingExecutor = {
-  /**
-   * Start the pairing handshake.
-   *
-   * @param statementStore - The statement store adapter for messaging.
-   * @param onQrPayload - Called when the QR payload is ready for display.
-   * @param signal - Abort signal for cancellation.
-   * @returns The pairing result, or undefined if the pairing was aborted.
-   */
   execute(
     statementStore: StatementStoreAdapter,
     onQrPayload: (payload: string) => void,
@@ -68,8 +54,10 @@ export type PairingExecutor = {
 export type SsoManagerConfig = {
   /** Statement store adapter for messaging. */
   statementStore: StatementStoreAdapter;
-  /** Session persistence. */
+  /** Session metadata persistence. */
   sessionStore: SsoSessionStore;
+  /** Cryptographic secret persistence. */
+  secretStore: SecretStore;
   /** Pairing protocol implementation. */
   pairingExecutor: PairingExecutor;
 };
@@ -97,23 +85,29 @@ export type SsoManager = {
   cancelPairing(): void;
 
   /**
-   * Disconnect the current session. Clears persisted session.
+   * Disconnect the current session. Clears persisted session and secrets.
    * Transitions paired -> idle.
    */
   unpair(): Promise<void>;
 
   /**
    * Try to restore a persisted session.
-   * If a session exists in the store, transitions directly to paired.
+   * Loads session metadata and secrets, transitions to paired if both exist.
    */
   restoreSession(): Promise<void>;
+
+  /**
+   * Get the persisted secrets for the current session.
+   * Returns undefined if not paired or secrets not available.
+   */
+  getSecrets(): Promise<PersistedSecrets | undefined>;
 
   /** Tear down the manager and release resources. */
   dispose(): void;
 };
 
 export function createSsoManager(config: SsoManagerConfig): SsoManager {
-  const { statementStore, sessionStore, pairingExecutor } = config;
+  const { statementStore, sessionStore, secretStore, pairingExecutor } = config;
 
   let currentState: SsoState = { status: 'idle' };
   const listeners = new Set<(state: SsoState) => void>();
@@ -164,6 +158,7 @@ export function createSsoManager(config: SsoManagerConfig): SsoManager {
             return;
           }
           await sessionStore.save(result.session);
+          await secretStore.save(result.session.sessionId, result.secrets);
           setState({ status: 'paired', session: result.session });
         },
         error => {
@@ -187,7 +182,11 @@ export function createSsoManager(config: SsoManagerConfig): SsoManager {
   }
 
   async function unpair(): Promise<void> {
+    const sessionId = currentState.status === 'paired' ? currentState.session.sessionId : undefined;
     cancelPairing();
+    if (sessionId) {
+      await secretStore.clear(sessionId);
+    }
     await sessionStore.clear();
     setState({ status: 'idle' });
   }
@@ -196,9 +195,20 @@ export function createSsoManager(config: SsoManagerConfig): SsoManager {
     if (disposed) return;
     if (currentState.status !== 'idle') return;
     const meta = await sessionStore.load();
-    if (meta !== undefined) {
-      setState({ status: 'paired', session: meta });
+    if (meta === undefined) return;
+    // Verify secrets exist — without them signing won't work
+    const secrets = await secretStore.load(meta.sessionId);
+    if (secrets === undefined) {
+      // Session metadata without secrets is useless — clean up
+      await sessionStore.clear();
+      return;
     }
+    setState({ status: 'paired', session: meta });
+  }
+
+  async function getSecrets(): Promise<PersistedSecrets | undefined> {
+    if (currentState.status !== 'paired') return undefined;
+    return secretStore.load(currentState.session.sessionId);
   }
 
   function dispose(): void {
@@ -214,6 +224,7 @@ export function createSsoManager(config: SsoManagerConfig): SsoManager {
     cancelPairing,
     unpair,
     restoreSession,
+    getSecrets,
     dispose,
   };
 }

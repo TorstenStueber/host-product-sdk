@@ -9,10 +9,11 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   createSsoManager,
   createSsoSessionStore,
+  createSecretStore,
   createMemoryStorageAdapter,
   createMemoryStatementStore,
 } from '@polkadot/host';
-import type { PairingExecutor, PairingResult, PersistedSessionMeta, SsoState } from '@polkadot/host';
+import type { PairingExecutor, PairingResult, PersistedSessionMeta, PersistedSecrets, SsoState } from '@polkadot/host';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -28,10 +29,18 @@ function makeMeta(id: string = 'session-1'): PersistedSessionMeta {
   };
 }
 
+function makeSecrets(): PersistedSecrets {
+  return {
+    ssSecret: new Uint8Array(64).fill(0xdd),
+    encrSecret: new Uint8Array(32).fill(0xee),
+    entropy: new Uint8Array(16).fill(0xff),
+  };
+}
+
 function makeResult(id: string = 'session-1'): PairingResult {
   return {
     session: makeMeta(id),
-    sessionKey: new Uint8Array(16).fill(0xcc),
+    secrets: makeSecrets(),
   };
 }
 
@@ -93,12 +102,19 @@ function failingExecutor(message: string): PairingExecutor {
 function createTestManager(executor: PairingExecutor) {
   const storage = createMemoryStorageAdapter();
   const sessionStore = createSsoSessionStore(storage);
+  const secrets = createSecretStore(storage);
   const bus = createMemoryStatementStore();
   const adapter = bus.createAdapter();
   return {
-    manager: createSsoManager({ statementStore: adapter, sessionStore, pairingExecutor: executor }),
+    manager: createSsoManager({
+      statementStore: adapter,
+      sessionStore,
+      secretStore: secrets,
+      pairingExecutor: executor,
+    }),
     storage,
     sessionStore,
+    secretStore: secrets,
   };
 }
 
@@ -242,17 +258,20 @@ describe('createSsoManager', () => {
 
   // ── Session restore ───────────────────────────────────────
 
-  it('restoreSession transitions to paired if session exists', async () => {
+  it('restoreSession transitions to paired if session and secrets exist', async () => {
     const storage = createMemoryStorageAdapter();
     const sessionStore = createSsoSessionStore(storage);
+    const secrets = createSecretStore(storage);
     const bus = createMemoryStatementStore();
 
-    // Pre-persist a session
+    // Pre-persist session AND secrets
     await sessionStore.save(makeMeta('restored'));
+    await secrets.save('restored', makeSecrets());
 
     const manager = createSsoManager({
       statementStore: bus.createAdapter(),
       sessionStore,
+      secretStore: secrets,
       pairingExecutor: immediateExecutor(makeResult()),
     });
 
@@ -262,6 +281,28 @@ describe('createSsoManager', () => {
     if (state.status === 'paired') {
       expect(state.session.sessionId).toBe('restored');
     }
+  });
+
+  it('restoreSession cleans up session if secrets are missing', async () => {
+    const storage = createMemoryStorageAdapter();
+    const sessionStore = createSsoSessionStore(storage);
+    const secrets = createSecretStore(storage);
+    const bus = createMemoryStatementStore();
+
+    // Pre-persist session but NOT secrets
+    await sessionStore.save(makeMeta('orphaned'));
+
+    const manager = createSsoManager({
+      statementStore: bus.createAdapter(),
+      sessionStore,
+      secretStore: secrets,
+      pairingExecutor: immediateExecutor(makeResult()),
+    });
+
+    await manager.restoreSession();
+    expect(manager.getState().status).toBe('idle');
+    // Session metadata should have been cleaned up
+    expect(await sessionStore.load()).toBeUndefined();
   });
 
   it('restoreSession is no-op when no session persisted', async () => {
@@ -274,13 +315,16 @@ describe('createSsoManager', () => {
   it('restoreSession is no-op when already paired', async () => {
     const storage = createMemoryStorageAdapter();
     const sessionStore = createSsoSessionStore(storage);
+    const secrets = createSecretStore(storage);
     const bus = createMemoryStatementStore();
 
     await sessionStore.save(makeMeta('stored'));
+    await secrets.save('stored', makeSecrets());
 
     const manager = createSsoManager({
       statementStore: bus.createAdapter(),
       sessionStore,
+      secretStore: secrets,
       pairingExecutor: immediateExecutor(makeResult('from-pairing')),
     });
 

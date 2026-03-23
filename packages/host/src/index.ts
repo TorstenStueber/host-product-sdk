@@ -87,6 +87,7 @@ export type { PappAdapter, PappAdapterConfig, PairingStatus, AttestationStatus }
 export type { IdentityProvider, ResolvedIdentity } from './auth/identity/types.js';
 export type { IdentityResolver } from './auth/identity/resolver.js';
 export { createIdentityResolver } from './auth/identity/resolver.js';
+export { createChainIdentityProvider } from './auth/identity/chainProvider.js';
 
 // ---------------------------------------------------------------------------
 // Statement store
@@ -111,6 +112,8 @@ export type {
   SsoManagerConfig,
   PairingExecutor,
   PairingResult,
+  SecretStore,
+  PersistedSecrets,
   RemoteSigner,
   RemoteSigningConfig,
   SignRequestExecutor,
@@ -122,6 +125,7 @@ export type {
 } from './auth/sso/types.js';
 
 export { createSsoManager } from './auth/sso/manager.js';
+export { createSecretStore } from './auth/sso/secretStore.js';
 export { createRemoteSigner } from './auth/sso/signing.js';
 export { createSsoSessionStore } from './auth/sso/sessionStore.js';
 export { createPairingExecutor } from './auth/sso/pairingExecutor.js';

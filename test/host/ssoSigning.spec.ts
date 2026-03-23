@@ -9,6 +9,7 @@ import {
   createRemoteSigner,
   createSsoManager,
   createSsoSessionStore,
+  createSecretStore,
   createMemoryStorageAdapter,
   createMemoryStatementStore,
 } from '@polkadot/host';
@@ -39,7 +40,11 @@ function makeMeta(): PersistedSessionMeta {
 function makeResult(): PairingResult {
   return {
     session: makeMeta(),
-    sessionKey: new Uint8Array(16).fill(0xcc),
+    secrets: {
+      ssSecret: new Uint8Array(64).fill(0xdd),
+      encrSecret: new Uint8Array(32).fill(0xee),
+      entropy: new Uint8Array(16).fill(0xff),
+    },
   };
 }
 
@@ -117,6 +122,7 @@ async function createPairedSetup(signExecutor?: SignRequestExecutor) {
   const manager = createSsoManager({
     statementStore: adapter,
     sessionStore,
+    secretStore: createSecretStore(storage),
     pairingExecutor: immediateExecutor(),
   });
 
@@ -148,6 +154,7 @@ describe('createRemoteSigner', () => {
     const manager = createSsoManager({
       statementStore: adapter,
       sessionStore,
+      secretStore: createSecretStore(storage),
       pairingExecutor: immediateExecutor(),
     });
 
@@ -168,6 +175,7 @@ describe('createRemoteSigner', () => {
     const manager = createSsoManager({
       statementStore: adapter,
       sessionStore,
+      secretStore: createSecretStore(storage),
       pairingExecutor: immediateExecutor(),
     });
 

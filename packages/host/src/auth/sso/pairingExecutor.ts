@@ -146,7 +146,11 @@ export function createPairingExecutor(config: PairingExecutorConfig): PairingExe
               unsub();
               resolve({
                 session,
-                sessionKey: sharedSecret,
+                secrets: {
+                  ssSecret,
+                  encrSecret,
+                  entropy,
+                },
               });
               return;
             } catch {

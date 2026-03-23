@@ -7,6 +7,7 @@
  */
 
 import type { HexString, RequestParams } from '@polkadot/api-protocol';
+import type { StatementStoreAdapter } from '../statementStore/types.js';
 import type {
   Feature,
   DevicePermissionRequest,
@@ -100,6 +101,10 @@ export type HandlersConfig = {
   // -- Chain connection -----------------------------------------------------
   /** Factory that returns a JSON-RPC provider for a given genesis hash, or undefined if unsupported. */
   chainProvider?: (genesisHash: HexString) => JsonRpcProvider | undefined;
+
+  // -- Statement store -------------------------------------------------------
+  /** Statement store adapter for product-facing statement operations. */
+  statementStore?: StatementStoreAdapter;
 };
 
 // ---------------------------------------------------------------------------
@@ -116,7 +121,7 @@ export function wireAllHandlers(container: HostFacade, config: HandlersConfig): 
   allCleanups.push(...wireSigningHandlers(container, config));
   allCleanups.push(...wireChainHandlers(container, config));
   allCleanups.push(...wireChatHandlers(container));
-  allCleanups.push(...wireStatementStoreHandlers(container));
+  allCleanups.push(...wireStatementStoreHandlers(container, { statementStore: config.statementStore }));
   allCleanups.push(...wirePreimageHandlers(container));
 
   return () => {
