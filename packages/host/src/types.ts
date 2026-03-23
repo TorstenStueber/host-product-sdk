@@ -124,6 +124,19 @@ export type HostSdk = {
    */
   clearSession(): void;
 
+  /**
+   * Start QR-code-based pairing.
+   * Requires statementStoreEndpoints to be configured.
+   * No-op if already paired or pairing in progress.
+   */
+  pair(): void;
+
+  /**
+   * Cancel an in-progress pairing.
+   * No-op if not pairing.
+   */
+  cancelPairing(): void;
+
   /** Dispose the SDK and all embedded products. */
   dispose(): void;
 };
