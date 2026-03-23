@@ -48,11 +48,30 @@ export type HostSdkConfig = {
   chainProvider?: (genesisHash: HexString) => JsonRpcProvider | undefined;
 
   // -- Signing callbacks (optional — defaults to remote signing via SSO) -----
-  /** Handle signing a structured payload. If not set, uses remote signing via SSO. */
+
+  /**
+   * Handle signing a structured payload. If not set, uses remote signing via SSO.
+   * If you set this, you are fully responsible for producing the signature.
+   */
   onSignPayload?: (session: UserSession, payload: SigningPayloadRequest) => SigningResult | Promise<SigningResult>;
 
   /** Handle signing raw data. If not set, uses remote signing via SSO. */
   onSignRaw?: (session: UserSession, payload: SigningRawRequest) => SigningResult | Promise<SigningResult>;
+
+  /**
+   * Approval gate for remote signing.
+   *
+   * Called before the SDK routes a sign request through the RemoteSigner.
+   * If this returns `true` (or resolves to `true`), the SDK proceeds with
+   * remote signing. If `false`, the request is rejected.
+   *
+   * Use this to show a confirmation modal to the user. The SDK handles
+   * the actual signing — this callback just gates whether to proceed.
+   *
+   * Only used when `onSignPayload` / `onSignRaw` are NOT set (i.e., when
+   * the SDK uses remote signing as the default).
+   */
+  onSignApproval?: (payload: SigningPayloadRequest | SigningRawRequest) => boolean | Promise<boolean>;
 
   /** Handle creating a transaction. Must return the signed transaction hex. */
   onCreateTransaction?: (

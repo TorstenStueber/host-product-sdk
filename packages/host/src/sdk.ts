@@ -149,6 +149,28 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
     auth.setState({ status: 'authenticated', session, identity });
   }
 
+  // Helper: check approval gate, then route through remote signer
+  async function approveAndRemoteSign(
+    payload: unknown,
+    doSign: () => Promise<{ signature: Uint8Array; signedTransaction?: Uint8Array | string }>,
+  ): Promise<SigningResult> {
+    if (config.onSignApproval) {
+      const approved = await config.onSignApproval(payload as never);
+      if (!approved) {
+        throw new Error('Rejected');
+      }
+    }
+    const result = await doSign();
+    return {
+      signature: bytesToHex(result.signature) as `0x${string}`,
+      signedTransaction: result.signedTransaction
+        ? result.signedTransaction instanceof Uint8Array
+          ? (bytesToHex(result.signedTransaction) as `0x${string}`)
+          : (result.signedTransaction as `0x${string}`)
+        : undefined,
+    };
+  }
+
   // Build handler config from SDK config + auth manager
   function buildHandlersConfig(storagePrefix: string): HandlersConfig {
     return {
@@ -175,6 +197,7 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
       onPermission: config.onPermission,
 
       // Signing: use explicit callbacks if provided, otherwise fall back to remote signer
+      // with optional approval gate
       onSignPayload: config.onSignPayload
         ? (_sessionInfo, payload) => {
             const session = auth.getSession();
@@ -183,17 +206,7 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
           }
         : remoteSigner
           ? (_sessionInfo, payload) => {
-              return remoteSigner!.signPayload(payload as never).then(
-                result =>
-                  ({
-                    signature: bytesToHex(result.signature) as `0x${string}`,
-                    signedTransaction: result.signedTransaction
-                      ? result.signedTransaction instanceof Uint8Array
-                        ? (bytesToHex(result.signedTransaction) as `0x${string}`)
-                        : (result.signedTransaction as `0x${string}`)
-                      : undefined,
-                  }) satisfies SigningResult,
-              );
+              return approveAndRemoteSign(payload, () => remoteSigner!.signPayload(payload as never));
             }
           : undefined,
 
@@ -205,17 +218,7 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
           }
         : remoteSigner
           ? (_sessionInfo, payload) => {
-              return remoteSigner!.signRaw(payload as never).then(
-                result =>
-                  ({
-                    signature: bytesToHex(result.signature) as `0x${string}`,
-                    signedTransaction: result.signedTransaction
-                      ? result.signedTransaction instanceof Uint8Array
-                        ? (bytesToHex(result.signedTransaction) as `0x${string}`)
-                        : (result.signedTransaction as `0x${string}`)
-                      : undefined,
-                  }) satisfies SigningResult,
-              );
+              return approveAndRemoteSign(payload, () => remoteSigner!.signRaw(payload as never));
             }
           : undefined,
 
