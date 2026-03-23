@@ -57,6 +57,7 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
       secretStore: secretStoreInstance,
       pairingExecutor: createPairingExecutor({
         metadata: config.pairingMetadata ?? '',
+        getUnsafeApi: () => chainClient!.getUnsafeApi(),
       }),
     });
 

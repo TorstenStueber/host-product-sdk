@@ -28,7 +28,9 @@
     "@polkadot-labs/hdkd-helpers": "^0.0.28",
     "@polkadot/api-protocol": "0.1.0",
     "@scure/sr25519": "^0.2.0",
+    "nanoid": "^3.3.11",
     "neverthrow": "^8.2.0",
-    "polkadot-api": "^2.0.0-rc.5"
+    "polkadot-api": "^2.0.0-rc.5",
+    "verifiablejs": "^1.2.0"
   }
 }

@@ -31,7 +31,8 @@ Runtime dependencies of api-protocol: `scale-ts`, `nanoevents`, `neverthrow`, `@
 Runtime dependencies of host (in addition to api-protocol): `@noble/ciphers`, `@noble/hashes`, `@noble/curves` (AES-GCM,
 HKDF, blake2b, P-256 ECDH), `@scure/sr25519` (sr25519 signing), `@polkadot-labs/hdkd-helpers` (BIP-39 mnemonics, HDKD),
 `@polkadot-api/substrate-bindings` (AccountId SS58 codec), `@novasamatech/sdk-statement` (statement-store parachain RPC
-client), `polkadot-api` + `@polkadot-api/ws-provider` (chain client and WebSocket transport).
+client), `polkadot-api` + `@polkadot-api/ws-provider` (chain client and WebSocket transport), `verifiablejs`
+(Bandersnatch ring-VRF WASM for attestation).
 
 ---
 
@@ -619,9 +620,16 @@ wallet:
 - `SigningPayloadRequestCodec` / `SigningRawRequestCodec` / `SigningResponseCodec`: signing request/response.
 - `RemoteMessageCodec`: versioned envelope `{ messageId, data: v1 { Disconnected | SignRequest | SignResponse } }`.
 
+**`sso/attestation.ts`**: `runAttestation(candidate, getUnsafeApi, signal)` — registers a lite person on the People
+pallet. Lazy-loads `verifiablejs` WASM (5.8 MB Bandersnatch ring-VRF), derives VRF key and proof-of-ownership, builds
+consumer registration signature, submits `PeopleLite.attest` extrinsic with custom signed extensions
+(`VerifyMultiSignature`, `AsPerson`). Uses a hardcoded sudo Alice verifier (testnet only).
+
 **`sso/pairingExecutor.ts`**: `createPairingExecutor(config)` — concrete `PairingExecutor` implementing the full QR-code
 handshake: generates mnemonic, derives sr25519 at `//wallet//sso` + P-256 keys, builds SCALE-encoded `HandshakeData`,
 publishes to statement-store topic, waits for mobile response, performs P-256 ECDH to decrypt session credentials.
+When `config.getUnsafeApi` is provided, runs attestation in parallel with the handshake — both must complete before
+the session is returned.
 
 **`sso/signRequestExecutor.ts`**: `createSignRequestExecutor(config)` — concrete `SignRequestExecutor` implementing
 encrypted sign request round-trips: SCALE-encodes `RemoteMessage` with `SignRequest`, encrypts with AES-GCM session key,

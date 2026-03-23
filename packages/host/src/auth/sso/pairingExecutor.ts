@@ -23,6 +23,9 @@ import {
   mnemonicToEntropy,
 } from './crypto.js';
 import { AccountId } from '@polkadot-api/substrate-bindings';
+import { runAttestation } from './attestation.js';
+import type { DerivedAccount } from './attestation.js';
+import { signWithSr25519 } from './crypto.js';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -37,6 +40,11 @@ export type PairingExecutorConfig = {
   osType?: string;
   /** Optional OS version string. */
   osVersion?: string;
+  /**
+   * Function returning the polkadot-api unsafe API for the People parachain.
+   * Required for attestation. If not provided, attestation is skipped.
+   */
+  getUnsafeApi?: () => unknown;
 };
 
 // ---------------------------------------------------------------------------
@@ -101,7 +109,21 @@ export function createPairingExecutor(config: PairingExecutorConfig): PairingExe
 
       if (signal.aborted) return undefined;
 
-      // 6. Subscribe to handshake topic and wait for mobile response
+      // 6. Start attestation in parallel with the handshake (if API provided)
+      let attestationPromise: Promise<void> | undefined;
+      if (config.getUnsafeApi) {
+        const candidate: DerivedAccount = {
+          secret: ssSecret,
+          publicKey: ssPublicKey,
+          entropy,
+          sign: (message: Uint8Array) => signWithSr25519(ssSecret, message),
+        };
+        attestationPromise = runAttestation(candidate, config.getUnsafeApi, signal).catch(e => {
+          console.warn('[sso] Attestation failed (non-fatal):', e instanceof Error ? e.message : e);
+        });
+      }
+
+      // 7. Subscribe to handshake topic and wait for mobile response
       const result = await new Promise<PairingResult | undefined>(resolve => {
         const unsub = statementStore.subscribe([topic], statements => {
           if (signal.aborted) {
@@ -164,6 +186,16 @@ export function createPairingExecutor(config: PairingExecutorConfig): PairingExe
           resolve(undefined);
         });
       });
+
+      if (!result) return undefined;
+
+      // Wait for attestation to complete before returning
+      // (session is only usable after both handshake AND attestation succeed)
+      if (attestationPromise) {
+        await attestationPromise;
+      }
+
+      if (signal.aborted) return undefined;
 
       return result;
     },
