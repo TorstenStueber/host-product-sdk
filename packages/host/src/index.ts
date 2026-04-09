@@ -97,7 +97,7 @@ export type { StatementStoreAdapter, Statement, SignedStatement, StatementProof 
 export type { ChainClient } from './statementStore/chainClient.js';
 export { createChainClient } from './statementStore/chainClient.js';
 export { createMemoryStatementStore } from './statementStore/memory.js';
-export { PEOPLE_PARACHAIN_ENDPOINTS } from './statementStore/constants.js';
+export { PEOPLE_PARACHAIN_ENDPOINTS } from './constants.js';
 
 // ---------------------------------------------------------------------------
 // SSO
