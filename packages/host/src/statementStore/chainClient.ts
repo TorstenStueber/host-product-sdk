@@ -12,7 +12,7 @@
  */
 
 import { createClient } from 'polkadot-api';
-import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
+import type { JsonRpcProvider } from 'polkadot-api';
 import { bytesToHex, hexToBytes } from '@polkadot/api-protocol';
 
 import type { StatementStoreAdapter, Statement, SignedStatement } from './types.js';

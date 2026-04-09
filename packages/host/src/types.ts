@@ -4,6 +4,7 @@
 
 import type { HexString, ResponseOk, RequestParams } from '@polkadot/api-protocol';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
+import type { JsonRpcProvider as PapiJsonRpcProvider } from 'polkadot-api';
 import type {
   SigningPayloadRequest,
   SigningRawRequest,
@@ -40,7 +41,7 @@ export type HostSdkConfig = {
    * remote signing, identity resolution, and statement store handlers
    * automatically.
    */
-  statementStoreProvider?: JsonRpcProvider;
+  statementStoreProvider?: PapiJsonRpcProvider;
 
   /** URL to the host metadata JSON (shown to the mobile wallet during pairing). */
   pairingMetadata?: string;
