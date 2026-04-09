@@ -60,7 +60,7 @@ export function toHexString(value: string): HexString {
   return value as HexString;
 }
 
-function bytesToHex(bytes: Uint8Array): HexString {
+export function bytesToHex(bytes: Uint8Array): HexString {
   let hex = '0x';
   for (let i = 0; i < bytes.length; i++) {
     hex += bytes[i]!.toString(16).padStart(2, '0');
@@ -68,7 +68,7 @@ function bytesToHex(bytes: Uint8Array): HexString {
   return hex as HexString;
 }
 
-function hexToBytes(hex: string): Uint8Array {
+export function hexToBytes(hex: string): Uint8Array {
   const start = hex.startsWith('0x') ? 2 : 0;
   const length = (hex.length - start) >> 1;
   const bytes = new Uint8Array(length);

@@ -8,7 +8,7 @@
 
 import { createAuthManager } from './auth/authManager.js';
 import type { UserSession, Identity } from './auth/authManager.js';
-import { createHostFacade } from '@polkadot/api-protocol';
+import { createHostFacade, bytesToHex } from '@polkadot/api-protocol';
 import { wireAllHandlers } from './handlers/registry.js';
 import type { HandlersConfig } from './handlers/registry.js';
 import type { SigningResult } from '@polkadot/api-protocol';
@@ -308,16 +308,4 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
   };
 
   return sdk;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function bytesToHex(bytes: Uint8Array): string {
-  let hex = '0x';
-  for (const b of bytes) {
-    hex += b.toString(16).padStart(2, '0');
-  }
-  return hex;
 }

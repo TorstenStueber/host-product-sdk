@@ -7,6 +7,7 @@
  */
 
 import type { IdentityProvider, ResolvedIdentity } from './types.js';
+import { hexToBytes } from '@polkadot/api-protocol';
 
 /**
  * Create an identity provider that queries the People parachain.
@@ -69,13 +70,4 @@ export function createChainIdentityProvider(getUnsafeApi: () => unknown): Identi
       }
     },
   };
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const clean = hex.startsWith('0x') ? hex.slice(2) : hex;
-  const bytes = new Uint8Array(clean.length / 2);
-  for (let i = 0; i < bytes.length; i++) {
-    bytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
-  }
-  return bytes;
 }
