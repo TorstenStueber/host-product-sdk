@@ -40,18 +40,18 @@ const sdk = createHostSdk({
   pairingMetadata: 'https://my-host.com/metadata.json',
 
   // Chain: provide JSON-RPC providers for Substrate chains
-  chainProvider: (genesisHash) => {
+  chainProvider: genesisHash => {
     // Return a JsonRpcProvider for supported chains, or undefined
     return getSmoldotProvider(genesisHash); // your smoldot setup
   },
 
   // Signing: show a confirmation modal before remote signing
-  onSignApproval: async (payload) => {
+  onSignApproval: async payload => {
     return await showConfirmationModal(payload); // returns true/false
   },
 
   // UI callbacks
-  onNavigateTo: (url) => window.open(url, '_blank'),
+  onNavigateTo: url => window.open(url, '_blank'),
   onPushNotification: ({ text }) => showToast(text),
 });
 ```
@@ -71,24 +71,24 @@ When `statementStoreEndpoints` is provided, the SDK automatically:
 
 ### `HostSdkConfig`
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `appId` | `string` | *required* | Application identifier. Used for storage scoping and auth. |
-| `storagePrefix` | `string` | `${appId}:` | Prefix for localStorage keys. |
-| `statementStoreEndpoints` | `string[]` | - | WebSocket URLs for the People parachain. Enables SSO, signing, identity. |
-| `statementStoreHeartbeatTimeout` | `number` | `120000` | WebSocket heartbeat timeout in ms. |
-| `pairingMetadata` | `string` | `''` | URL to host metadata JSON shown during QR pairing. |
-| `chainProvider` | `(genesisHash) => JsonRpcProvider \| undefined` | - | Factory for chain connections. Called when a product requests chain data. |
-| `onSignPayload` | `(session, payload) => SigningResult \| Promise<SigningResult>` | remote signing | Override: handle payload signing yourself. |
-| `onSignRaw` | `(session, payload) => SigningResult \| Promise<SigningResult>` | remote signing | Override: handle raw signing yourself. |
-| `onSignApproval` | `(payload) => boolean \| Promise<boolean>` | auto-approve | Gate for remote signing. Show a modal, return true/false. |
-| `onCreateTransaction` | callback | - | Handle transaction creation. |
-| `onCreateTransactionWithNonProductAccount` | callback | - | Handle transaction creation for non-product accounts. |
-| `onFeatureSupported` | `(feature) => boolean` | chain check | Custom feature support. Default checks `chainProvider` for `Chain` features. |
-| `onDevicePermission` | `(permission) => boolean \| Promise<boolean>` | `false` | Device permission handler. |
-| `onPermission` | `(request) => boolean \| Promise<boolean>` | `false` | Remote permission handler. |
-| `onNavigateTo` | `(url) => void` | `window.open` | Navigation handler. |
-| `onPushNotification` | `(notification) => void` | `console.warn` | Push notification handler. |
+| Option                                     | Type                                                            | Default        | Description                                                                  |
+| ------------------------------------------ | --------------------------------------------------------------- | -------------- | ---------------------------------------------------------------------------- |
+| `appId`                                    | `string`                                                        | _required_     | Application identifier. Used for storage scoping and auth.                   |
+| `storagePrefix`                            | `string`                                                        | `${appId}:`    | Prefix for localStorage keys.                                                |
+| `statementStoreEndpoints`                  | `string[]`                                                      | -              | WebSocket URLs for the People parachain. Enables SSO, signing, identity.     |
+| `statementStoreHeartbeatTimeout`           | `number`                                                        | `120000`       | WebSocket heartbeat timeout in ms.                                           |
+| `pairingMetadata`                          | `string`                                                        | `''`           | URL to host metadata JSON shown during QR pairing.                           |
+| `chainProvider`                            | `(genesisHash) => JsonRpcProvider \| undefined`                 | -              | Factory for chain connections. Called when a product requests chain data.    |
+| `onSignPayload`                            | `(session, payload) => SigningResult \| Promise<SigningResult>` | remote signing | Override: handle payload signing yourself.                                   |
+| `onSignRaw`                                | `(session, payload) => SigningResult \| Promise<SigningResult>` | remote signing | Override: handle raw signing yourself.                                       |
+| `onSignApproval`                           | `(payload) => boolean \| Promise<boolean>`                      | auto-approve   | Gate for remote signing. Show a modal, return true/false.                    |
+| `onCreateTransaction`                      | callback                                                        | -              | Handle transaction creation.                                                 |
+| `onCreateTransactionWithNonProductAccount` | callback                                                        | -              | Handle transaction creation for non-product accounts.                        |
+| `onFeatureSupported`                       | `(feature) => boolean`                                          | chain check    | Custom feature support. Default checks `chainProvider` for `Chain` features. |
+| `onDevicePermission`                       | `(permission) => boolean \| Promise<boolean>`                   | `false`        | Device permission handler.                                                   |
+| `onPermission`                             | `(request) => boolean \| Promise<boolean>`                      | `false`        | Remote permission handler.                                                   |
+| `onNavigateTo`                             | `(url) => void`                                                 | `window.open`  | Navigation handler.                                                          |
+| `onPushNotification`                       | `(notification) => void`                                        | `console.warn` | Push notification handler.                                                   |
 
 ## `HostSdk` API
 
@@ -109,10 +109,11 @@ product.dispose();
 
 ### `sdk.pair()`
 
-Start QR-code-based pairing with the Polkadot mobile wallet. Requires `statementStoreEndpoints` to be configured.
-No-op if already paired or pairing in progress.
+Start QR-code-based pairing with the Polkadot mobile wallet. Requires `statementStoreEndpoints` to be configured. No-op
+if already paired or pairing in progress.
 
 The pairing flow:
+
 1. Generates a fresh mnemonic and derives sr25519 + P-256 keys
 2. Builds a QR payload and transitions to `pairing` state (with the QR string)
 3. Waits for the mobile wallet to scan and respond
@@ -124,7 +125,7 @@ The pairing flow:
 Subscribe to `sdk.auth` to track progress:
 
 ```typescript
-sdk.auth.subscribe((state) => {
+sdk.auth.subscribe(state => {
   switch (state.status) {
     case 'idle':
       hideModal();
@@ -172,13 +173,13 @@ The auth state manager. Provides:
 - `sdk.auth.subscribe(callback): () => void` -- subscribe to state changes
 - `sdk.auth.getSession(): UserSession | undefined` -- get the current session (if authenticated)
 
-Auth states: `idle`, `pairing` (with `payload`), `attesting` (with optional `username`), `authenticated` (with
-`session` and `identity`), `error` (with `message`).
+Auth states: `idle`, `pairing` (with `payload`), `attesting` (with optional `username`), `authenticated` (with `session`
+and `identity`), `error` (with `message`).
 
 ### `sdk.dispose()`
 
-Tear down the SDK and all embedded products. Closes the WebSocket connection, stops the SSO manager, and cleans up
-all resources.
+Tear down the SDK and all embedded products. Closes the WebSocket connection, stops the SSO manager, and cleans up all
+resources.
 
 ## Signing
 
@@ -231,7 +232,7 @@ const chains = new Map<string, JsonRpcProvider>();
 
 const sdk = createHostSdk({
   appId: 'my-host',
-  chainProvider: (genesisHash) => {
+  chainProvider: genesisHash => {
     if (chains.has(genesisHash)) return chains.get(genesisHash);
     const chain = smoldot.addChain({ chainSpec: getSpecFor(genesisHash) });
     const provider = getSmProvider(chain);
@@ -246,8 +247,8 @@ returns a provider, the feature is supported.
 
 ## Nested dApps
 
-If a product embeds another dApp via iframe (dApp-in-dApp), all nested dApps send their postMessage to `window.top`.
-The SDK's `embed()` does NOT automatically detect nested dApps. Use `setupNestedBridgeDetector` for this:
+If a product embeds another dApp via iframe (dApp-in-dApp), all nested dApps send their postMessage to `window.top`. The
+SDK's `embed()` does NOT automatically detect nested dApps. Use `setupNestedBridgeDetector` for this:
 
 ```typescript
 import { setupNestedBridgeDetector } from '@polkadot/host';
@@ -257,7 +258,7 @@ const product = sdk.embed(iframe, url);
 const disposeNested = setupNestedBridgeDetector({
   primaryIframe: iframe,
   label: 'my-dapp',
-  createConfig: (nestedId) => ({
+  createConfig: nestedId => ({
     appId: 'my-host',
     storagePrefix: `my-host:nested-${nestedId}:`,
     // ... same handlers as the primary bridge
@@ -301,7 +302,7 @@ const config: HandlersConfig = {
   appId: 'my-host',
   storagePrefix: 'my-host:',
   getSession: () => ({ rootPublicKey: myPublicKey }),
-  subscribeAuthState: (callback) => {
+  subscribeAuthState: callback => {
     callback('authenticated');
     return () => {};
   },
@@ -408,7 +409,7 @@ const chain = createChainClient(PEOPLE_PARACHAIN_ENDPOINTS);
 // Subscribe to statements on a topic
 const unsub = chain.statementStore.subscribe(
   [myTopic], // array of 32-byte Uint8Array topics
-  (statements) => {
+  statements => {
     for (const stmt of statements) {
       console.log('Received:', stmt.data);
     }
@@ -440,7 +441,7 @@ const memory = createMemoryStorageAdapter();
 const local = createLocalStorageAdapter('my-prefix:');
 
 // Both support reactive subscriptions:
-const unsub = local.subscribe('myKey', (value) => {
+const unsub = local.subscribe('myKey', value => {
   console.log('Changed:', value); // Uint8Array | undefined
 });
 ```
@@ -456,8 +457,8 @@ The `pairingMetadata` URL should serve a JSON file with this structure:
 }
 ```
 
-The icon should be a rasterized image (PNG/JPEG) with a minimum size of 256x256 pixels. This is displayed on the
-mobile wallet during the QR pairing flow.
+The icon should be a rasterized image (PNG/JPEG) with a minimum size of 256x256 pixels. This is displayed on the mobile
+wallet during the QR pairing flow.
 
 ## Protocol Compatibility
 
@@ -472,17 +473,17 @@ The SSO pairing protocol (QR handshake, statement-store messaging, remote signin
 
 Runtime dependencies:
 
-| Package | Purpose |
-|---------|---------|
-| `@noble/ciphers` | AES-GCM encryption |
-| `@noble/hashes` | HKDF-SHA256, blake2b |
-| `@noble/curves` | P-256 ECDH (pairing handshake) |
-| `@scure/sr25519` | Sr25519 signing |
-| `@polkadot-labs/hdkd-helpers` | BIP-39 mnemonics, HDKD key derivation |
-| `@polkadot-api/substrate-bindings` | AccountId SS58 codec |
-| `@novasamatech/sdk-statement` | Statement-store parachain RPC |
-| `polkadot-api` | Chain client |
-| `@polkadot-api/ws-provider` | WebSocket transport |
-| `verifiablejs` | Bandersnatch ring-VRF (5.8 MB WASM, lazy-loaded during pairing) |
-| `neverthrow` | Result types |
-| `scale-ts` | SCALE codec |
+| Package                            | Purpose                                                         |
+| ---------------------------------- | --------------------------------------------------------------- |
+| `@noble/ciphers`                   | AES-GCM encryption                                              |
+| `@noble/hashes`                    | HKDF-SHA256, blake2b                                            |
+| `@noble/curves`                    | P-256 ECDH (pairing handshake)                                  |
+| `@scure/sr25519`                   | Sr25519 signing                                                 |
+| `@polkadot-labs/hdkd-helpers`      | BIP-39 mnemonics, HDKD key derivation                           |
+| `@polkadot-api/substrate-bindings` | AccountId SS58 codec                                            |
+| `@novasamatech/sdk-statement`      | Statement-store parachain RPC                                   |
+| `polkadot-api`                     | Chain client                                                    |
+| `@polkadot-api/ws-provider`        | WebSocket transport                                             |
+| `verifiablejs`                     | Bandersnatch ring-VRF (5.8 MB WASM, lazy-loaded during pairing) |
+| `neverthrow`                       | Result types                                                    |
+| `scale-ts`                         | SCALE codec                                                     |

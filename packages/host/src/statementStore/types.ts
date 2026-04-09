@@ -7,7 +7,7 @@
  */
 
 // ---------------------------------------------------------------------------
-// Statement types (matching @novasamatech/sdk-statement)
+// Statement types (matching Substrate statement-store wire format)
 // ---------------------------------------------------------------------------
 
 export type StatementProof =

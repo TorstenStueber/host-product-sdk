@@ -4,13 +4,17 @@
  * Creates a single WebSocket connection on first use. Provides both
  * the statement store adapter (for SSO and host API handlers) and
  * raw RPC access (for identity resolution).
+ *
+ * Uses the polkadot-api client's `_request` / `_subscribe` escape
+ * hatches for direct RPC access to the statement-store endpoints
+ * (`statement_submit`, `statement_subscribeStatement`).
  */
 
 import { getWsProvider } from '@polkadot-api/ws-provider';
 import { createClient } from 'polkadot-api';
-import { createStatementSdk } from '@novasamatech/sdk-statement';
 
 import type { StatementStoreAdapter, Statement, SignedStatement } from './types.js';
+import { encodeStatement, decodeStatement } from './codec.js';
 
 // ---------------------------------------------------------------------------
 // Hex helpers
@@ -34,53 +38,26 @@ function hexToBytes(hex: string): Uint8Array {
 }
 
 // ---------------------------------------------------------------------------
-// SDK statement conversion
+// RPC types
 // ---------------------------------------------------------------------------
 
-function fromSdkStatement(sdkStmt: Record<string, unknown>): Statement {
-  const stmt: Statement = {};
-  if (sdkStmt.data !== undefined) {
-    stmt.data = sdkStmt.data instanceof Uint8Array ? sdkStmt.data : hexToBytes(sdkStmt.data as string);
-  }
-  if (sdkStmt.topics !== undefined) {
-    stmt.topics = (sdkStmt.topics as string[]).map(hexToBytes);
-  }
-  if (sdkStmt.channel !== undefined) {
-    stmt.channel = hexToBytes(sdkStmt.channel as string);
-  }
-  if (sdkStmt.expiry !== undefined) {
-    stmt.expiry = sdkStmt.expiry as bigint;
-  }
-  if (sdkStmt.proof !== undefined) {
-    const proof = sdkStmt.proof as { type: string; value: Record<string, string | undefined> };
-    const tag = proof.type as 'sr25519' | 'ed25519' | 'ecdsa';
-    const sig = proof.value.signature;
-    const signer = proof.value.signer;
-    if (sig && signer) {
-      stmt.proof = { tag, value: { signature: hexToBytes(sig), signer: hexToBytes(signer) } };
-    }
-  }
-  return stmt;
-}
+/** Subscription event from `statement_subscribeStatement`. */
+type StatementEvent = {
+  event: string;
+  data: {
+    statements: string[]; // hex-encoded SCALE statements
+    remaining?: number;
+  };
+};
 
-function toSdkStatement(statement: SignedStatement): Record<string, unknown> {
-  const sdk: Record<string, unknown> = {};
-  if (statement.data) sdk.data = statement.data;
-  if (statement.topics) sdk.topics = statement.topics.map(bytesToHex);
-  if (statement.channel) sdk.channel = bytesToHex(statement.channel);
-  if (statement.expiry !== undefined) sdk.expiry = statement.expiry;
-  if (statement.decryptionKey) sdk.decryptionKey = bytesToHex(statement.decryptionKey);
-  if (statement.proof) {
-    sdk.proof = {
-      type: statement.proof.tag,
-      value: {
-        signature: bytesToHex(statement.proof.value.signature),
-        signer: bytesToHex(statement.proof.value.signer),
-      },
-    };
-  }
-  return sdk;
-}
+/** Topic filter for statement subscriptions. */
+type TopicFilter = 'any' | { matchAny: `0x${string}`[] } | { matchAll: `0x${string}`[] };
+
+/** Minimal Observable protocol (avoids importing rxjs directly). */
+type Subscription = { unsubscribe(): void };
+type Observable<T> = {
+  subscribe(observer: { next(value: T): void; error(err: unknown): void }): Subscription;
+};
 
 // ---------------------------------------------------------------------------
 // Chain client
@@ -112,7 +89,6 @@ export type ChainClient = {
  */
 export function createChainClient(endpoints: string[], options?: { heartbeatTimeout?: number }): ChainClient {
   let client: ReturnType<typeof createClient> | undefined;
-  let sdk: ReturnType<typeof createStatementSdk> | undefined;
 
   function ensureClient(): ReturnType<typeof createClient> {
     if (client) return client;
@@ -123,51 +99,98 @@ export function createChainClient(endpoints: string[], options?: { heartbeatTime
     return client;
   }
 
-  function ensureSdk(): ReturnType<typeof createStatementSdk> {
-    if (sdk) return sdk;
-    const c = ensureClient();
-    // polkadot-api's createClient exposes _request for raw RPC
-    const raw = c as unknown as {
-      _request: (...args: never[]) => Promise<never>;
+  /** Access the polkadot-api client's internal `_request` for one-shot RPCs. */
+  function rpcRequest<T>(method: string, params: unknown[]): Promise<T> {
+    const c = ensureClient() as unknown as {
+      _request: <R>(method: string, params: unknown[]) => Promise<R>;
     };
-    sdk = createStatementSdk(raw._request.bind(raw) as never, raw._request.bind(raw) as never);
-    return sdk;
+    return c._request<T>(method, params);
+  }
+
+  /** Access the polkadot-api client's internal `_subscribe` for subscription RPCs. */
+  function rpcSubscribe<T>(method: string, unsubMethod: string, params: unknown[]): Observable<T> {
+    const c = ensureClient() as unknown as {
+      _subscribe: <R>(method: string, unsubMethod: string, params: unknown[]) => Observable<R>;
+    };
+    return c._subscribe<T>(method, unsubMethod, params);
+  }
+
+  function buildFilter(topics: Uint8Array[]): TopicFilter {
+    return topics.length > 0 ? { matchAny: topics.map(bytesToHex) } : 'any';
   }
 
   const statementStore: StatementStoreAdapter = {
     subscribe(topics: Uint8Array[], callback: (statements: Statement[]) => void): () => void {
-      const s = ensureSdk();
-      const topicHexes = topics.map(bytesToHex);
-      const filter = topicHexes.length > 0 ? { matchAny: topicHexes } : ('any' as const);
-
-      return s.subscribeStatements(
-        filter as never,
-        (sdkStmt: unknown) => {
-          callback([fromSdkStatement(sdkStmt as Record<string, unknown>)]);
-        },
-        error => {
-          console.error('[statement-store] subscription error:', error);
-        },
+      const observable = rpcSubscribe<StatementEvent>(
+        'statement_subscribeStatement',
+        'statement_unsubscribeStatement',
+        [buildFilter(topics)],
       );
+
+      const sub = observable.subscribe({
+        next(event) {
+          if (event.event === 'newStatements') {
+            for (const encoded of event.data.statements) {
+              try {
+                callback([decodeStatement(hexToBytes(encoded))]);
+              } catch {
+                // Skip malformed statements
+              }
+            }
+          }
+        },
+        error(err) {
+          console.error('[statement-store] subscription error:', err);
+        },
+      });
+
+      return () => sub.unsubscribe();
     },
 
     async submit(statement: SignedStatement): Promise<void> {
-      const s = ensureSdk();
-      const result = await s.submit(toSdkStatement(statement) as never);
-      if (result.status === 'new' || result.status === 'known' || result.status === 'knownExpired') {
-        return;
-      }
-      const reason = 'reason' in result ? (result as { reason: string }).reason : '';
-      const error = 'error' in result ? (result as { error: string }).error : '';
-      throw new Error(`Statement ${result.status}: ${reason || error}`);
+      const encoded = encodeStatement(statement);
+      const result = await rpcRequest<{ status: string; reason?: string; error?: string }>('statement_submit', [
+        bytesToHex(encoded),
+      ]);
+      if (!result) return; // null/void response means success
+      const status = result.status;
+      if (status === 'new' || status === 'known' || status === 'knownExpired') return;
+      const detail = result.reason ?? result.error ?? '';
+      throw new Error(`Statement ${status}: ${detail}`);
     },
 
     async query(topics: Uint8Array[]): Promise<Statement[]> {
-      const s = ensureSdk();
-      const topicHexes = topics.map(bytesToHex);
-      const filter = topicHexes.length > 0 ? { matchAny: topicHexes } : ('any' as const);
-      const results = await s.getStatements(filter as never);
-      return results.map(r => fromSdkStatement(r as unknown as Record<string, unknown>));
+      return new Promise<Statement[]>((resolve, reject) => {
+        const statements: Statement[] = [];
+
+        const observable = rpcSubscribe<StatementEvent>(
+          'statement_subscribeStatement',
+          'statement_unsubscribeStatement',
+          [buildFilter(topics)],
+        );
+
+        const sub = observable.subscribe({
+          next(event) {
+            if (event.event === 'newStatements') {
+              for (const encoded of event.data.statements) {
+                try {
+                  statements.push(decodeStatement(hexToBytes(encoded)));
+                } catch {
+                  // Skip malformed statements
+                }
+              }
+              if (event.data.remaining === 0 || event.data.remaining === undefined) {
+                sub.unsubscribe();
+                resolve(statements);
+              }
+            }
+          },
+          error(err) {
+            sub.unsubscribe();
+            reject(err);
+          },
+        });
+      });
     },
   };
 
@@ -181,7 +204,6 @@ export function createChainClient(endpoints: string[], options?: { heartbeatTime
     dispose() {
       client?.destroy();
       client = undefined;
-      sdk = undefined;
     },
   };
 }

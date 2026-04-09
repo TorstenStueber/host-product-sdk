@@ -30,9 +30,8 @@ Runtime dependencies of api-protocol: `scale-ts`, `nanoevents`, `neverthrow`, `@
 
 Runtime dependencies of host (in addition to api-protocol): `@noble/ciphers`, `@noble/hashes`, `@noble/curves` (AES-GCM,
 HKDF, blake2b, P-256 ECDH), `@scure/sr25519` (sr25519 signing), `@polkadot-labs/hdkd-helpers` (BIP-39 mnemonics, HDKD),
-`@polkadot-api/substrate-bindings` (AccountId SS58 codec), `@novasamatech/sdk-statement` (statement-store parachain RPC
-client), `polkadot-api` + `@polkadot-api/ws-provider` (chain client and WebSocket transport), `verifiablejs`
-(Bandersnatch ring-VRF WASM for attestation).
+`@polkadot-api/substrate-bindings` (AccountId SS58 codec), `polkadot-api` + `@polkadot-api/ws-provider` (chain client
+and WebSocket transport), `verifiablejs` (Bandersnatch ring-VRF WASM for attestation).
 
 ---
 
@@ -627,9 +626,9 @@ consumer registration signature, submits `PeopleLite.attest` extrinsic with cust
 
 **`sso/pairingExecutor.ts`**: `createPairingExecutor(config)` — concrete `PairingExecutor` implementing the full QR-code
 handshake: generates mnemonic, derives sr25519 at `//wallet//sso` + P-256 keys, builds SCALE-encoded `HandshakeData`,
-publishes to statement-store topic, waits for mobile response, performs P-256 ECDH to decrypt session credentials.
-When `config.getUnsafeApi` is provided, runs attestation in parallel with the handshake — both must complete before
-the session is returned.
+publishes to statement-store topic, waits for mobile response, performs P-256 ECDH to decrypt session credentials. When
+`config.getUnsafeApi` is provided, runs attestation in parallel with the handshake — both must complete before the
+session is returned.
 
 **`sso/signRequestExecutor.ts`**: `createSignRequestExecutor(config)` — concrete `SignRequestExecutor` implementing
 encrypted sign request round-trips: SCALE-encodes `RemoteMessage` with `SignRequest`, encrypts with AES-GCM session key,
@@ -658,8 +657,13 @@ the People/statement-store parachain. The connection is established on first use
 - `getUnsafeApi()`: polkadot-api unsafe API (for identity resolution via `Resources.Consumers`)
 - `dispose()`: tears down the WebSocket connection
 
-The host app provides just the endpoint URLs (e.g. `['wss://pop3-testnet.parity-lab.parity.io/people']`). Internally
-wraps `@novasamatech/sdk-statement` for statement RPC and `polkadot-api` for typed/untyped storage queries.
+The host app provides just the endpoint URLs (e.g. `['wss://pop3-testnet.parity-lab.parity.io/people']`). Uses
+`polkadot-api`'s `_request`/`_subscribe` escape hatches for direct `statement_submit` and `statement_subscribeStatement`
+RPC access, and the same client's typed/untyped API for storage queries.
+
+**`statementStore/codec.ts`**: SCALE encode/decode for Substrate statements. Statements are encoded as a `Vector` of
+`Variant` fields in strictly ascending index order (proof=0, decryptionKey=1, expiry=2, channel=3, topic1–4=4–7,
+data=8). Only present fields are included. Topics are expanded from an array into individual `topic1`..`topic4` entries.
 
 **`statementStore/constants.ts`**: `PEOPLE_PARACHAIN_ENDPOINTS` — default WebSocket endpoints for the People parachain.
 
