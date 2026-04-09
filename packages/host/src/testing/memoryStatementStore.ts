@@ -5,7 +5,7 @@
  * Replaces the old memoryTransport.
  */
 
-import type { StatementStoreAdapter, Statement, SignedStatement } from './types.js';
+import type { StatementStoreAdapter, Statement, SignedStatement } from '../statementStore/types.js';
 
 type Subscriber = {
   topics: Uint8Array[];

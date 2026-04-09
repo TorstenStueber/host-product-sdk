@@ -96,7 +96,6 @@ export { createChainIdentityProvider } from './auth/identity/chainProvider.js';
 export type { StatementStoreAdapter, Statement, SignedStatement, StatementProof } from './statementStore/types.js';
 export type { ChainClient } from './statementStore/chainClient.js';
 export { createChainClient } from './statementStore/chainClient.js';
-export { createMemoryStatementStore } from './statementStore/memory.js';
 export { PEOPLE_PARACHAIN_ENDPOINTS } from './constants.js';
 
 // ---------------------------------------------------------------------------
@@ -137,3 +136,9 @@ export { createSignRequestExecutor } from './auth/sso/signRequestExecutor.js';
 
 export { setupNestedBridgeDetector } from './nested/detector.js';
 export type { NestedBridgeDetectorOptions } from './nested/detector.js';
+
+// ---------------------------------------------------------------------------
+// Testing utilities
+// ---------------------------------------------------------------------------
+
+export { createMemoryStatementStore } from './testing/memoryStatementStore.js';

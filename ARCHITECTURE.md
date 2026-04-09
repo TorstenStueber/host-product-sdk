@@ -665,8 +665,8 @@ Uses `polkadot-api`'s `_request`/`_subscribe` escape hatches for direct `stateme
 `Variant` fields in strictly ascending index order (proof=0, decryptionKey=1, expiry=2, channel=3, topic1–4=4–7,
 data=8). Only present fields are included. Topics are expanded from an array into individual `topic1`..`topic4` entries.
 
-**`statementStore/memory.ts`**: `createMemoryStatementStore()` — in-memory adapter for testing. All adapters from the
-same bus see each other's statements.
+**`testing/memoryStatementStore.ts`**: `createMemoryStatementStore()` — in-memory `StatementStoreAdapter` for testing.
+All adapters created from the same factory share a single in-memory bus.
 
 ### 2.6 Webview Port
 
