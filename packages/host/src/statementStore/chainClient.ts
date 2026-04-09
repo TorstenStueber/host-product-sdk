@@ -1,17 +1,18 @@
 /**
  * Lazy chain client for the People/statement-store parachain.
  *
- * Creates a single WebSocket connection on first use. Provides both
- * the statement store adapter (for SSO and host API handlers) and
- * raw RPC access (for identity resolution).
+ * Creates a polkadot-api client from the caller-provided JsonRpcProvider
+ * on first use. Provides both the statement store adapter (for SSO and
+ * host API handlers) and raw RPC access (for identity resolution).
  *
- * Uses the polkadot-api client's `_request` / `_subscribe` escape
- * hatches for direct RPC access to the statement-store endpoints
- * (`statement_submit`, `statement_subscribeStatement`).
+ * The provider is transport-agnostic: it can be backed by a WebSocket
+ * connection (via `getWsProvider`) or an in-process Smoldot light client
+ * (via `getSmProvider`). Both support the `statement_submit` and
+ * `statement_subscribeStatement` RPCs.
  */
 
-import { getWsProvider } from '@polkadot-api/ws-provider';
 import { createClient } from 'polkadot-api';
+import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 import { bytesToHex, hexToBytes } from '@polkadot/api-protocol';
 
 import type { StatementStoreAdapter, Statement, SignedStatement } from './types.js';
@@ -53,28 +54,25 @@ export type ChainClient = {
    */
   getUnsafeApi(): unknown;
 
-  /** Dispose the WebSocket connection and all resources. */
+  /** Dispose the connection and all resources. */
   dispose(): void;
 };
 
 /**
- * Create a lazy chain client from WebSocket endpoints.
+ * Create a lazy chain client from a JSON-RPC provider.
  *
- * The connection is established on first use (first subscribe, submit,
- * query, or getUnsafeApi call). Both the statement store and identity
- * resolution share this single connection.
+ * The provider can be any `JsonRpcProvider` — a WebSocket connection
+ * (via `getWsProvider`) or a Smoldot light client (via `getSmProvider`).
+ * The polkadot-api client is created on first use. Both the statement
+ * store and identity resolution share this single connection.
  *
- * @param endpoints - WebSocket URLs for the People/statement-store parachain.
- * @param options - Optional configuration.
+ * @param provider - A `JsonRpcProvider` connected to the People parachain.
  */
-export function createChainClient(endpoints: string[], options?: { heartbeatTimeout?: number }): ChainClient {
+export function createChainClient(provider: JsonRpcProvider): ChainClient {
   let client: ReturnType<typeof createClient> | undefined;
 
   function ensureClient(): ReturnType<typeof createClient> {
     if (client) return client;
-    const provider = getWsProvider(endpoints, {
-      heartbeatTimeout: options?.heartbeatTimeout,
-    });
     client = createClient(provider);
     return client;
   }

@@ -30,15 +30,17 @@ export type HostSdkConfig = {
 
   // -- Statement store / SSO -------------------------------------------------
   /**
-   * WebSocket endpoints for the People/statement-store parachain.
+   * JSON-RPC provider for the People/statement-store parachain.
+   *
+   * Can be any `JsonRpcProvider` — a WebSocket connection (via
+   * `getWsProvider` from `@polkadot-api/ws-provider`) or a Smoldot
+   * light client (via `getSmProvider` from `@polkadot-api/sm-provider`).
+   *
    * When provided, the SDK creates a ChainClient and wires SSO pairing,
    * remote signing, identity resolution, and statement store handlers
    * automatically.
    */
-  statementStoreEndpoints?: string[];
-
-  /** Heartbeat timeout for the statement store WebSocket. Default: 120000 (2 min). */
-  statementStoreHeartbeatTimeout?: number;
+  statementStoreProvider?: JsonRpcProvider;
 
   /** URL to the host metadata JSON (shown to the mobile wallet during pairing). */
   pairingMetadata?: string;
@@ -145,7 +147,7 @@ export type HostSdk = {
 
   /**
    * Start QR-code-based pairing.
-   * Requires statementStoreEndpoints to be configured.
+   * Requires statementStoreProvider to be configured.
    * No-op if already paired or pairing in progress.
    */
   pair(): void;

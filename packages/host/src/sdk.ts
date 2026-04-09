@@ -42,10 +42,8 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
   let identityResolver: IdentityResolver | undefined;
   let remoteSigner: RemoteSigner | undefined;
 
-  if (config.statementStoreEndpoints && config.statementStoreEndpoints.length > 0) {
-    chainClient = createChainClient(config.statementStoreEndpoints, {
-      heartbeatTimeout: config.statementStoreHeartbeatTimeout ?? 120_000,
-    });
+  if (config.statementStoreProvider) {
+    chainClient = createChainClient(config.statementStoreProvider);
 
     const storage = createLocalStorageAdapter(config.appId + ':sso:');
     const sessionStore = createSsoSessionStore(storage);

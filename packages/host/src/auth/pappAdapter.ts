@@ -14,8 +14,8 @@ import type { UserSession, Identity } from './authManager.js';
 export type PappAdapterConfig = {
   appId: string;
   metadata: string;
-  /** Statement store endpoints for identity resolution. */
-  statementStoreEndpoints?: string[];
+  /** JSON-RPC provider for the People/statement-store parachain. */
+  statementStoreProvider?: unknown;
 };
 
 export type PairingStatus =

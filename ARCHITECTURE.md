@@ -30,8 +30,8 @@ Runtime dependencies of api-protocol: `scale-ts`, `nanoevents`, `neverthrow`, `@
 
 Runtime dependencies of host (in addition to api-protocol): `@noble/ciphers`, `@noble/hashes`, `@noble/curves` (AES-GCM,
 HKDF, blake2b, P-256 ECDH), `@scure/sr25519` (sr25519 signing), `@polkadot-labs/hdkd-helpers` (BIP-39 mnemonics, HDKD),
-`@polkadot-api/substrate-bindings` (AccountId SS58 codec), `polkadot-api` + `@polkadot-api/ws-provider` (chain client
-and WebSocket transport), `verifiablejs` (Bandersnatch ring-VRF WASM for attestation).
+`@polkadot-api/substrate-bindings` (AccountId SS58 codec), `@polkadot-api/json-rpc-provider` (transport interface),
+`polkadot-api` (chain client), `verifiablejs` (Bandersnatch ring-VRF WASM for attestation).
 
 ---
 
@@ -650,16 +650,16 @@ Unified statement-store parachain adapter used by both SSO (pairing/signing) and
 `submit(statement)`, and `query(topics)`. `Statement` and `SignedStatement` types with tagged `StatementProof` union
 (sr25519/ed25519/ecdsa).
 
-**`statementStore/chainClient.ts`**: `createChainClient(endpoints, options?)` — creates a lazy WebSocket connection to
-the People/statement-store parachain. The connection is established on first use. Returns `ChainClient` with:
+**`statementStore/chainClient.ts`**: `createChainClient(provider)` — creates a lazy polkadot-api client from any
+`JsonRpcProvider`. The provider is transport-agnostic: it can be a WebSocket connection (via `getWsProvider`) or a
+Smoldot light client (via `getSmProvider`). The polkadot-api client is created on first use. Returns `ChainClient` with:
 
 - `statementStore`: the `StatementStoreAdapter` (for SSO and host API handlers)
 - `getUnsafeApi()`: polkadot-api unsafe API (for identity resolution via `Resources.Consumers`)
-- `dispose()`: tears down the WebSocket connection
+- `dispose()`: tears down the connection
 
-The host app provides just the endpoint URLs (e.g. `['wss://pop3-testnet.parity-lab.parity.io/people']`). Uses
-`polkadot-api`'s `_request`/`_subscribe` escape hatches for direct `statement_submit` and `statement_subscribeStatement`
-RPC access, and the same client's typed/untyped API for storage queries.
+Uses `polkadot-api`'s `_request`/`_subscribe` escape hatches for direct `statement_submit` and
+`statement_subscribeStatement` RPC access, and the same client's typed/untyped API for storage queries.
 
 **`statementStore/codec.ts`**: SCALE encode/decode for Substrate statements. Statements are encoded as a `Vector` of
 `Variant` fields in strictly ascending index order (proof=0, decryptionKey=1, expiry=2, channel=3, topic1–4=4–7,
@@ -686,7 +686,7 @@ Auto-creates `createHostFacade` + `wireAllHandlers` bridge for each nested dApp.
 ```typescript
 const sdk = createHostSdk({
   appId: 'dot.li',
-  statementStoreEndpoints: ['wss://pop3-testnet.parity-lab.parity.io/people'],
+  statementStoreProvider: getWsProvider(PEOPLE_PARACHAIN_ENDPOINTS),
   pairingMetadata: 'https://dot.li/metadata.json',
   chainProvider: genesisHash => getSmoldotProvider(genesisHash),
 });
@@ -696,9 +696,9 @@ product.dispose();
 sdk.dispose();
 ```
 
-When `statementStoreEndpoints` is provided, `createHostSdk` internally creates:
+When `statementStoreProvider` is provided, `createHostSdk` internally creates:
 
-- `ChainClient` (single WebSocket connection to the People/statement-store parachain)
+- `ChainClient` from the provider (transport-agnostic — works with WebSocket or Smoldot)
 - `SsoManager` with `PairingExecutor`, `SsoSessionStore`, and `SecretStore` (for session reconnection)
 - `IdentityResolver` backed by `createChainIdentityProvider` (queries `Resources.Consumers`)
 - Statement store handlers are wired to the `ChainClient`'s adapter
@@ -714,8 +714,8 @@ Statement store `handleStatementStoreCreateProof` is wired to sign with the sr25
 
 `clearSession()` calls `ssoManager.unpair()` to clear both session metadata and secrets.
 
-**`types.ts`**: `HostSdkConfig` with all options: `appId`, `statementStoreEndpoints`, `pairingMetadata`,
-`chainProvider`, signing callbacks, permission callbacks, UI callbacks.
+**`types.ts`**: `HostSdkConfig` with all options: `appId`, `statementStoreProvider`, `pairingMetadata`, `chainProvider`,
+signing callbacks, permission callbacks, UI callbacks.
 
 **`sso/secretStore.ts`**: `createSecretStore(storage)` — persists `{ ssSecret, encrSecret, entropy }` keyed by session
 ID. Used by the manager to persist secrets on pairing and load them on `restoreSession()`.
