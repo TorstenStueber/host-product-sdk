@@ -564,8 +564,12 @@ manager to watch for session changes.
 `clearSession()`). Any state can go to `error`. Pub-sub via `subscribe(callback)`. `getSession()` returns session if
 authenticated.
 
-**`crypto.ts`**: `deriveProductPublicKey(rootPublicKey, productId, derivationIndex)`: HDKD soft derivation through
-junctions `['product', productId, derivationIndex]`.
+**`hdkd.ts`**: Sr25519 hierarchical deterministic key derivation, wrapping `@polkadot-labs/hdkd-helpers`' `createDerive`
+for path parsing and chain code encoding. Two functions: `sr25519DeriveSecret(miniSecret, path)` for secret-key
+derivation (hard + soft junctions) and `sr25519DerivePublicKey(publicKey, path)` for public-key derivation (soft only).
+
+**`crypto.ts`**: `deriveProductPublicKey(rootPublicKey, productId, derivationIndex)`: thin wrapper that builds the soft
+derivation path `/product/{productId}/{derivationIndex}` and delegates to `sr25519DerivePublicKey`.
 
 **`pappAdapter.ts`**: Stub interface for QR-code pairing (to be ported from old host-papp).
 

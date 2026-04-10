@@ -75,7 +75,9 @@ export type {
 export { createAuthManager } from './auth/authManager.js';
 export type { AuthManager } from './auth/authManager.js';
 
-export { deriveProductPublicKey, injectHDKD } from './auth/crypto.js';
+export { deriveProductPublicKey } from './auth/crypto.js';
+
+export { sr25519DeriveSecret, sr25519DerivePublicKey } from './auth/hdkd.js';
 
 export { createPappAdapterStub } from './auth/pappAdapter.js';
 export type { PappAdapter, PappAdapterConfig, PairingStatus, AttestationStatus } from './auth/pappAdapter.js';
