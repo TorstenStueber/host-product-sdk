@@ -131,11 +131,52 @@ export function createP256SharedSecret(secret: Uint8Array, publicKey: Uint8Array
 // ---------------------------------------------------------------------------
 
 /**
- * Derive a 32-byte account ID from a sr25519 public key.
- * This is blake2b_256(publicKey).
+ * Create a 32-byte account ID from a sr25519 public key.
+ *
+ * For sr25519 (and ed25519), the AccountId IS the raw 32-byte public key —
+ * no hashing. This matches standard Substrate behavior and the
+ * triangle-js-sdks implementation.
  */
 export function createAccountId(publicKey: Uint8Array): Uint8Array {
-  return blake2b(publicKey, { dkLen: 32 });
+  return publicKey.slice(0, 32);
+}
+
+// ---------------------------------------------------------------------------
+// Session ID derivation (matches triangle-js-sdks statement-store)
+// ---------------------------------------------------------------------------
+
+const pinSeparator = textEncoder.encode('/');
+
+/**
+ * Derive a session ID from a shared secret and two session accounts.
+ *
+ * Formula: khash(sharedSecret, "session" || accountA || accountB || "/" || "/")
+ * The account order determines direction: outgoing vs incoming.
+ *
+ * Pins are currently unused (always "/"), but the separator is included
+ * for wire compatibility with triangle-js-sdks.
+ */
+export function createSessionId(sharedSecret: Uint8Array, accountIdA: Uint8Array, accountIdB: Uint8Array): Uint8Array {
+  return khash(
+    sharedSecret,
+    concatBytes(textEncoder.encode('session'), accountIdA, accountIdB, pinSeparator, pinSeparator),
+  );
+}
+
+/**
+ * Derive a request channel from a session ID.
+ * channel = khash(sessionId, "request")
+ */
+export function createRequestChannel(sessionId: Uint8Array): Uint8Array {
+  return khash(sessionId, textEncoder.encode('request'));
+}
+
+/**
+ * Derive a response channel from a session ID.
+ * channel = khash(sessionId, "response")
+ */
+export function createResponseChannel(sessionId: Uint8Array): Uint8Array {
+  return khash(sessionId, textEncoder.encode('response'));
 }
 
 // ---------------------------------------------------------------------------

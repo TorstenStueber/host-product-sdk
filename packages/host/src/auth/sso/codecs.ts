@@ -121,6 +121,49 @@ export const SigningResponseCodec = Struct({
 });
 
 // ---------------------------------------------------------------------------
+// Statement data (session-level wrapper from triangle-js-sdks statement-store)
+// ---------------------------------------------------------------------------
+
+const ResponseCode = enhanceCodec<number, string>(
+  u8,
+  (status: string) => {
+    switch (status) {
+      case 'success':
+        return 0;
+      case 'decryptionFailed':
+        return 1;
+      case 'decodingFailed':
+        return 2;
+      default:
+        return 255;
+    }
+  },
+  (code: number) => {
+    switch (code) {
+      case 0:
+        return 'success';
+      case 1:
+        return 'decryptionFailed';
+      case 2:
+        return 'decodingFailed';
+      default:
+        return 'unknown';
+    }
+  },
+);
+
+export const StatementDataCodec = Enum({
+  request: Struct({
+    requestId: str,
+    data: Vector(Bytes()),
+  }),
+  response: Struct({
+    requestId: str,
+    responseCode: ResponseCode,
+  }),
+});
+
+// ---------------------------------------------------------------------------
 // Remote message (versioned envelope for SSO channel)
 // ---------------------------------------------------------------------------
 

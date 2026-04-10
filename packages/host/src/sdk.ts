@@ -114,7 +114,6 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
       signer,
       remoteAccountId: state.session.remoteAccountId,
       localAccountId,
-      sessionId: localAccountId, // session topic derived from local account
     });
 
     remoteSigner = createRemoteSigner({
