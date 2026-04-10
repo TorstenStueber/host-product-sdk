@@ -12,14 +12,19 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { blake2b } from '@noble/hashes/blake2.js';
 import { randomBytes } from '@noble/hashes/utils.js';
 import { p256 } from '@noble/curves/nist.js';
-import { entropyToMiniSecret, generateMnemonic, mnemonicToEntropy } from '@polkadot-labs/hdkd-helpers';
+import {
+  createDerive,
+  sr25519,
+  entropyToMiniSecret,
+  generateMnemonic,
+  mnemonicToEntropy,
+} from '@polkadot-labs/hdkd-helpers';
 import {
   HDKD,
   getPublicKey as sr25519GetPublicKey,
   secretFromSeed as sr25519SecretFromSeed,
   sign as sr25519Sign,
 } from '@scure/sr25519';
-import { str } from 'scale-ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -87,34 +92,41 @@ export function khash(secret: Uint8Array, message: Uint8Array): Uint8Array {
 
 // ---------------------------------------------------------------------------
 // Sr25519 key derivation
+//
+// Uses hdkd-helpers' createDerive for path parsing and chain code encoding
+// (correctly handles numeric path segments as u32). We provide a custom
+// derive function because we need the raw 64-byte secret key for
+// persistence in the SecretStore — hdkd's sr25519Derive only exposes
+// { publicKey, sign }.
 // ---------------------------------------------------------------------------
 
-function createChainCode(derivation: string): Uint8Array {
-  const chainCode = new Uint8Array(32);
-  chainCode.set(str.enc(derivation));
-  return chainCode;
-}
-
-function parseDerivations(derivationsStr: string): [type: 'hard' | 'soft', code: string][] {
-  const DERIVATION_RE = /(\/{1,2})([^/]+)/g;
-  const derivations: [type: 'hard' | 'soft', code: string][] = [];
-  for (const [, type, code] of derivationsStr.matchAll(DERIVATION_RE)) {
-    if (code) {
-      derivations.push([type === '//' ? 'hard' : 'soft', code]);
-    }
-  }
-  return derivations;
-}
+/** Like hdkd's sr25519Derive, but returns the raw secret key. */
+const sr25519DeriveWithSecret: (
+  seed: Uint8Array,
+  curve: {
+    getPublicKey(key: Uint8Array | string): Uint8Array;
+    sign(msg: Uint8Array | string, key: Uint8Array | string): Uint8Array;
+  },
+  derivations: [type: 'hard' | 'soft', chainCode: Uint8Array][],
+) => { secret: Uint8Array; publicKey: Uint8Array; sign(msg: Uint8Array | string): Uint8Array } = (
+  seed,
+  curve,
+  derivations,
+) => {
+  const secret = derivations.reduce(
+    (key, [type, chainCode]) => (type === 'hard' ? HDKD.secretHard : HDKD.secretSoft)(key, chainCode),
+    sr25519SecretFromSeed(seed),
+  );
+  return { secret, publicKey: curve.getPublicKey(secret) as Uint8Array, sign: msg => curve.sign(msg, secret) };
+};
 
 export function createSr25519Secret(entropy: Uint8Array, derivation?: string): Uint8Array {
   const miniSecret = entropyToMiniSecret(entropy);
-  const secret = sr25519SecretFromSeed(miniSecret);
-  if (!derivation) return secret;
+  if (!derivation) return sr25519SecretFromSeed(miniSecret);
 
-  return parseDerivations(derivation).reduce((sec, [type, code]) => {
-    const chainCode = createChainCode(code);
-    return type === 'hard' ? HDKD.secretHard(sec, chainCode) : HDKD.secretSoft(sec, chainCode);
-  }, secret);
+  // createDerive uses hdkd-helpers' parseDerivations + createChainCode internally
+  const derive = createDerive({ seed: miniSecret, curve: sr25519, derive: sr25519DeriveWithSecret as never });
+  return (derive(derivation) as unknown as { secret: Uint8Array }).secret;
 }
 
 export function deriveSr25519PublicKey(secret: Uint8Array): Uint8Array {
