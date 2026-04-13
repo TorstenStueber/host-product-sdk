@@ -2,10 +2,11 @@
  * Concrete PairingExecutor implementation.
  *
  * Implements the QR-code-based pairing handshake following triangle-js-sdks'
- * wire format exactly. Generates a mnemonic, derives sr25519 and P-256 keys,
+ * wire format exactly. Generates fresh entropy, derives sr25519 and P-256 keys,
  * publishes the handshake payload, and waits for the mobile wallet's response.
  */
 
+import { randomBytes } from '@noble/hashes/utils.js';
 import type { StatementStoreAdapter } from '../../statementStore/types.js';
 import type { PairingExecutor, PairingResult } from './manager.js';
 import type { PersistedSessionMeta } from './transport.js';
@@ -18,9 +19,7 @@ import {
   createSr25519Secret,
   deriveHandshakeTopic,
   deriveSr25519PublicKey,
-  generateMnemonic,
   getP256PublicKey,
-  mnemonicToEntropy,
 } from './crypto.js';
 import { AccountId } from '@polkadot-api/substrate-bindings';
 import { runAttestation } from './attestation.js';
@@ -76,9 +75,10 @@ export function createPairingExecutor(config: PairingExecutorConfig): PairingExe
       onQrPayload: (payload: string) => void,
       signal: AbortSignal,
     ): Promise<PairingResult | undefined> {
-      // 1. Generate fresh mnemonic and derive keys
-      const mnemonic = generateMnemonic();
-      const entropy = mnemonicToEntropy(mnemonic);
+      // 1. Generate fresh 16 bytes of entropy and derive keys
+      //    (equivalent to mnemonicToEntropy(generateMnemonic()) — the mnemonic
+      //    is never displayed or stored, so the BIP-39 round-trip is redundant)
+      const entropy = randomBytes(16);
       const ssSecret = createSr25519Secret(entropy, '//wallet//sso');
       const ssPublicKey = deriveSr25519PublicKey(ssSecret);
       const accountId = createAccountId(ssPublicKey);
