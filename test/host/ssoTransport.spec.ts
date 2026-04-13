@@ -38,7 +38,7 @@ function makeMeta(id: string = 'session-1'): PersistedSessionMeta {
     sessionId: id,
     address: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
     displayName: 'Test Device',
-    remotePublicKey: new Uint8Array(32).fill(0xaa),
+    sessionKey: new Uint8Array(32).fill(0xaa),
     remoteAccountId: new Uint8Array(32).fill(0xbb),
   };
 }
@@ -231,9 +231,9 @@ describe('createSsoSessionStore', () => {
     await store.save(meta);
     const loaded = await store.load();
 
-    expect(loaded?.remotePublicKey).toBeInstanceOf(Uint8Array);
+    expect(loaded?.sessionKey).toBeInstanceOf(Uint8Array);
     expect(loaded?.remoteAccountId).toBeInstanceOf(Uint8Array);
-    expect(loaded?.remotePublicKey).toEqual(new Uint8Array(32).fill(0xaa));
+    expect(loaded?.sessionKey).toEqual(new Uint8Array(32).fill(0xaa));
     expect(loaded?.remoteAccountId).toEqual(new Uint8Array(32).fill(0xbb));
   });
 });

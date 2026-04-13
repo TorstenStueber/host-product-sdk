@@ -14,7 +14,7 @@ type SerializedMeta = {
   sessionId: string;
   address: string;
   displayName: string;
-  remotePublicKey: number[];
+  sessionKey: number[];
   remoteAccountId: number[];
 };
 
@@ -23,7 +23,7 @@ function serialize(meta: PersistedSessionMeta): Uint8Array {
     sessionId: meta.sessionId,
     address: meta.address,
     displayName: meta.displayName,
-    remotePublicKey: Array.from(meta.remotePublicKey),
+    sessionKey: Array.from(meta.sessionKey),
     remoteAccountId: Array.from(meta.remoteAccountId),
   };
   return new TextEncoder().encode(JSON.stringify(obj));
@@ -36,7 +36,7 @@ function deserialize(data: Uint8Array): PersistedSessionMeta | undefined {
       sessionId: obj.sessionId,
       address: obj.address,
       displayName: obj.displayName,
-      remotePublicKey: new Uint8Array(obj.remotePublicKey),
+      sessionKey: new Uint8Array(obj.sessionKey),
       remoteAccountId: new Uint8Array(obj.remoteAccountId),
     };
   } catch {

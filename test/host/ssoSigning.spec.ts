@@ -32,7 +32,7 @@ function makeMeta(): PersistedSessionMeta {
     sessionId: 'sign-session',
     address: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
     displayName: 'Signer',
-    remotePublicKey: new Uint8Array(32).fill(0xaa),
+    sessionKey: new Uint8Array(32).fill(0xaa),
     remoteAccountId: new Uint8Array(32).fill(0xbb),
   };
 }

@@ -24,7 +24,7 @@ function makeMeta(id: string = 'session-1'): PersistedSessionMeta {
     sessionId: id,
     address: '5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY',
     displayName: 'Test Device',
-    remotePublicKey: new Uint8Array(32).fill(0xaa),
+    sessionKey: new Uint8Array(32).fill(0xaa),
     remoteAccountId: new Uint8Array(32).fill(0xbb),
   };
 }

@@ -708,9 +708,9 @@ When `statementStoreProvider` is provided, `createHostSdk` internally creates:
 The SSO manager auto-restores persisted sessions on creation. SSO state changes are synced to the `AuthManager`.
 
 On pairing success or session restore, the SDK builds a `RemoteSigner` from the persisted secrets (derives sr25519
-signer from `ssSecret`, uses `remotePublicKey` as AES session key). If the host app does not provide `onSignPayload` /
-`onSignRaw` callbacks, the SDK defaults to routing sign requests through the `RemoteSigner` → `SignRequestExecutor` →
-encrypted statement-store channel → mobile wallet.
+signer from `ssSecret`, uses the persisted `sessionKey` as the AES session key). If the host app does not provide
+`onSignPayload` / `onSignRaw` callbacks, the SDK defaults to routing sign requests through the `RemoteSigner` →
+`SignRequestExecutor` → encrypted statement-store channel → mobile wallet.
 
 Statement store `handleStatementStoreCreateProof` is wired to sign with the sr25519 key when available.
 

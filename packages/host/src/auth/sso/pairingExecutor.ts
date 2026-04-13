@@ -161,7 +161,7 @@ export function createPairingExecutor(config: PairingExecutorConfig): PairingExe
                 sessionId: `${toHex(accountId)}_${toHex(walletAccountId)}`,
                 address,
                 displayName: address.slice(0, 8) + '...' + address.slice(-6),
-                remotePublicKey: sharedSecret,
+                sessionKey: sharedSecret,
                 remoteAccountId: walletAccountId,
               };
 

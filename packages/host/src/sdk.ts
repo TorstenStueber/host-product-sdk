@@ -96,11 +96,8 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
     const ssPublicKey = deriveSr25519PublicKey(secrets.ssSecret);
     const localAccountId = createAccountId(ssPublicKey);
 
-    // The session key is the P-256 shared secret between our encrSecret
-    // and the remote's public key (stored in remotePublicKey field).
-    // Note: remotePublicKey in PersistedSessionMeta IS the shared secret
-    // (already derived during pairing), so we use it directly.
-    const sessionKey = state.session.remotePublicKey;
+    // The session key is the P-256 shared secret derived during pairing.
+    const sessionKey = state.session.sessionKey;
 
     const signer = {
       publicKey: ssPublicKey,

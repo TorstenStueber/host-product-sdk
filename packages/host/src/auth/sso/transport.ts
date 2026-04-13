@@ -48,8 +48,8 @@ export type PersistedSessionMeta = {
   address: string;
   /** Human-readable name shown during pairing (e.g. device name). */
   displayName: string;
-  /** The mobile wallet's sr25519 public key (32 bytes). */
-  remotePublicKey: Uint8Array;
+  /** AES session key (32 bytes) — the P-256 ECDH shared secret derived during pairing. */
+  sessionKey: Uint8Array;
   /** The mobile wallet's sr25519 account ID (32 bytes). */
   remoteAccountId: Uint8Array;
 };
