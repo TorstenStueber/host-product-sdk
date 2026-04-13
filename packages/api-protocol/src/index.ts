@@ -190,7 +190,7 @@ export { delay, promiseWithResolvers, composeAction, extractErrorMessage } from 
 // ===========================================================================
 
 export type { HexString } from './shared/codec/scale/primitives.js';
-export { toHexString, bytesToHex, hexToBytes } from './shared/codec/scale/primitives.js';
+export { toHexString, bytesToHex, hexToBytes, Hex, OptionBool } from './shared/codec/scale/primitives.js';
 
 export { ok, err, okAsync, errAsync, Result, ResultAsync } from 'neverthrow';
 export type { Ok, Err } from 'neverthrow';
