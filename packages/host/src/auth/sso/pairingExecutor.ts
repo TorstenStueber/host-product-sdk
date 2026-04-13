@@ -149,20 +149,20 @@ export function createPairingExecutor(config: PairingExecutorConfig): PairingExe
               const decrypted = encryption.decrypt(encrypted);
 
               // 10. Extract remote P-256 public key and account ID
-              const [pappEncrPublicKey, pappAccountId] = HandshakeResponseSensitiveData.dec(decrypted);
+              const [walletEncrPublicKey, walletAccountId] = HandshakeResponseSensitiveData.dec(decrypted);
 
               // 11. Derive the shared secret for the session
-              const sharedSecret = createP256SharedSecret(encrSecret, pappEncrPublicKey);
+              const sharedSecret = createP256SharedSecret(encrSecret, walletEncrPublicKey);
 
               // 12. Build session metadata
-              const address = accountIdCodec.dec(pappAccountId);
+              const address = accountIdCodec.dec(walletAccountId);
 
               const session: PersistedSessionMeta = {
-                sessionId: `${toHex(accountId)}_${toHex(pappAccountId)}`,
+                sessionId: `${toHex(accountId)}_${toHex(walletAccountId)}`,
                 address,
                 displayName: address.slice(0, 8) + '...' + address.slice(-6),
                 remotePublicKey: sharedSecret,
-                remoteAccountId: pappAccountId,
+                remoteAccountId: walletAccountId,
               };
 
               unsub();
