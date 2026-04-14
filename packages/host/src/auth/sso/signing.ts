@@ -10,39 +10,15 @@
 
 import type { StatementStoreAdapter } from '../../statementStore/types.js';
 import type { SsoManager } from './manager.js';
+import type { SigningPayloadRequest, SigningRawRequest, SigningPayloadResponseData } from './codecs.js';
 
 // ---------------------------------------------------------------------------
-// Sign request types (protocol-level, before SCALE encoding)
+// Sign request/response types (derived from SCALE codecs)
 // ---------------------------------------------------------------------------
 
-export type RemoteSignPayloadRequest = {
-  address: string;
-  blockHash: string;
-  blockNumber: string;
-  era: string;
-  genesisHash: string;
-  method: string;
-  nonce: string;
-  specVersion: string;
-  tip: string;
-  transactionVersion: string;
-  signedExtensions: string[];
-  version: number;
-  assetId?: string;
-  metadataHash?: string;
-  mode?: number;
-  withSignedTransaction?: boolean;
-};
-
-export type RemoteSignRawRequest = {
-  address: string;
-  data: { tag: 'Bytes'; value: Uint8Array } | { tag: 'Payload'; value: string };
-};
-
-export type RemoteSignResult = {
-  signature: Uint8Array;
-  signedTransaction?: Uint8Array | string;
-};
+export type RemoteSignPayloadRequest = SigningPayloadRequest;
+export type RemoteSignRawRequest = SigningRawRequest;
+export type RemoteSignResult = SigningPayloadResponseData;
 
 // ---------------------------------------------------------------------------
 // Sign request executor (injected crypto/framing)

@@ -146,7 +146,7 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
   // Helper: check approval gate, then route through remote signer
   async function approveAndRemoteSign(
     payload: unknown,
-    doSign: () => Promise<{ signature: Uint8Array; signedTransaction?: Uint8Array | string }>,
+    doSign: () => Promise<{ signature: Uint8Array; signedTransaction: Uint8Array | undefined }>,
   ): Promise<SigningResult> {
     if (config.onSignApproval) {
       const approved = await config.onSignApproval(payload as never);
@@ -157,11 +157,7 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
     const result = await doSign();
     return {
       signature: bytesToHex(result.signature) as `0x${string}`,
-      signedTransaction: result.signedTransaction
-        ? result.signedTransaction instanceof Uint8Array
-          ? (bytesToHex(result.signedTransaction) as `0x${string}`)
-          : (result.signedTransaction as `0x${string}`)
-        : undefined,
+      signedTransaction: result.signedTransaction ? (bytesToHex(result.signedTransaction) as `0x${string}`) : undefined,
     };
   }
 

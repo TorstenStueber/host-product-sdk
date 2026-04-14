@@ -132,3 +132,14 @@ export const RemoteMessageCodec = Struct({
     }),
   }),
 });
+
+// ---------------------------------------------------------------------------
+// Derived types (inferred from codecs via CodecType)
+// ---------------------------------------------------------------------------
+
+import type { CodecType } from 'scale-ts';
+
+export type SigningPayloadRequest = CodecType<typeof SigningPayloadRequestCodec>;
+export type SigningRawRequest = CodecType<typeof SigningRawRequestCodec>;
+export type SigningPayloadResponseData = CodecType<typeof SigningPayloadResponseDataCodec>;
+export type SigningResponse = CodecType<typeof SigningResponseCodec>;
