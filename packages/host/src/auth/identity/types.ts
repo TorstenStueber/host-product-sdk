@@ -15,8 +15,6 @@ export type ResolvedIdentity = {
   liteUsername: string;
   /** Full display name if available. */
   fullUsername?: string;
-  /** Optional avatar URL. */
-  avatarUrl?: string;
   /** Chain-specific identity fields. */
   chainIdentity?: Record<string, unknown>;
 };
