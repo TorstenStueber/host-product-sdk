@@ -95,6 +95,36 @@ export type Transport = {
     callback: (payload: ReceiveCodecType<M>) => void,
   ): Subscription;
 
+  /**
+   * Register a handler for a subscription method.
+   *
+   * Each time a `start` message arrives for `method`, `handler` is invoked
+   * with:
+   *
+   * - `params`: the versioned start payload.
+   * - `send`: pushes a value to the subscriber. Safe to call repeatedly until
+   *   the subscription is terminated.
+   * - `interrupt`: terminates the subscription from the producer side. Posts
+   *   an `interrupt` message to the consumer and triggers the handler's
+   *   cleanup (see below). Idempotent — extra calls after the first are
+   *   ignored.
+   *
+   * `handler` must return a cleanup function. The transport guarantees the
+   * cleanup runs exactly once, whichever of the three termination paths is
+   * taken:
+   *
+   * 1. The consumer sends `stop` (e.g. the subscriber unsubscribed).
+   * 2. The handler calls `interrupt()` synchronously during its own
+   *    invocation.
+   * 3. The handler calls `interrupt()` asynchronously after it returned.
+   *
+   * Handlers should put **all** teardown logic in the returned cleanup rather
+   * than performing it inline before calling `interrupt()` — the transport
+   * will invoke it for them.
+   *
+   * @returns A function that unregisters the handler and runs cleanup for
+   *   every in-flight subscription created by it.
+   */
   handleSubscription<M extends SubscriptionMethod>(
     method: M,
     handler: (
@@ -444,10 +474,19 @@ export function createTransport(options: CreateTransportOptions): Transport {
           value => {
             transport.postMessage(requestId, { tag: receiveAction, value });
           },
-          // interrupt callback
+          // interrupt callback — idempotent. When invoked synchronously during
+          // handler(), the outer `if (interrupted)` branch runs the cleanup.
+          // When invoked asynchronously, the stored cleanup is pulled from the
+          // map and invoked here so the handler never has to tear itself down
+          // manually.
           () => {
+            if (interrupted) return;
             interrupted = true;
-            subscriptions.delete(requestId);
+            const storedUnsub = subscriptions.get(requestId);
+            if (storedUnsub) {
+              subscriptions.delete(requestId);
+              storedUnsub();
+            }
             transport.postMessage(requestId, { tag: interruptAction, value: undefined });
           },
         );
