@@ -5,7 +5,7 @@
  * concurrent request deduplication, and error handling.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createIdentityResolver } from '@polkadot/host';
 import type { IdentityProvider, ResolvedIdentity } from '@polkadot/host';
 

@@ -57,8 +57,8 @@ describe('createMemoryStatementStore', () => {
     await transport.submit(makeStatement(1, new Uint8Array([42])));
 
     expect(callback).toHaveBeenCalledTimes(1);
-    expect(callback.mock.calls[0][0]).toHaveLength(1);
-    expect(callback.mock.calls[0][0][0].data).toEqual(new Uint8Array([42]));
+    expect(callback.mock.calls[0]![0]).toHaveLength(1);
+    expect(callback.mock.calls[0]![0]![0].data).toEqual(new Uint8Array([42]));
   });
 
   it('does not deliver statements to non-matching subscribers', async () => {
@@ -82,7 +82,7 @@ describe('createMemoryStatementStore', () => {
     await host.submit(makeStatement(1, new Uint8Array([99])));
 
     expect(callback).toHaveBeenCalledTimes(1);
-    expect(callback.mock.calls[0][0][0].data).toEqual(new Uint8Array([99]));
+    expect(callback.mock.calls[0]![0]![0].data).toEqual(new Uint8Array([99]));
   });
 
   it('unsubscribe stops delivery', async () => {
@@ -121,7 +121,7 @@ describe('createMemoryStatementStore', () => {
     transport.subscribe([topic(1)], callback);
     await transport.submit(makeStatement(1, new Uint8Array([1])));
 
-    const received = callback.mock.calls[0][0][0];
+    const received = callback.mock.calls[0]![0]![0];
     expect(received.proof?.tag).toBe('sr25519');
     if (received.proof?.tag === 'sr25519') {
       expect(received.proof.value.signer).toEqual(new Uint8Array(32).fill(1));
@@ -193,7 +193,7 @@ describe('createSsoSessionStore', () => {
     await store.save(makeMeta('s1'));
 
     expect(callback).toHaveBeenCalledTimes(1);
-    expect(callback.mock.calls[0][0]?.sessionId).toBe('s1');
+    expect(callback.mock.calls[0]![0]?.sessionId).toBe('s1');
   });
 
   it('subscribe fires with undefined on clear', async () => {
@@ -206,7 +206,7 @@ describe('createSsoSessionStore', () => {
     await store.clear();
 
     expect(callback).toHaveBeenCalledTimes(1);
-    expect(callback.mock.calls[0][0]).toBeUndefined();
+    expect(callback.mock.calls[0]![0]).toBeUndefined();
   });
 
   it('unsubscribe stops notifications', async () => {

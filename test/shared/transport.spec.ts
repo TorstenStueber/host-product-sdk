@@ -12,7 +12,7 @@ import {
   scaleCodecAdapter,
   MethodNotSupportedError,
 } from '@polkadot/api-protocol';
-import type { Transport, CodecAdapter, ProtocolMessage } from '@polkadot/api-protocol';
+import type { Transport } from '@polkadot/api-protocol';
 import { createMockProviderPair, createSyncMockProviderPair } from '../helpers/mockProvider.js';
 import type { MockProvider } from '../helpers/mockProvider.js';
 
@@ -142,7 +142,7 @@ describe('Transport', () => {
 
     it('send request with ID, response with same ID resolves promise', async () => {
       // Host handles "host_feature_supported" requests
-      hostTransport.handleRequest('host_feature_supported', async msg => {
+      hostTransport.handleRequest('host_feature_supported', async _msg => {
         // Unwrap and respond with a valid versioned response
         return { tag: 'v1', value: { success: true, value: true } };
       });
@@ -208,20 +208,23 @@ describe('Transport', () => {
 
     it('start subscription, receive multiple values, then stop', async () => {
       const received: unknown[] = [];
+      let cleanupCalls = 0;
 
-      // Host handles subscription: sends 3 values then interrupts
+      // Host handles subscription: sends 3 values then interrupts.
+      // The handler relies on the returned cleanup to clear the interval
+      // — it does not clear it inline before calling interrupt().
       hostTransport.handleSubscription('host_account_connection_status_subscribe', (_params, send, interrupt) => {
         let count = 0;
         const interval = setInterval(() => {
           count++;
           send({ tag: 'v1', value: 'connected' });
           if (count >= 3) {
-            clearInterval(interval);
             interrupt();
           }
         }, 10);
 
         return () => {
+          cleanupCalls++;
           clearInterval(interval);
         };
       });
@@ -246,6 +249,68 @@ describe('Transport', () => {
       expect(received[0]).toEqual({ tag: 'v1', value: 'connected' });
       expect(received[1]).toEqual({ tag: 'v1', value: 'connected' });
       expect(received[2]).toEqual({ tag: 'v1', value: 'connected' });
+      // Transport must invoke the handler's cleanup exactly once even when
+      // interrupt() is called asynchronously from within the handler.
+      expect(cleanupCalls).toBe(1);
+    });
+
+    it('async interrupt invokes handler cleanup exactly once', async () => {
+      let cleanupCalls = 0;
+      let capturedInterrupt: (() => void) | undefined;
+
+      hostTransport.handleSubscription('host_account_connection_status_subscribe', (_params, _send, interrupt) => {
+        capturedInterrupt = interrupt;
+        return () => {
+          cleanupCalls++;
+        };
+      });
+
+      await productTransport.whenReady();
+
+      const interruptedPromise = new Promise<void>(resolve => {
+        const sub = productTransport.subscribe(
+          'host_account_connection_status_subscribe',
+          { tag: 'v1', value: undefined },
+          () => {},
+        );
+        sub.onInterrupt(() => resolve());
+      });
+
+      // Let the start message round-trip so the handler has returned.
+      await flush();
+      expect(capturedInterrupt).toBeDefined();
+      expect(cleanupCalls).toBe(0);
+
+      capturedInterrupt!();
+      // Second call must be ignored.
+      capturedInterrupt!();
+
+      await interruptedPromise;
+      expect(cleanupCalls).toBe(1);
+    });
+
+    it('sync interrupt inside handler invokes cleanup exactly once', async () => {
+      let cleanupCalls = 0;
+
+      hostTransport.handleSubscription('host_account_connection_status_subscribe', (_params, _send, interrupt) => {
+        interrupt();
+        return () => {
+          cleanupCalls++;
+        };
+      });
+
+      await productTransport.whenReady();
+
+      await new Promise<void>(resolve => {
+        const sub = productTransport.subscribe(
+          'host_account_connection_status_subscribe',
+          { tag: 'v1', value: undefined },
+          () => {},
+        );
+        sub.onInterrupt(() => resolve());
+      });
+
+      expect(cleanupCalls).toBe(1);
     });
 
     it('unsubscribe stops receiving values', async () => {

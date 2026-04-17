@@ -71,6 +71,10 @@ function makePayloadRequest(): RemoteSignPayloadRequest {
     transactionVersion: '0x01',
     signedExtensions: [],
     version: 4,
+    assetId: undefined,
+    metadataHash: undefined,
+    mode: undefined,
+    withSignedTransaction: false,
   };
 }
 
@@ -220,7 +224,7 @@ describe('createRemoteSigner', () => {
     await signer.signPayload(req);
 
     expect(executorFn).toHaveBeenCalledTimes(1);
-    expect(executorFn.mock.calls[0][1]).toEqual(req);
+    expect(executorFn.mock.calls[0]![1]).toEqual(req);
   });
 
   // ── Timeout ───────────────────────────────────────────────

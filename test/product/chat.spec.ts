@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createTransport, createMessagePortProvider, createProductFacade } from '@polkadot/api-protocol';
 import type { Transport, ProductFacade } from '@polkadot/api-protocol';
 import { handleCustomMessageRendering } from '@polkadot/product';
+import type { CustomRendererNode } from '@polkadot/product';
 
 function flush(): Promise<void> {
   return new Promise(r => setTimeout(r, 0));
@@ -74,14 +75,14 @@ describe('handleCustomMessageRendering', () => {
     await flush();
 
     expect(rendererCalls).toHaveLength(1);
-    expect(rendererCalls[0].messageId).toBe('msg-42');
-    expect(rendererCalls[0].messageType).toBe('poll');
+    expect(rendererCalls[0]!.messageId).toBe('msg-42');
+    expect(rendererCalls[0]!.messageType).toBe('poll');
   });
 
   it('provides a render function to the callback', async () => {
     await facade.whenReady();
 
-    let renderFn: ((node: unknown) => void) | undefined;
+    let renderFn: ((node: CustomRendererNode) => void) | undefined;
 
     handleCustomMessageRendering((_params, render) => {
       renderFn = render;

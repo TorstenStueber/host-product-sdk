@@ -1,53 +1,40 @@
 /**
- * Default handlers for localStorage methods.
+ * Handlers for localStorage methods.
  *
- * Uses a scoped key prefix (config.storagePrefix or `${appId}:`) to
- * isolate storage per product.
+ * Delegates to the StorageAdapter provided in config.storage.
  */
 
 import type { HostFacade } from '@polkadot/api-protocol';
 import type { HandlersConfig } from './registry.js';
-import { okAsync, errAsync } from '@polkadot/api-protocol';
+import { ResultAsync } from '@polkadot/api-protocol';
+
+const storageError = (reason: string) => ({ tag: 'Unknown' as const, value: { reason } });
 
 export function wireStorageHandlers(container: HostFacade, config: HandlersConfig): (() => void)[] {
   const cleanups: (() => void)[] = [];
-  const prefix = config.storagePrefix ?? `${config.appId ?? 'host'}:`;
+  const storage = config.storage;
 
   cleanups.push(
     container.handleLocalStorageRead(key => {
-      try {
-        const raw = localStorage.getItem(prefix + key);
-        if (raw === null) {
-          return okAsync(undefined);
-        }
-        const bytes = Uint8Array.from(atob(raw), c => c.charCodeAt(0));
-        return okAsync(bytes);
-      } catch {
-        return errAsync({ tag: 'Unknown', value: { reason: 'Failed to read from storage' } });
-      }
+      return ResultAsync.fromPromise(storage.read(key), () => storageError('Failed to read from storage'));
     }),
   );
 
   cleanups.push(
     container.handleLocalStorageWrite(([key, value]) => {
-      try {
-        const b64 = btoa(Array.from(value, byte => String.fromCharCode(byte)).join(''));
-        localStorage.setItem(prefix + key, b64);
-        return okAsync(undefined);
-      } catch {
-        return errAsync({ tag: 'Unknown', value: { reason: 'Failed to write to storage' } });
-      }
+      return ResultAsync.fromPromise(
+        storage.write(key, value).then(() => undefined),
+        () => storageError('Failed to write to storage'),
+      );
     }),
   );
 
   cleanups.push(
     container.handleLocalStorageClear(key => {
-      try {
-        localStorage.removeItem(prefix + key);
-        return okAsync(undefined);
-      } catch {
-        return errAsync({ tag: 'Unknown', value: { reason: 'Failed to clear storage' } });
-      }
+      return ResultAsync.fromPromise(
+        storage.clear(key).then(() => undefined),
+        () => storageError('Failed to clear storage'),
+      );
     }),
   );
 

@@ -7,7 +7,6 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { createRateLimiter, RATE_LIMITED_MESSAGE } from '@polkadot/host';
-import type { RateLimiter } from '@polkadot/host';
 
 describe('RateLimiter', () => {
   // -----------------------------------------------------------------------

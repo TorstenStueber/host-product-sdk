@@ -17,7 +17,6 @@ function flush(): Promise<void> {
 }
 
 function createMockPort() {
-  const listeners: ((event: MessageEvent) => void)[] = [];
   const port = {
     onmessage: null as ((event: MessageEvent) => void) | null,
     start: vi.fn(),
@@ -113,7 +112,7 @@ describe('createMessagePortProvider', () => {
   // -- Async port ---------------------------------------------------------
 
   it('accepts a Promise<MessagePort> and resolves it', async () => {
-    const provider = createMessagePortProvider(Promise.resolve(port as unknown as MessagePort));
+    createMessagePortProvider(Promise.resolve(port as unknown as MessagePort));
     await flush();
 
     expect(port.onmessage).toBeTypeOf('function');

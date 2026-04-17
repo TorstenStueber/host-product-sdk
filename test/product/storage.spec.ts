@@ -15,8 +15,7 @@ describe('createLocalStorage', () => {
   });
 
   it('returns an object with all expected methods', () => {
-    // createLocalStorage() without args uses the sandbox transport
-    const storage = createLocalStorage();
+    const storage = createLocalStorage({} as any);
 
     expect(typeof storage.clear).toBe('function');
     expect(typeof storage.readBytes).toBe('function');
@@ -28,7 +27,7 @@ describe('createLocalStorage', () => {
   });
 
   it('each method returns a promise', () => {
-    const storage = createLocalStorage();
+    const storage = createLocalStorage({} as any);
 
     // These will fail because the sandbox transport is not connected,
     // but they should return promises regardless.

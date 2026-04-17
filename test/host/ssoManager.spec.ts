@@ -200,7 +200,7 @@ describe('createSsoManager', () => {
 
     // Replace executor and retry — but we need a new manager since executor is fixed
     // Instead, test that pair() works from failed state
-    const { manager: m2 } = createTestManager(immediateExecutor(makeResult()));
+    const { manager: _m2 } = createTestManager(immediateExecutor(makeResult()));
     // Set to failed first by pairing with a failing executor
     const { manager: m3 } = createTestManager(failingExecutor('oops'));
     m3.pair();
@@ -334,8 +334,9 @@ describe('createSsoManager', () => {
 
     // restoreSession should not overwrite
     await manager.restoreSession();
-    if (manager.getState().status === 'paired') {
-      expect(manager.getState().status === 'paired' && manager.getState().session.sessionId).toBe('from-pairing');
+    const state = manager.getState();
+    if (state.status === 'paired') {
+      expect(state.session.sessionId).toBe('from-pairing');
     }
   });
 

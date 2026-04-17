@@ -20,6 +20,7 @@ export type {
   HostSdk,
   EmbeddedProduct,
   AuthState,
+  AuthStatus,
   UserSession,
   Identity,
   HostFacade,

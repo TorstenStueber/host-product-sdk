@@ -34,6 +34,8 @@ export type AuthState =
   | { status: 'authenticated'; session: UserSession; identity: Identity | undefined }
   | { status: 'error'; message: string };
 
+export type AuthStatus = AuthState['status'];
+
 type AuthListener = (state: AuthState) => void;
 
 // ---------------------------------------------------------------------------
@@ -45,7 +47,7 @@ export type AuthManager = {
   setState(state: AuthState): void;
   subscribe(listener: AuthListener): () => void;
   getSession(): UserSession | undefined;
-  subscribeAuthStatus(callback: (status: string) => void): () => void;
+  subscribeAuthStatus(callback: (status: AuthStatus) => void): () => void;
   dispose(): void;
 };
 
@@ -73,7 +75,7 @@ export function createAuthManager(): AuthManager {
     return currentState.status === 'authenticated' ? currentState.session : undefined;
   }
 
-  function subscribeAuthStatus(callback: (status: string) => void): () => void {
+  function subscribeAuthStatus(callback: (status: AuthStatus) => void): () => void {
     callback(currentState.status);
     return subscribe(state => callback(state.status));
   }

@@ -121,7 +121,7 @@ describe('Codec negotiation', () => {
     await connectTransports(hostTransport, productTransport);
 
     // Register a test handler on the host side.
-    hostTransport.handleRequest('host_feature_supported', async message => {
+    hostTransport.handleRequest('host_feature_supported', async _message => {
       return { tag: 'v1', value: { success: true, value: true } };
     });
 

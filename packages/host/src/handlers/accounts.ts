@@ -65,14 +65,8 @@ export function wireAccountHandlers(container: HostFacade, config: HandlersConfi
   // Account connection status subscription
   cleanups.push(
     container.handleAccountConnectionStatusSubscribe((_params, send) => {
-      if (!config.subscribeAuthState) {
-        // No auth integration; report connected by default
-        send('connected');
-        return () => {};
-      }
-
-      return config.subscribeAuthState(state => {
-        send(state === 'authenticated' ? 'connected' : 'disconnected');
+      return config.subscribeAuthState(status => {
+        send(status === 'authenticated' ? 'connected' : 'disconnected');
       });
     }),
   );

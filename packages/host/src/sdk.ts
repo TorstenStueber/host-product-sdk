@@ -11,6 +11,7 @@ import type { UserSession, Identity } from './auth/authManager.js';
 import { createHostFacade, bytesToHex } from '@polkadot/api-protocol';
 import { wireAllHandlers } from './handlers/registry.js';
 import type { HandlersConfig } from './handlers/registry.js';
+import type { StorageAdapter } from './storage/types.js';
 import type { SigningResult } from '@polkadot/api-protocol';
 import type { HostSdkConfig, HostSdk, EmbeddedProduct } from './types.js';
 
@@ -162,10 +163,9 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
   }
 
   // Build handler config from SDK config + auth manager
-  function buildHandlersConfig(storagePrefix: string): HandlersConfig {
+  function buildHandlersConfig(storage: StorageAdapter): HandlersConfig {
     return {
-      appId: config.appId,
-      storagePrefix,
+      storage,
 
       getSession() {
         const session = auth.getSession();
@@ -238,12 +238,12 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
 
     embed(iframe: HTMLIFrameElement, url: string): EmbeddedProduct {
       iframe.src = url;
-      const storagePrefix = config.storagePrefix ?? `${config.appId}:`;
+      const storage = createLocalStorageAdapter(config.storagePrefix ?? `${config.appId}:`);
       const container = createHostFacade({
         messaging: { type: 'window', target: iframe.contentWindow! },
       });
 
-      const handlersConfig = buildHandlersConfig(storagePrefix);
+      const handlersConfig = buildHandlersConfig(storage);
       const cleanupHandlers = wireAllHandlers(container, handlersConfig);
 
       const product: EmbeddedProduct = {

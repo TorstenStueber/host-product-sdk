@@ -89,15 +89,18 @@ describe('Host SDK (auth manager integration)', () => {
   });
 
   describe('SDK config patterns', () => {
-    it('storagePrefix defaults to appId:', () => {
-      const config = { appId: 'dot.li' };
-      const storagePrefix = config.appId + ':';
+    it('storagePrefix defaults to appId: in HostSdkConfig', () => {
+      const config: { appId: string; storagePrefix?: string } = { appId: 'dot.li' };
+      const storagePrefix = config.storagePrefix ?? `${config.appId}:`;
       expect(storagePrefix).toBe('dot.li:');
     });
 
-    it('custom storagePrefix overrides default', () => {
-      const config = { appId: 'dot.li', storagePrefix: 'custom_prefix_' };
-      const storagePrefix = config.storagePrefix ?? config.appId + ':';
+    it('custom storagePrefix overrides default in HostSdkConfig', () => {
+      const config: { appId: string; storagePrefix?: string } = {
+        appId: 'dot.li',
+        storagePrefix: 'custom_prefix_',
+      };
+      const storagePrefix = config.storagePrefix ?? `${config.appId}:`;
       expect(storagePrefix).toBe('custom_prefix_');
     });
   });

@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createAuthManager } from '@polkadot/host';
-import type { AuthManager } from '@polkadot/host';
+import type { AuthManager, AuthStatus } from '@polkadot/host';
 
 describe('createAuthManager', () => {
   let auth: AuthManager;
@@ -178,7 +178,7 @@ describe('createAuthManager', () => {
   // -----------------------------------------------------------------------
 
   it('subscribeAuthStatus fires immediately with current status', () => {
-    const statuses: string[] = [];
+    const statuses: AuthStatus[] = [];
 
     auth.subscribeAuthStatus(status => statuses.push(status));
 
@@ -186,8 +186,8 @@ describe('createAuthManager', () => {
     expect(statuses).toEqual(['idle']);
   });
 
-  it('subscribeAuthStatus receives status string on changes', () => {
-    const statuses: string[] = [];
+  it('subscribeAuthStatus receives status on changes', () => {
+    const statuses: AuthStatus[] = [];
 
     auth.subscribeAuthStatus(status => statuses.push(status));
 

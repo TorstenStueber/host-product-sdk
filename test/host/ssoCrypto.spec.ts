@@ -20,13 +20,7 @@ import {
   generateMnemonic,
   mnemonicToEntropy,
 } from '../../packages/host/src/auth/sso/crypto.js';
-import {
-  HandshakeData,
-  HandshakeResponsePayload,
-  RemoteMessageCodec,
-  SigningPayloadRequestCodec,
-  SigningRawRequestCodec,
-} from '../../packages/host/src/auth/sso/codecs.js';
+import { HandshakeData, RemoteMessageCodec } from '../../packages/host/src/auth/sso/codecs.js';
 
 // ---------------------------------------------------------------------------
 // Encryption

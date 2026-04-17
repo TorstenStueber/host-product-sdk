@@ -291,6 +291,11 @@ and resolves with `ResponseCodecType<M>`. Supports `AbortSignal`. If the other s
 **Subscriptions**: `transport.subscribe<M>(method, payload, callback)` sends `_start` with `StartCodecType<M>`, listens
 for `_receive` with `ReceiveCodecType<M>`. `unsubscribe()` sends `_stop`. The other side can `interrupt()`.
 
+**Handle Subscription**: `transport.handleSubscription<M>(method, handler)` registers a producer. `handler` returns a
+cleanup function; the transport guarantees it runs exactly once on any termination path -- consumer-sent `_stop`,
+synchronous `interrupt()` during `handler()`, or asynchronous `interrupt()` after the handler returned. `interrupt()` is
+idempotent. Handlers should put teardown in the returned cleanup rather than running it inline before `interrupt()`.
+
 **Multiplexing**: Two callers subscribing to the same method+payload share one wire subscription. When the last listener
 unsubscribes, `_stop` is sent.
 
@@ -520,15 +525,16 @@ What runs on the host page. Handlers, auth, storage adapters, and the SDK entry 
 ### 2.1 Handlers (`handlers/`)
 
 **`registry.ts`**: `wireAllHandlers(protocolHandler, config)`: orchestrator calling each domain wiring function.
-`HandlersConfig` has `getSession()`, `subscribeAuthState()`, `chainProvider()`, plus callbacks.
+`HandlersConfig` has `storage: StorageAdapter` (required), `subscribeAuthState` (required), `getSession()`,
+`chainProvider()`, plus callbacks.
 
-**`host.ts`**: `featureSupported` (config callback or chainProvider check), `navigateTo` (callback or `window.open`),
-`pushNotification` (callback or `console.warn`).
+**`host.ts`**: `featureSupported` (config callback or chainProvider check), `navigateTo` (delegates to callback, no-op
+if not configured), `pushNotification` (callback or `console.warn`).
 
 **`permissions.ts`**: `devicePermission` and `permission` return `false` by default.
 
-**`storage.ts`**: Scoped browser localStorage. Keys prefixed with `config.storagePrefix` (default `"${appId}:"`). Values
-stored as base64 strings.
+**`storage.ts`**: Delegates to the `StorageAdapter` in `config.storage`. The adapter handles key scoping, encoding, and
+persistence — the handler is storage-backend-agnostic.
 
 **`accounts.ts`**: `accountGet` derives product-specific public key via HDKD from session. `getNonProductAccounts`
 returns root account. `connectionStatusSubscribe` pushes connected/disconnected. `getAlias`/`createProof` are stubs.
@@ -562,7 +568,9 @@ manager to watch for session changes.
 
 **`authManager.ts`**: State machine: `idle -> pairing -> attesting -> authenticated -> idle` (back to idle via
 `clearSession()`). Any state can go to `error`. Pub-sub via `subscribe(callback)`. `getSession()` returns session if
-authenticated.
+authenticated. `AuthStatus` type (`AuthState['status']`) is derived from the `AuthState` union, giving
+`'idle' | 'pairing' | 'attesting' | 'authenticated' | 'error'`. Used by `subscribeAuthStatus` and
+`HandlersConfig.subscribeAuthState`.
 
 **`hdkd.ts`**: Sr25519 hierarchical deterministic key derivation, wrapping `@polkadot-labs/hdkd-helpers`' `createDerive`
 for path parsing and chain code encoding. Two functions: `sr25519DeriveSecret(miniSecret, path)` for secret-key
@@ -639,7 +647,7 @@ encrypted sign request round-trips: SCALE-encodes `RemoteMessage` with `SignRequ
 publishes to session topic, waits for `SignResponse` matching the message ID, decrypts and returns signature.
 
 **`identity/types.ts`**: `IdentityProvider` interface (`getIdentity(accountIdHex)`) and `ResolvedIdentity` type
-(liteUsername, fullUsername, avatarUrl, chainIdentity). Implementations query a chain (e.g. People parachain's
+(liteUsername, fullUsername, chainIdentity). Implementations query a chain (e.g. People parachain's
 `Resources.Consumers` storage) and return structured identity data.
 
 **`identity/resolver.ts`**: `createIdentityResolver(provider)` — wraps an `IdentityProvider` with in-memory caching and
@@ -810,7 +818,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 ## Part 4: Tests
 
-### 4.1 Unit Tests (20 files, 254 tests)
+### 4.1 Unit Tests (22 files, 299 tests)
 
 **Test helper** (`test/helpers/mockProvider.ts`): creates connected mock Provider pairs (async and sync variants).
 
@@ -829,7 +837,7 @@ and Rococo relay), `SpektrExtensionName = 'spektr'`.
 
 **Host** (10 files):
 
-- `handlers.spec.ts` (14 tests): featureSupported, navigateTo, pushNotification, permissions, storage
+- `handlers.spec.ts` (12 tests): featureSupported, navigateTo, pushNotification, permissions, storage adapter delegation
 - `authManager.spec.ts` (14 tests): full state machine, subscribe/unsubscribe
 - `storage.spec.ts` (19 tests): memory adapter CRUD, prefix isolation, reactive subscriptions (write/clear
   notifications, unsubscribe, multiple listeners, key isolation)

@@ -50,7 +50,7 @@ describe('ProductFacade transport proxies', () => {
 
     const receivedValues: unknown[] = [];
 
-    facade.handleHostSubscription('product_chat_custom_message_render_subscribe', (params, send, interrupt) => {
+    facade.handleHostSubscription('product_chat_custom_message_render_subscribe', (params, _send, _interrupt) => {
       receivedValues.push(params);
       return () => {};
     });

@@ -1,5 +1,5 @@
 /**
- * Default handlers for core host methods:
+ * Handlers for core host methods:
  * - featureSupported
  * - navigateTo
  * - pushNotification
@@ -30,13 +30,11 @@ export function wireHostHandlers(container: HostFacade, config: HandlersConfig):
     }),
   );
 
-  // Navigate to - opens URL in new tab by default
+  // Navigate to - delegates to config callback
   cleanups.push(
     container.handleNavigateTo(url => {
       if (config.onNavigateTo) {
         config.onNavigateTo(url);
-      } else if (typeof window !== 'undefined') {
-        window.open(url, '_blank');
       }
       return okAsync(undefined);
     }),

@@ -9,6 +9,8 @@
 import type { HexString, RequestParams } from '@polkadot/api-protocol';
 import type { StatementStoreAdapter } from '../statementStore/types.js';
 import type { SsoSigner } from '../auth/sso/transport.js';
+import type { StorageAdapter } from '../storage/types.js';
+import type { AuthStatus } from '../auth/authManager.js';
 import type {
   Feature,
   DevicePermissionRequest,
@@ -46,18 +48,15 @@ export type UserSessionInfo = {
 // ---------------------------------------------------------------------------
 
 export type HandlersConfig = {
-  /** Application identifier, used for storage prefix fallback. */
-  appId?: string;
-
-  /** Storage key prefix for localStorage scoping. */
-  storagePrefix?: string;
+  /** Storage adapter for product-facing localStorage operations. */
+  storage: StorageAdapter;
 
   // -- Session access -------------------------------------------------------
   /** Returns the current user session, or undefined if not authenticated. */
   getSession?: () => UserSessionInfo | undefined;
 
-  /** Subscribe to auth state changes. Callback receives the auth status string. */
-  subscribeAuthState?: (callback: (state: string) => void) => () => void;
+  /** Subscribe to auth state changes. Callback receives the auth status. */
+  subscribeAuthState: (callback: (status: AuthStatus) => void) => () => void;
 
   // -- Feature support ------------------------------------------------------
   /** Custom feature support check. */

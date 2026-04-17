@@ -4,21 +4,6 @@
 
 import { describe, it, expect } from 'vitest';
 import { hostApiProtocol } from '@polkadot/api-protocol';
-import type {
-  GenericError,
-  HandshakeError,
-  RequestCredentialsError,
-  CreateProofError,
-  SigningError,
-  CreateTransactionError,
-  StorageError,
-  NavigateToError,
-  ChatRoomRegistrationError,
-  ChatBotRegistrationError,
-  ChatMessagePostingError,
-  StatementProofError,
-  PreimageSubmitError,
-} from '@polkadot/api-protocol';
 
 describe('hostApiProtocol', () => {
   it('is a non-empty object', () => {
@@ -79,15 +64,15 @@ describe('hostApiProtocol', () => {
 
 describe('Error types', () => {
   it('GenericError can be constructed', () => {
-    const err: GenericError = { reason: 'Something went wrong' };
+    const err = { reason: 'Something went wrong' };
     expect(err.reason).toBe('Something went wrong');
   });
 
   it('HandshakeError variants can be pattern-matched', () => {
-    const errors: HandshakeError[] = [
-      { tag: 'Timeout', value: undefined },
-      { tag: 'UnsupportedProtocolVersion', value: undefined },
-      { tag: 'Unknown', value: { reason: 'test' } },
+    const errors = [
+      { tag: 'Timeout' as const, value: undefined },
+      { tag: 'UnsupportedProtocolVersion' as const, value: undefined },
+      { tag: 'Unknown' as const, value: { reason: 'test' } },
     ];
 
     for (const error of errors) {
@@ -106,7 +91,7 @@ describe('Error types', () => {
   });
 
   it('RequestCredentialsError variants are all valid', () => {
-    const errors: RequestCredentialsError[] = [
+    const errors = [
       { tag: 'NotConnected', value: undefined },
       { tag: 'Rejected', value: undefined },
       { tag: 'DomainNotValid', value: undefined },
@@ -116,12 +101,12 @@ describe('Error types', () => {
   });
 
   it('CreateProofError variants can be constructed', () => {
-    const err: CreateProofError = { tag: 'RingNotFound', value: undefined };
+    const err = { tag: 'RingNotFound', value: undefined };
     expect(err.tag).toBe('RingNotFound');
   });
 
   it('SigningError variants can be constructed', () => {
-    const errors: SigningError[] = [
+    const errors = [
       { tag: 'FailedToDecode', value: undefined },
       { tag: 'Rejected', value: undefined },
       { tag: 'PermissionDenied', value: undefined },
@@ -131,45 +116,45 @@ describe('Error types', () => {
   });
 
   it('CreateTransactionError supports NotSupported with string', () => {
-    const err: CreateTransactionError = { tag: 'NotSupported', value: 'Ledger not supported' };
+    const err = { tag: 'NotSupported', value: 'Ledger not supported' };
     expect(err.tag).toBe('NotSupported');
     expect(err.value).toBe('Ledger not supported');
   });
 
   it('StorageError variants', () => {
-    const full: StorageError = { tag: 'Full', value: undefined };
-    const unknown: StorageError = { tag: 'Unknown', value: { reason: 'quota exceeded' } };
+    const full = { tag: 'Full', value: undefined };
+    const unknown = { tag: 'Unknown', value: { reason: 'quota exceeded' } };
     expect(full.tag).toBe('Full');
     expect(unknown.tag).toBe('Unknown');
   });
 
   it('NavigateToError variants', () => {
-    const err: NavigateToError = { tag: 'PermissionDenied', value: undefined };
+    const err = { tag: 'PermissionDenied', value: undefined };
     expect(err.tag).toBe('PermissionDenied');
   });
 
   it('ChatRoomRegistrationError variants', () => {
-    const err: ChatRoomRegistrationError = { tag: 'PermissionDenied', value: undefined };
+    const err = { tag: 'PermissionDenied', value: undefined };
     expect(err.tag).toBe('PermissionDenied');
   });
 
   it('ChatBotRegistrationError variants', () => {
-    const err: ChatBotRegistrationError = { tag: 'Unknown', value: { reason: 'test' } };
+    const err = { tag: 'Unknown', value: { reason: 'test' } };
     expect(err.tag).toBe('Unknown');
   });
 
   it('ChatMessagePostingError variants', () => {
-    const err: ChatMessagePostingError = { tag: 'MessageTooLarge', value: undefined };
+    const err = { tag: 'MessageTooLarge', value: undefined };
     expect(err.tag).toBe('MessageTooLarge');
   });
 
   it('StatementProofError variants', () => {
-    const err: StatementProofError = { tag: 'UnableToSign', value: undefined };
+    const err = { tag: 'UnableToSign', value: undefined };
     expect(err.tag).toBe('UnableToSign');
   });
 
   it('PreimageSubmitError variants', () => {
-    const err: PreimageSubmitError = { tag: 'Unknown', value: { reason: 'test' } };
+    const err = { tag: 'Unknown', value: { reason: 'test' } };
     expect(err.tag).toBe('Unknown');
     expect(err.value.reason).toBe('test');
   });
