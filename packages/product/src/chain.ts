@@ -35,11 +35,10 @@ export function createPapiProvider(
   __fallback?: JsonRpcProvider,
 ): JsonRpcProvider {
   // -------------------------------------------------------------------------
-  // Follow state tracking
+  // Follow state tracking3
   // -------------------------------------------------------------------------
 
   type FollowState = {
-    syntheticSubId: string;
     subscription: { unsubscribe: () => void };
     genesisHash: HexString;
   };
@@ -49,13 +48,11 @@ export function createPapiProvider(
   // -------------------------------------------------------------------------
 
   const typedProvider: JsonRpcProvider = onMessage => {
+    // Keyed by the transport-level `subscriptionId` that the product and
+    // host both agree on — the same id we return as the `chainHead_v1_follow`
+    // result and surface as `followSubscriptionId` on chain-op requests.
     const activeFollows = new Map<string, FollowState>();
     const activeBroadcasts = new Set<string>();
-    let nextSubId = 0;
-
-    function getNextSubId(): string {
-      return `follow_${nextSubId++}`;
-    }
 
     // -- JSON-RPC response helpers ------------------------------------------
 
@@ -220,19 +217,17 @@ export function createPapiProvider(
         // -- chainHead_v1_follow --------------------------------------------
         case 'chainHead_v1_follow': {
           const [withRuntime] = params as [boolean];
-          const syntheticSubId = getNextSubId();
 
           const subscription = facade.chainHeadFollow({ genesisHash, withRuntime }, payload => {
             const jsonRpcEvent = convertTypedEventToJsonRpc(payload);
-            sendFollowEvent(syntheticSubId, jsonRpcEvent);
+            sendFollowEvent(subscription.subscriptionId, jsonRpcEvent);
           });
 
-          activeFollows.set(syntheticSubId, {
-            syntheticSubId,
+          activeFollows.set(subscription.subscriptionId, {
             subscription,
             genesisHash,
           });
-          sendJsonRpcResponse(id, syntheticSubId);
+          sendJsonRpcResponse(id, subscription.subscriptionId);
           break;
         }
 

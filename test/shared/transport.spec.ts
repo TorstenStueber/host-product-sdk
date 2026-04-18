@@ -313,6 +313,90 @@ describe('Transport', () => {
       expect(cleanupCalls).toBe(1);
     });
 
+    it('consumer and producer observe the same subscriptionId', async () => {
+      let observedByHandler: string | undefined;
+
+      hostTransport.handleSubscription(
+        'host_account_connection_status_subscribe',
+        (_params, _send, _interrupt, subscriptionId) => {
+          observedByHandler = subscriptionId;
+          return () => {};
+        },
+      );
+
+      await productTransport.whenReady();
+
+      const sub = productTransport.subscribe(
+        'host_account_connection_status_subscribe',
+        { tag: 'v1', value: undefined },
+        () => {},
+      );
+
+      expect(typeof sub.subscriptionId).toBe('string');
+      expect(sub.subscriptionId.length).toBeGreaterThan(0);
+
+      await flush();
+      expect(observedByHandler).toBe(sub.subscriptionId);
+
+      sub.unsubscribe();
+    });
+
+    it('subscriptionId is shared across multiplexed subscribers', async () => {
+      hostTransport.handleSubscription('host_account_connection_status_subscribe', () => () => {});
+
+      await productTransport.whenReady();
+
+      const subA = productTransport.subscribe(
+        'host_account_connection_status_subscribe',
+        { tag: 'v1', value: undefined },
+        () => {},
+      );
+      const subB = productTransport.subscribe(
+        'host_account_connection_status_subscribe',
+        { tag: 'v1', value: undefined },
+        () => {},
+      );
+
+      expect(subA.subscriptionId).toBe(subB.subscriptionId);
+
+      subA.unsubscribe();
+      subB.unsubscribe();
+    });
+
+    it('distinct method+payload combinations get distinct subscriptionIds', async () => {
+      const seenByHandler: string[] = [];
+
+      hostTransport.handleSubscription(
+        'host_account_connection_status_subscribe',
+        (_params, _send, _interrupt, subscriptionId) => {
+          seenByHandler.push(subscriptionId);
+          return () => {};
+        },
+      );
+
+      await productTransport.whenReady();
+
+      // Two different products (different payloads) → two distinct wire subs.
+      const subA = productTransport.subscribe(
+        'host_account_connection_status_subscribe',
+        { tag: 'v1', value: { productId: 'A' } as never },
+        () => {},
+      );
+      const subB = productTransport.subscribe(
+        'host_account_connection_status_subscribe',
+        { tag: 'v1', value: { productId: 'B' } as never },
+        () => {},
+      );
+
+      await flush();
+      expect(subA.subscriptionId).not.toBe(subB.subscriptionId);
+      expect(seenByHandler).toContain(subA.subscriptionId);
+      expect(seenByHandler).toContain(subB.subscriptionId);
+
+      subA.unsubscribe();
+      subB.unsubscribe();
+    });
+
     it('unsubscribe stops receiving values', async () => {
       const received: unknown[] = [];
 

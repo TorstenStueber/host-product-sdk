@@ -296,6 +296,16 @@ cleanup function; the transport guarantees it runs exactly once on any terminati
 synchronous `interrupt()` during `handler()`, or asynchronous `interrupt()` after the handler returned. `interrupt()` is
 idempotent. Handlers should put teardown in the returned cleanup rather than running it inline before `interrupt()`.
 
+**Subscription id**: Every wire subscription has a stable id -- the transport requestId generated on the consumer side
+when `subscribe()` is called. Both sides agree on it: consumers read it from `Subscription.subscriptionId`; producers
+receive it as the fourth handler argument on `handleSubscription`. Multiplexed subscribers (same method+payload) share
+one id. The id is the canonical way for the application protocol to correlate follow-up requests with an active
+subscription -- e.g. the `followSubscriptionId` field on `remote_chain_head_header/_body/_storage/_call/_unpin/_continue/
+_stop_operation` is set to the `subscriptionId` of the originating `remote_chain_head_follow` subscription, and the host
+uses it to look up the real node-assigned `chainHead_v1` subscription. In contrast with JSON-RPC, where the server picks
+the subscription id and returns it in the response, our transport has no response phase for subscriptions -- the id is
+generated on the consumer side and travels with the `_start` message.
+
 **Multiplexing**: Two callers subscribing to the same method+payload share one wire subscription. When the last listener
 unsubscribes, `_stop` is sent.
 
@@ -442,6 +452,25 @@ map.
 
 `handleChainConnection(factory)` is special -- creates a `ChainConnectionManager` and wires all 13 chain methods with
 its own inline version dispatch.
+
+### 1b.2 ChainConnectionManager (`host-facade/connectionManager.ts`)
+
+Multiplexes per-chain JSON-RPC connections for the `remote_chain_*` methods. `createChainConnectionManager(factory)`
+lazily opens one `JsonRpcProvider` per `genesisHash` (ref-counted across `getOrCreateChain` / `releaseChain` calls),
+maintains a request-id map for pending request/response correlation, and a follow map for `chainHead_v1_follow`
+subscriptions.
+
+Key detail: the follow map is keyed by the **transport-level `subscriptionId`** of the originating
+`remote_chain_head_follow` subscription -- the same id the product embeds in `followSubscriptionId` on every subsequent
+chain-op request (`remote_chain_head_header`, `_body`, `_storage`, `_call`, `_unpin`, `_continue`, `_stop_operation`).
+Before issuing a JSON-RPC call, the protocol handler calls `manager.getChainSubId(genesisHash, followSubscriptionId)` to
+translate it into the node-assigned chainHead subscription id and passes that to the node. This is what makes multiple
+concurrent follows on the same chain route correctly.
+
+`startFollow(genesisHash, subscriptionId, withRuntime, onEvent)` returns a stop function. The stop function is
+idempotent and handles the race where it is called before the node's `chainHead_v1_follow` response has arrived -- in
+that case the deferred `chainHead_v1_unfollow` is sent once the response resolves, and the follow is never inserted
+into the map.
 
 ### 1b.3 HostFacade Types (`host-facade/types.ts`)
 
@@ -767,6 +796,10 @@ diagnostics.
 When PAPI calls `send('{"method":"chainHead_v1_follow",...}')`: parses JSON-RPC, maps to `hostApi` method, converts
 parameters, converts response back to JSON-RPC. Handles all `chainHead_v1_*`, `chainSpec_v1_*`, `transaction_v1_*`
 methods.
+
+`chainHead_v1_follow` responses return the transport-level `subscriptionId` of the underlying Host API subscription
+directly -- no synthetic id layer. PAPI echoes that id back as the first parameter of every follow-scoped chain-op, and
+the bridge forwards it as `followSubscriptionId` so the host can route to the correct follow.
 
 ### 3.3 Storage (`storage.ts`)
 

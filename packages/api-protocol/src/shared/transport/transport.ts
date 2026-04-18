@@ -64,6 +64,16 @@ export class MethodNotSupportedError extends Error {
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
 
 export type Subscription = {
+  /**
+   * The transport-assigned subscription id. Uniquely identifies this
+   * subscription over the wire and is shared by both sides — the consumer
+   * (this side) generated it; the producer receives it on its
+   * `handleSubscription` handler. Stable for the lifetime of the
+   * subscription. Use it when the application protocol needs to refer to
+   * an active subscription by id in a subsequent request (e.g. the
+   * `followSubscriptionId` field on `remote_chain_head_*` chain-ops).
+   */
+  subscriptionId: string;
   unsubscribe: () => void;
   onInterrupt(callback: () => void): () => void;
 };
@@ -108,6 +118,11 @@ export type Transport = {
    *   an `interrupt` message to the consumer and triggers the handler's
    *   cleanup (see below). Idempotent — extra calls after the first are
    *   ignored.
+   * - `subscriptionId`: the transport-assigned id for this subscription, the
+   *   same string the consumer sees in its returned `Subscription`. Stable
+   *   for the lifetime of the subscription. Use it when the application
+   *   protocol needs to correlate later requests with this subscription
+   *   (e.g. a `followSubscriptionId` field on a follow-up request).
    *
    * `handler` must return a cleanup function. The transport guarantees the
    * cleanup runs exactly once, whichever of the three termination paths is
@@ -131,6 +146,7 @@ export type Transport = {
       params: StartCodecType<M>,
       send: (value: ReceiveCodecType<M>) => void,
       interrupt: () => void,
+      subscriptionId: string,
     ) => () => void,
   ): () => void;
 
@@ -388,7 +404,14 @@ export function createTransport(options: CreateTransportOptions): Transport {
         unsubscribe: unsub,
       };
 
+      // When a subscription for this key already exists, reuse its requestId
+      // so all callers of `subscribe(method, payload, ...)` with identical
+      // method+payload observe the same `subscriptionId` — the one the other
+      // side sees on its `handleSubscription` handler.
+      const subscriptionId = subscription?.requestId ?? nextId();
+
       const publicSubscription: Subscription = {
+        subscriptionId,
         unsubscribe: unsub,
         onInterrupt(cb) {
           return subEvents.on('interrupt', cb);
@@ -396,7 +419,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
       };
 
       if (!subscription) {
-        const requestId = nextId();
+        const requestId = subscriptionId;
 
         const stopAction = composeAction(method, 'stop');
         const interruptAction = composeAction(method, 'interrupt');
@@ -452,6 +475,7 @@ export function createTransport(options: CreateTransportOptions): Transport {
         params: StartCodecType<M>,
         send: (value: ReceiveCodecType<M>) => void,
         interrupt: () => void,
+        subscriptionId: string,
       ) => () => void,
     ): () => void {
       throwIfDisposed();
@@ -489,6 +513,9 @@ export function createTransport(options: CreateTransportOptions): Transport {
             }
             transport.postMessage(requestId, { tag: interruptAction, value: undefined });
           },
+          // subscriptionId — the transport requestId, same value the consumer
+          // sees on its Subscription.
+          requestId,
         );
 
         if (interrupted) {

@@ -20,14 +20,19 @@ type PendingRequest = {
 };
 
 type FollowSubscription = {
+  /** The real subscription id returned by the substrate node. */
   chainSubId: string;
   eventListener: (event: unknown) => void;
-  pendingRequestId?: string;
 };
 
 type ChainEntry = {
   connection: { send: (msg: string) => void; disconnect: () => void };
   pendingRequests: Map<string, PendingRequest>;
+  /**
+   * Active follow subscriptions keyed by the transport-level
+   * `subscriptionId` — i.e. the same id the product embeds in
+   * `followSubscriptionId` on subsequent chain-op requests.
+   */
   followSubscriptions: Map<string, FollowSubscription>;
   refCount: number;
 };
@@ -89,12 +94,15 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
         }
       }
 
-      // Subscription notification (has params.subscription)
+      // Subscription notification (has params.subscription).
+      // Node-assigned subscription id → host-local FollowSubscription lookup.
+      // Linear scan is fine: at most one follow per consumer, and consumers
+      // per chain are typically O(1).
       const params = parsed.params as Record<string, unknown> | undefined;
       if (params?.subscription) {
-        const subId = String(params.subscription);
+        const chainSubId = String(params.subscription);
         for (const follow of followSubscriptions.values()) {
-          if (follow.chainSubId === subId) {
+          if (follow.chainSubId === chainSubId) {
             follow.eventListener(params.result);
             break;
           }
@@ -117,80 +125,86 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
     });
   }
 
+  /**
+   * Start a `chainHead_v1_follow` subscription on the given chain.
+   *
+   * `subscriptionId` is chosen by the caller (typically the transport-level
+   * id of the corresponding Host API subscription). It identifies the
+   * follow locally for the lifetime of the returned stop function and for
+   * every subsequent chain-op lookup via `getChainSubId()`.
+   *
+   * The returned function stops the follow. It is idempotent and handles
+   * all three states: (1) the node response hasn't arrived yet (stop is
+   * deferred — `unfollow` is sent once the response arrives), (2) the
+   * follow is active (sends `unfollow` immediately), (3) the follow was
+   * already stopped (no-op).
+   */
   function startFollow(
     genesisHash: HexString,
+    subscriptionId: string,
     withRuntime: boolean,
     onEvent: (event: unknown) => void,
-  ): { followId: string } {
+  ): () => void {
     const entry = chains.get(genesisHash);
     if (!entry) throw new Error(`No connection for chain ${genesisHash}`);
 
-    const followId = getNextId();
     const requestId = getNextId();
-    const follow: FollowSubscription = {
-      chainSubId: '',
-      eventListener: onEvent,
-      pendingRequestId: requestId,
-    };
-    entry.followSubscriptions.set(followId, follow);
+    let stopped = false;
+    let chainSubId: string | undefined;
 
     entry.pendingRequests.set(requestId, {
       resolve: result => {
-        follow.chainSubId = result as string;
-        follow.pendingRequestId = undefined;
+        chainSubId = result as string;
+        if (stopped) {
+          // Stop was called before the node responded — unfollow immediately.
+          if (chainSubId) sendUnfollow(entry, chainSubId);
+          return;
+        }
+        entry.followSubscriptions.set(subscriptionId, { chainSubId, eventListener: onEvent });
       },
       reject: () => {
-        follow.pendingRequestId = undefined;
-        entry.followSubscriptions.delete(followId);
+        // No follow was ever registered; nothing to clean up.
       },
     });
     entry.connection.send(
       JSON.stringify({ jsonrpc: '2.0', id: requestId, method: 'chainHead_v1_follow', params: [withRuntime] }),
     );
 
-    return { followId };
+    return () => {
+      if (stopped) return;
+      stopped = true;
+      if (chainSubId) {
+        entry.followSubscriptions.delete(subscriptionId);
+        sendUnfollow(entry, chainSubId);
+      }
+      // If chainSubId is not yet known, the pending-request resolve closure
+      // above observes `stopped` and issues the unfollow when it arrives.
+    };
   }
 
-  function stopFollow(genesisHash: HexString, followId: string): void {
-    const entry = chains.get(genesisHash);
-    if (!entry) return;
-
-    const follow = entry.followSubscriptions.get(followId);
-    if (!follow) return;
-
-    entry.followSubscriptions.delete(followId);
-
-    if (follow.chainSubId) {
-      const id = getNextId();
-      entry.connection.send(
-        JSON.stringify({ jsonrpc: '2.0', id, method: 'chainHead_v1_unfollow', params: [follow.chainSubId] }),
-      );
-    } else if (follow.pendingRequestId) {
-      entry.pendingRequests.set(follow.pendingRequestId, {
-        resolve: result => {
-          const chainSubId = result as string;
-          if (chainSubId) {
-            const unfollowId = getNextId();
-            entry.connection.send(
-              JSON.stringify({ jsonrpc: '2.0', id: unfollowId, method: 'chainHead_v1_unfollow', params: [chainSubId] }),
-            );
-          }
-        },
-        reject: () => {
-          /* follow already cleaned up */
-        },
-      });
-    }
+  function sendUnfollow(entry: ChainEntry, chainSubId: string): void {
+    const id = getNextId();
+    entry.connection.send(
+      JSON.stringify({ jsonrpc: '2.0', id, method: 'chainHead_v1_unfollow', params: [chainSubId] }),
+    );
   }
 
-  function getChainFollowSubId(genesisHash: HexString): string | undefined {
+  /**
+   * Resolve the real (node-assigned) chainHead subscription id for the
+   * follow registered under `subscriptionId` on the given chain. Returns
+   * undefined if no such follow exists or if the node has not yet
+   * responded with an id.
+   */
+  function getChainSubId(genesisHash: HexString, subscriptionId: string): string | undefined {
     const entry = chains.get(genesisHash);
-    if (!entry) return undefined;
+    return entry?.followSubscriptions.get(subscriptionId)?.chainSubId;
+  }
 
+  function unfollowAll(entry: ChainEntry): void {
     for (const follow of entry.followSubscriptions.values()) {
-      if (follow.chainSubId) return follow.chainSubId;
+      if (follow.chainSubId) sendUnfollow(entry, follow.chainSubId);
     }
-    return undefined;
+    entry.followSubscriptions.clear();
   }
 
   function releaseChain(genesisHash: HexString): void {
@@ -199,15 +213,7 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
 
     entry.refCount--;
     if (entry.refCount <= 0) {
-      for (const follow of entry.followSubscriptions.values()) {
-        if (follow.chainSubId) {
-          const id = getNextId();
-          entry.connection.send(
-            JSON.stringify({ jsonrpc: '2.0', id, method: 'chainHead_v1_unfollow', params: [follow.chainSubId] }),
-          );
-        }
-      }
-      entry.followSubscriptions.clear();
+      unfollowAll(entry);
       entry.connection.disconnect();
       chains.delete(genesisHash);
     }
@@ -215,15 +221,7 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
 
   function dispose(): void {
     for (const entry of chains.values()) {
-      for (const follow of entry.followSubscriptions.values()) {
-        if (follow.chainSubId) {
-          const id = getNextId();
-          entry.connection.send(
-            JSON.stringify({ jsonrpc: '2.0', id, method: 'chainHead_v1_unfollow', params: [follow.chainSubId] }),
-          );
-        }
-      }
-      entry.followSubscriptions.clear();
+      unfollowAll(entry);
       entry.connection.disconnect();
     }
     chains.clear();
@@ -374,8 +372,7 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
     getOrCreateChain,
     sendRequest,
     startFollow,
-    stopFollow,
-    getChainFollowSubId,
+    getChainSubId,
     releaseChain,
     dispose,
     convertJsonRpcEventToTyped,

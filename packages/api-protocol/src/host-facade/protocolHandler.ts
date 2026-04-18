@@ -34,6 +34,7 @@ import { structuredCloneCodecAdapter } from '../shared/codec/structured/index.js
 import type { ResultAsync } from 'neverthrow';
 
 import { createChainConnectionManager } from './connectionManager.js';
+import type { HexString } from '../shared/codec/scale/primitives.js';
 import type { HostFacade } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -521,9 +522,11 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
       const version = 'v1';
       const errorResult = (reason: string) => wrapErr(version, genericError(reason));
 
-      // Follow subscription
+      // Follow subscription. The transport-level subscriptionId is the same
+      // string the product embeds as `followSubscriptionId` on subsequent
+      // chain-op requests, so we key the follow in the manager by it.
       cleanups.push(
-        transport.handleSubscription('remote_chain_head_follow', (params, send, interrupt) => {
+        transport.handleSubscription('remote_chain_head_follow', (params, send, interrupt, subscriptionId) => {
           const unwrapped = unwrap(params, version);
           if (!unwrapped.ok) {
             interrupt();
@@ -537,13 +540,13 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
             return () => {};
           }
 
-          const { followId } = manager.startFollow(genesisHash, withRuntime, (event: unknown) => {
+          const stopFollow = manager.startFollow(genesisHash, subscriptionId, withRuntime, (event: unknown) => {
             const typedEvent = manager.convertJsonRpcEventToTyped(event as Record<string, unknown>);
             send(wrap(version, typedEvent) as ReceiveCodecType<'remote_chain_head_follow'>);
           });
 
           return () => {
-            manager.stopFollow(genesisHash, followId);
+            stopFollow();
             manager.releaseChain(genesisHash);
           };
         }),
@@ -577,29 +580,44 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
         );
       }
 
+      /**
+       * Resolve the real (node-assigned) chainHead subscription id for the
+       * `followSubscriptionId` the product embedded in a chain-op request.
+       * Returns a tagged result instead of throwing so the caller can turn
+       * the missing-follow case into a protocol-level error.
+       */
+      function resolveChainSubId(
+        genesisHash: HexString,
+        followSubscriptionId: string,
+      ): { ok: true; value: string } | { ok: false } {
+        const realSubId = manager.getChainSubId(genesisHash, followSubscriptionId);
+        if (!realSubId) return { ok: false };
+        return { ok: true, value: realSubId };
+      }
+
       // Header
       wireChainRequest('remote_chain_head_header', async value => {
-        const { genesisHash, hash } = value;
-        const realSubId = manager.getChainFollowSubId(genesisHash);
-        if (!realSubId) return errorResult('No active follow for this chain');
-        const result = await manager.sendRequest(genesisHash, 'chainHead_v1_header', [realSubId, hash]);
+        const { genesisHash, followSubscriptionId, hash } = value;
+        const sub = resolveChainSubId(genesisHash, followSubscriptionId);
+        if (!sub.ok) return errorResult('No active follow for this subscription id');
+        const result = await manager.sendRequest(genesisHash, 'chainHead_v1_header', [sub.value, hash]);
         return wrapOk(version, result);
       });
 
       // Body
       wireChainRequest('remote_chain_head_body', async value => {
-        const { genesisHash, hash } = value;
-        const realSubId = manager.getChainFollowSubId(genesisHash);
-        if (!realSubId) return errorResult('No active follow for this chain');
-        const result = await manager.sendRequest(genesisHash, 'chainHead_v1_body', [realSubId, hash]);
+        const { genesisHash, followSubscriptionId, hash } = value;
+        const sub = resolveChainSubId(genesisHash, followSubscriptionId);
+        if (!sub.ok) return errorResult('No active follow for this subscription id');
+        const result = await manager.sendRequest(genesisHash, 'chainHead_v1_body', [sub.value, hash]);
         return wrapOk(version, manager.convertOperationStartedResult(result));
       });
 
       // Storage
       wireChainRequest('remote_chain_head_storage', async value => {
-        const { genesisHash, hash, items, childTrie } = value;
-        const realSubId = manager.getChainFollowSubId(genesisHash);
-        if (!realSubId) return errorResult('No active follow for this chain');
+        const { genesisHash, followSubscriptionId, hash, items, childTrie } = value;
+        const sub = resolveChainSubId(genesisHash, followSubscriptionId);
+        if (!sub.ok) return errorResult('No active follow for this subscription id');
 
         const jsonRpcItems = items.map(item => ({
           key: item.key,
@@ -607,7 +625,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
         }));
 
         const result = await manager.sendRequest(genesisHash, 'chainHead_v1_storage', [
-          realSubId,
+          sub.value,
           hash,
           jsonRpcItems,
           childTrie,
@@ -617,10 +635,10 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
 
       // Call
       wireChainRequest('remote_chain_head_call', async value => {
-        const realSubId = manager.getChainFollowSubId(value.genesisHash);
-        if (!realSubId) return errorResult('No active follow for this chain');
+        const sub = resolveChainSubId(value.genesisHash, value.followSubscriptionId);
+        if (!sub.ok) return errorResult('No active follow for this subscription id');
         const result = await manager.sendRequest(value.genesisHash, 'chainHead_v1_call', [
-          realSubId,
+          sub.value,
           value.hash,
           value.function,
           value.callParameters,
@@ -630,28 +648,28 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
 
       // Unpin
       wireChainRequest('remote_chain_head_unpin', async value => {
-        const { genesisHash, hashes } = value;
-        const realSubId = manager.getChainFollowSubId(genesisHash);
-        if (!realSubId) return errorResult('No active follow for this chain');
-        await manager.sendRequest(genesisHash, 'chainHead_v1_unpin', [realSubId, hashes]);
+        const { genesisHash, followSubscriptionId, hashes } = value;
+        const sub = resolveChainSubId(genesisHash, followSubscriptionId);
+        if (!sub.ok) return errorResult('No active follow for this subscription id');
+        await manager.sendRequest(genesisHash, 'chainHead_v1_unpin', [sub.value, hashes]);
         return wrapOk(version, undefined);
       });
 
       // Continue
       wireChainRequest('remote_chain_head_continue', async value => {
-        const { genesisHash, operationId } = value;
-        const realSubId = manager.getChainFollowSubId(genesisHash);
-        if (!realSubId) return errorResult('No active follow for this chain');
-        await manager.sendRequest(genesisHash, 'chainHead_v1_continue', [realSubId, operationId]);
+        const { genesisHash, followSubscriptionId, operationId } = value;
+        const sub = resolveChainSubId(genesisHash, followSubscriptionId);
+        if (!sub.ok) return errorResult('No active follow for this subscription id');
+        await manager.sendRequest(genesisHash, 'chainHead_v1_continue', [sub.value, operationId]);
         return wrapOk(version, undefined);
       });
 
       // StopOperation
       wireChainRequest('remote_chain_head_stop_operation', async value => {
-        const { genesisHash, operationId } = value;
-        const realSubId = manager.getChainFollowSubId(genesisHash);
-        if (!realSubId) return errorResult('No active follow for this chain');
-        await manager.sendRequest(genesisHash, 'chainHead_v1_stopOperation', [realSubId, operationId]);
+        const { genesisHash, followSubscriptionId, operationId } = value;
+        const sub = resolveChainSubId(genesisHash, followSubscriptionId);
+        if (!sub.ok) return errorResult('No active follow for this subscription id');
+        await manager.sendRequest(genesisHash, 'chainHead_v1_stopOperation', [sub.value, operationId]);
         return wrapOk(version, undefined);
       });
 
