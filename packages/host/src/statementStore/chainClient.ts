@@ -107,15 +107,16 @@ export function createChainClient(provider: JsonRpcProvider): ChainClient {
 
       const sub = observable.subscribe({
         next(event) {
-          if (event.event === 'newStatements') {
-            for (const encoded of event.data.statements) {
-              try {
-                callback([decodeStatement(hexToBytes(encoded))]);
-              } catch {
-                // Skip malformed statements
-              }
+          if (event.event !== 'newStatements') return;
+          const decoded: Statement[] = [];
+          for (const encoded of event.data.statements) {
+            try {
+              decoded.push(decodeStatement(hexToBytes(encoded)));
+            } catch {
+              // Skip malformed statements
             }
           }
+          if (decoded.length > 0) callback(decoded);
         },
         error(err) {
           console.error('[statement-store] subscription error:', err);

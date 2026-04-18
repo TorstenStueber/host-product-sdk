@@ -12,6 +12,13 @@
 - **Prefer `undefined` over `null`.** Use `undefined` for absent values. Only use `null` when forced by an external API
   (DOM methods like `localStorage.getItem()`, `contentWindow`, JSON-RPC spec, etc.). Never introduce `null` in our own
   types, return values, or state variables.
+- **Avoid `as` type assertions.** `as T`, `as never`, `as unknown`, `as any` all suppress TypeScript's checks and
+  frequently hide real bugs (enum-tag casing mismatches, field renames, optional-vs-required differences). Only use `as`
+  when unavoidable — at genuine system boundaries where the runtime type is known but unexpressible statically:
+  `JSON.parse` results, SCALE-decoded bytes, raw DOM APIs, legitimately-typed tagged unions narrowed by a runtime check.
+  If you're reaching for `as never` or `as unknown` in domain code, the types actually differ — write a proper
+  conversion function instead of a cast. Prefer inline object literals over casts when returning typed values
+  (TypeScript uses contextual typing to check them).
 
 ## Git
 
