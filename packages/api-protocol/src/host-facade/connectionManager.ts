@@ -119,10 +119,16 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
     return entry;
   }
 
-  function sendRequest(genesisHash: HexString, method: string, params: unknown[]): Promise<unknown> {
-    const entry = chains.get(genesisHash);
-    if (!entry) return Promise.reject(new Error(`No connection for chain ${genesisHash}`));
-
+  /**
+   * Send a JSON-RPC 2.0 request on the given chain's connection and resolve
+   * with the node's `result` (or reject with the node's `error` object,
+   * shape `{code, message, data?}`).
+   *
+   * Takes a `ChainEntry` directly rather than a `genesisHash` so the
+   * "chain not found" case is impossible by construction — every call site
+   * has already obtained an entry via `getOrCreateChain` or `resolveFollow`.
+   */
+  function sendRequest(entry: ChainEntry, method: string, params: unknown[]): Promise<unknown> {
     const id = getNextId();
     return new Promise((resolve, reject) => {
       entry.pendingRequests.set(id, { resolve, reject });
@@ -152,14 +158,11 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
    * already stopped (no-op).
    */
   function startFollow(
-    genesisHash: HexString,
+    entry: ChainEntry,
     subscriptionId: string,
     withRuntime: boolean,
     onEvent: (event: unknown) => void,
   ): () => void {
-    const entry = chains.get(genesisHash);
-    if (!entry) throw new Error(`No connection for chain ${genesisHash}`);
-
     const requestId = getNextId();
     let stopped = false;
     let followId: string | undefined;
@@ -200,14 +203,21 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
   }
 
   /**
-   * Resolve the node-assigned `chainHead_v1_follow` id for the follow
-   * registered under `subscriptionId` on the given chain. Returns
-   * undefined if no such follow exists or if the node has not yet
-   * responded with an id.
+   * Look up an active follow by the transport-level `subscriptionId` on the
+   * given chain. Returns both the `ChainEntry` (needed for `sendRequest`)
+   * and the node-assigned `followId` (needed as the first positional
+   * argument on every `chainHead_v1_*` call). Returns `undefined` if the
+   * chain is gone, no follow matches the id, or the node hasn't yet
+   * responded with a follow id for it.
    */
-  function getFollowId(genesisHash: HexString, subscriptionId: string): string | undefined {
+  function resolveFollow(
+    genesisHash: HexString,
+    subscriptionId: string,
+  ): { entry: ChainEntry; followId: string } | undefined {
     const entry = chains.get(genesisHash);
-    return entry?.followSubscriptions.get(subscriptionId)?.followId;
+    const followId = entry?.followSubscriptions.get(subscriptionId)?.followId;
+    if (!entry || !followId) return undefined;
+    return { entry, followId };
   }
 
   function unfollowAll(entry: ChainEntry): void {
@@ -382,7 +392,7 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
     getOrCreateChain,
     sendRequest,
     startFollow,
-    getFollowId,
+    resolveFollow,
     releaseChain,
     dispose,
     convertJsonRpcEventToTyped,
