@@ -8,7 +8,7 @@
 import type { HostFacade } from '@polkadot/api-protocol';
 import { errAsync, okAsync } from '@polkadot/api-protocol';
 import { ResultAsync } from 'neverthrow';
-import type { StatementStoreAdapter } from '../statementStore/types.js';
+import type { StatementStoreAdapter, SignedStatement } from '../statementStore/types.js';
 import type { SsoSigner } from '../auth/sso/transport.js';
 
 export type StatementStoreHandlersConfig = {
@@ -34,20 +34,22 @@ export function wireStatementStoreHandlers(
       // params is an array of topic Uint8Arrays
       const topics = params;
       const unsub = adapter.subscribe(topics, statements => {
-        // Convert our Statement[] to the protocol's SignedStatement[] format
-        // The protocol expects SCALE-encoded statements, but the handler
-        // wiring takes care of the SCALE encoding — we just provide the data.
-        for (const stmt of statements) {
-          if (stmt.proof) {
-            send({
-              proof: stmt.proof,
-              data: stmt.data,
-              topics: stmt.topics,
-              channel: stmt.channel,
-              expiry: stmt.expiry,
-              decryptionKey: stmt.decryptionKey,
-            } as never);
-          }
+        // The protocol receive type is `Vector(SignedStatement)` — each
+        // `send()` call must carry the whole batch as an array, not one
+        // statement. Unproven statements can't round-trip through the
+        // SignedStatement shape, so filter them out before forwarding.
+        const signed: SignedStatement[] = statements
+          .filter((s): s is SignedStatement => s.proof !== undefined)
+          .map(s => ({
+            proof: s.proof,
+            data: s.data,
+            topics: s.topics,
+            channel: s.channel,
+            expiry: s.expiry,
+            decryptionKey: s.decryptionKey,
+          }));
+        if (signed.length > 0) {
+          send(signed as never);
         }
       });
 
