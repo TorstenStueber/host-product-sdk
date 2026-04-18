@@ -73,6 +73,30 @@ function genericError(reason: string): GenericErr {
   return { reason };
 }
 
+/**
+ * Serialize an error for the `GenericErr.reason` string field.
+ *
+ * The protocol schema only gives us an opaque string for chain-op error
+ * reasons, but the catch arm of `wireChainRequest` receives either a
+ * JSON-RPC 2.0 error object (`{code, message, data?}` — from the node or
+ * synthesized by the connection manager for transport-level failures) or,
+ * rarely, an `Error` instance (e.g. a `JSON.stringify` TypeError inside a
+ * handler). Packing the JSON-RPC shape as JSON lets the product side
+ * round-trip and preserve `code` and `data`; `Error` instances don't
+ * serialize usefully so we fall back to `message`.
+ */
+function stringifyError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === 'object' && e !== null) {
+    try {
+      return JSON.stringify(e);
+    } catch {
+      return String(e);
+    }
+  }
+  return String(e);
+}
+
 // ---------------------------------------------------------------------------
 // HostFacade options
 // ---------------------------------------------------------------------------
@@ -599,7 +623,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
               const result = await handler(unwrapped.value as RequestParams<M, 'v1'>);
               return { tag: version, value: result } as ResponseCodecType<M>;
             } catch (e) {
-              return errorResult(String(e)) as ResponseCodecType<M>;
+              return errorResult(stringifyError(e)) as ResponseCodecType<M>;
             }
           }),
         );

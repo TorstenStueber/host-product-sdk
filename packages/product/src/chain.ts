@@ -60,8 +60,10 @@ export function createPapiProvider(
       onMessage(JSON.stringify({ jsonrpc: '2.0', id, result }));
     }
 
-    function sendJsonRpcError(id: number | string, code: number, message: string): void {
-      onMessage(JSON.stringify({ jsonrpc: '2.0', id, error: { code, message } }));
+    function sendJsonRpcError(id: number | string, code: number, message: string, data?: unknown): void {
+      const error: { code: number; message: string; data?: unknown } = { code, message };
+      if (data !== undefined) error.data = data;
+      onMessage(JSON.stringify({ jsonrpc: '2.0', id, error }));
     }
 
     function sendFollowEvent(syntheticSubId: string, event: unknown): void {
@@ -197,8 +199,34 @@ export function createPapiProvider(
 
     // -- Error extraction helper --------------------------------------------
 
-    function extractErrorReason(error: { reason: string }): string {
-      return error.reason;
+    /**
+     * Forward a chain-op `GenericErr` to the PAPI JSON-RPC caller.
+     *
+     * The host side packs JSON-RPC 2.0 error objects into `error.reason`
+     * (see `stringifyError` on the host). We try to round-trip that JSON:
+     * if `reason` parses to a `{code, message, data?}` shape, the original
+     * code/message/data are forwarded verbatim, so PAPI sees the node's
+     * real error. Anything else (plain strings, parse failures) falls back
+     * to `-32603 Internal error` with the raw reason as the message —
+     * preserving the previous behavior for unknown shapes.
+     */
+    function forwardChainError(id: number | string, error: { reason: string }): void {
+      try {
+        const parsed: unknown = JSON.parse(error.reason);
+        if (
+          typeof parsed === 'object' &&
+          parsed !== null &&
+          typeof (parsed as { code?: unknown }).code === 'number' &&
+          typeof (parsed as { message?: unknown }).message === 'string'
+        ) {
+          const { code, message, data } = parsed as { code: number; message: string; data?: unknown };
+          sendJsonRpcError(id, code, message, data);
+          return;
+        }
+      } catch {
+        // Not JSON — fall through to the opaque-string path.
+      }
+      sendJsonRpcError(id, -32603, error.reason);
     }
 
     // -- Message handler ----------------------------------------------------
@@ -254,7 +282,7 @@ export function createPapiProvider(
             })
             .match(
               result => sendJsonRpcResponse(id, result),
-              error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
+              error => forwardChainError(id, error),
             );
           break;
         }
@@ -270,7 +298,7 @@ export function createPapiProvider(
             })
             .match(
               result => sendJsonRpcResponse(id, convertOperationResultToJsonRpc(result)),
-              error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
+              error => forwardChainError(id, error),
             );
           break;
         }
@@ -298,7 +326,7 @@ export function createPapiProvider(
             })
             .match(
               result => sendJsonRpcResponse(id, convertOperationResultToJsonRpc(result)),
-              error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
+              error => forwardChainError(id, error),
             );
           break;
         }
@@ -316,7 +344,7 @@ export function createPapiProvider(
             })
             .match(
               result => sendJsonRpcResponse(id, convertOperationResultToJsonRpc(result)),
-              error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
+              error => forwardChainError(id, error),
             );
           break;
         }
@@ -333,7 +361,7 @@ export function createPapiProvider(
             })
             .match(
               () => sendJsonRpcResponse(id, null),
-              error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
+              error => forwardChainError(id, error),
             );
           break;
         }
@@ -349,7 +377,7 @@ export function createPapiProvider(
             })
             .match(
               () => sendJsonRpcResponse(id, null),
-              error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
+              error => forwardChainError(id, error),
             );
           break;
         }
@@ -365,7 +393,7 @@ export function createPapiProvider(
             })
             .match(
               () => sendJsonRpcResponse(id, null),
-              error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
+              error => forwardChainError(id, error),
             );
           break;
         }
@@ -374,7 +402,7 @@ export function createPapiProvider(
         case 'chainSpec_v1_genesisHash': {
           facade.chainSpecGenesisHash(genesisHash).match(
             result => sendJsonRpcResponse(id, result),
-            error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
+            error => forwardChainError(id, error),
           );
           break;
         }
@@ -383,7 +411,7 @@ export function createPapiProvider(
         case 'chainSpec_v1_chainName': {
           facade.chainSpecChainName(genesisHash).match(
             result => sendJsonRpcResponse(id, result),
-            error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
+            error => forwardChainError(id, error),
           );
           break;
         }
@@ -398,7 +426,7 @@ export function createPapiProvider(
                 sendJsonRpcResponse(id, result);
               }
             },
-            error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
+            error => forwardChainError(id, error),
           );
           break;
         }
@@ -414,7 +442,7 @@ export function createPapiProvider(
               }
               sendJsonRpcResponse(id, opId);
             },
-            error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
+            error => forwardChainError(id, error),
           );
           break;
         }
@@ -425,7 +453,7 @@ export function createPapiProvider(
           activeBroadcasts.delete(operationId);
           facade.chainTransactionStop({ genesisHash, operationId }).match(
             () => sendJsonRpcResponse(id, null),
-            error => sendJsonRpcError(id, -32603, extractErrorReason(error)),
+            error => forwardChainError(id, error),
           );
           break;
         }
