@@ -120,9 +120,21 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
   }
 
   /**
+   * Build a JSON-RPC 2.0-shaped error object for transport-level failures
+   * (e.g. `connection.send` throwing synchronously on a closed socket).
+   * Using the same `{code, message, data?}` shape as real node errors means
+   * callers of `sendRequest` / `startFollow` only ever see one error shape.
+   * Code -32603 is "Internal error" per the spec.
+   */
+  function transportError(e: unknown): { code: number; message: string } {
+    return { code: -32603, message: e instanceof Error ? e.message : String(e) };
+  }
+
+  /**
    * Send a JSON-RPC 2.0 request on the given chain's connection and resolve
    * with the node's `result` (or reject with the node's `error` object,
-   * shape `{code, message, data?}`).
+   * shape `{code, message, data?}`). Synchronous failures of
+   * `connection.send` are converted to the same shape via `transportError`.
    *
    * Takes a `ChainEntry` directly rather than a `genesisHash` so the
    * "chain not found" case is impossible by construction — every call site
@@ -132,7 +144,12 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
     const id = getNextId();
     return new Promise((resolve, reject) => {
       entry.pendingRequests.set(id, { resolve, reject });
-      entry.connection.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }));
+      try {
+        entry.connection.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }));
+      } catch (e) {
+        entry.pendingRequests.delete(id);
+        reject(transportError(e));
+      }
     });
   }
 
@@ -151,6 +168,14 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
    *   node. Used for `chainHead_v1_*` calls on the wire to the node
    *   and for routing incoming notifications.
    *
+   * `onRejected` is invoked with a `{code, message, data?}` JSON-RPC error
+   * if the node rejects the follow request, or with a transport-level
+   * error if `connection.send` throws synchronously. The caller is
+   * expected to translate this into a protocol-level termination signal
+   * (e.g. `interrupt()` on the TrUAPI subscription) -- without this hook
+   * the product would silently receive no events and never learn the
+   * follow failed.
+   *
    * The returned function stops the follow. It is idempotent and handles
    * all three states: (1) the node response hasn't arrived yet (stop is
    * deferred — `unfollow` is sent once the response arrives), (2) the
@@ -162,6 +187,7 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
     subscriptionId: string,
     withRuntime: boolean,
     onEvent: (event: unknown) => void,
+    onRejected: (error: unknown) => void,
   ): () => void {
     const requestId = getNextId();
     let stopped = false;
@@ -177,13 +203,21 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
         }
         entry.followSubscriptions.set(subscriptionId, { followId, eventListener: onEvent });
       },
-      reject: () => {
-        // No follow was ever registered; nothing to clean up.
+      reject: error => {
+        // Node rejected the follow request — notify the caller so the
+        // subscription is torn down cleanly on the product side.
+        if (!stopped) onRejected(error);
       },
     });
-    entry.connection.send(
-      JSON.stringify({ jsonrpc: '2.0', id: requestId, method: 'chainHead_v1_follow', params: [withRuntime] }),
-    );
+    try {
+      entry.connection.send(
+        JSON.stringify({ jsonrpc: '2.0', id: requestId, method: 'chainHead_v1_follow', params: [withRuntime] }),
+      );
+    } catch (e) {
+      entry.pendingRequests.delete(requestId);
+      onRejected(transportError(e));
+      return () => {};
+    }
 
     return () => {
       if (stopped) return;

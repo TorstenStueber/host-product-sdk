@@ -540,10 +540,21 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
             return () => {};
           }
 
-          const stopFollow = manager.startFollow(entry, subscriptionId, withRuntime, (event: unknown) => {
-            const typedEvent = manager.convertJsonRpcEventToTyped(event as Record<string, unknown>);
-            send(wrap(version, typedEvent) as ReceiveCodecType<'remote_chain_head_follow'>);
-          });
+          const stopFollow = manager.startFollow(
+            entry,
+            subscriptionId,
+            withRuntime,
+            (event: unknown) => {
+              const typedEvent = manager.convertJsonRpcEventToTyped(event as Record<string, unknown>);
+              send(wrap(version, typedEvent) as ReceiveCodecType<'remote_chain_head_follow'>);
+            },
+            // Node-side or transport-level rejection of chainHead_v1_follow
+            // — interrupt the TrUAPI subscription so the product sees a
+            // clean termination. The transport interrupt callback is
+            // idempotent and handles both the sync-during-handler path and
+            // the async-after-handler-returned path.
+            () => interrupt(),
+          );
 
           return () => {
             stopFollow();
