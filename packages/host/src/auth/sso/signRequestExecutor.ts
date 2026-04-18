@@ -156,8 +156,9 @@ export function createSignRequestExecutor(config: SignRequestExecutorConfig): Si
             channel: outgoingRequestChannel,
             topics: [outgoingSessionId],
             data: encrypted,
+            decryptionKey: undefined,
             proof: {
-              tag: 'sr25519',
+              tag: 'Sr25519',
               value: {
                 signer: config.signer.publicKey,
                 signature,

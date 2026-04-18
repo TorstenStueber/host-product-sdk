@@ -24,7 +24,7 @@ function makeStatement(topicId: number, data: Uint8Array): SignedStatement {
     topics: [topic(topicId)],
     data,
     proof: {
-      tag: 'sr25519',
+      tag: 'Sr25519',
       value: {
         signature: new Uint8Array(64).fill(2),
         signer: new Uint8Array(32).fill(1),
@@ -122,8 +122,8 @@ describe('createMemoryStatementStore', () => {
     await transport.submit(makeStatement(1, new Uint8Array([1])));
 
     const received = callback.mock.calls[0]![0]![0];
-    expect(received.proof?.tag).toBe('sr25519');
-    if (received.proof?.tag === 'sr25519') {
+    expect(received.proof?.tag).toBe('Sr25519');
+    if (received.proof?.tag === 'Sr25519') {
       expect(received.proof.value.signer).toEqual(new Uint8Array(32).fill(1));
     }
   });

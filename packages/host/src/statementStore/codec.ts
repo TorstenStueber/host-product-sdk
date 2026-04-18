@@ -110,20 +110,20 @@ function encodeSigProof(idx: number, signature: Uint8Array, signer: Uint8Array):
 
 function encodeProof(proof: StatementProof): Uint8Array {
   switch (proof.tag) {
-    case 'sr25519':
+    case 'Sr25519':
       return encodeSigProof(PROOF_SR25519, proof.value.signature, proof.value.signer);
-    case 'ed25519':
+    case 'Ed25519':
       return encodeSigProof(PROOF_ED25519, proof.value.signature, proof.value.signer);
-    case 'ecdsa':
+    case 'Ecdsa':
       return encodeSigProof(PROOF_ECDSA, proof.value.signature, proof.value.signer);
-    case 'onChain': {
-      const { who, blockHash, eventIndex } = proof.value;
-      // 1-byte discriminant + 32 (who) + 32 (block_hash) + 8 (event_index u64 LE) = 73
+    case 'OnChain': {
+      const { who, blockHash, event } = proof.value;
+      // 1-byte discriminant + 32 (who) + 32 (block_hash) + 8 (event u64 LE) = 73
       const out = new Uint8Array(1 + 32 + 32 + 8);
       out[0] = PROOF_ON_CHAIN;
       out.set(who, 1);
       out.set(blockHash, 33);
-      new DataView(out.buffer).setBigUint64(65, eventIndex, true);
+      new DataView(out.buffer).setBigUint64(65, event, true);
       return out;
     }
   }
@@ -144,11 +144,9 @@ export function encodeStatement(statement: Statement): Uint8Array {
   if (statement.channel) {
     fields.push(concat(new Uint8Array([FIELD_CHANNEL]), statement.channel));
   }
-  if (statement.topics) {
-    if (statement.topics.length > 4) throw new Error(`Max 4 topics, got ${statement.topics.length}`);
-    for (let i = 0; i < statement.topics.length; i++) {
-      fields.push(concat(new Uint8Array([FIELD_TOPIC_BASE + i]), statement.topics[i]!));
-    }
+  if (statement.topics.length > 4) throw new Error(`Max 4 topics, got ${statement.topics.length}`);
+  for (let i = 0; i < statement.topics.length; i++) {
+    fields.push(concat(new Uint8Array([FIELD_TOPIC_BASE + i]), statement.topics[i]!));
   }
   if (statement.data) {
     fields.push(concat(new Uint8Array([FIELD_DATA]), encodeCompact(statement.data.length), statement.data));
@@ -165,7 +163,14 @@ export function decodeStatement(data: Uint8Array): Statement {
   const [fieldCount, lenBytes] = decodeCompact(data, offset);
   offset += lenBytes;
 
-  const statement: Statement = {};
+  const statement: Statement = {
+    proof: undefined,
+    decryptionKey: undefined,
+    expiry: undefined,
+    channel: undefined,
+    topics: [],
+    data: undefined,
+  };
   let maxIdx = -1;
   let topicCount = 0;
 
@@ -185,7 +190,7 @@ export function decodeStatement(data: Uint8Array): Statement {
           case PROOF_ED25519:
           case PROOF_ECDSA: {
             const [sigLen, signerLen] = proofIdx === PROOF_ECDSA ? [65, 33] : [64, 32];
-            const tag = proofIdx === PROOF_SR25519 ? 'sr25519' : proofIdx === PROOF_ED25519 ? 'ed25519' : 'ecdsa';
+            const tag = proofIdx === PROOF_SR25519 ? 'Sr25519' : proofIdx === PROOF_ED25519 ? 'Ed25519' : 'Ecdsa';
             const signature = data.slice(offset, offset + sigLen);
             offset += sigLen;
             const signer = data.slice(offset, offset + signerLen);
@@ -198,9 +203,9 @@ export function decodeStatement(data: Uint8Array): Statement {
             offset += 32;
             const blockHash = data.slice(offset, offset + 32);
             offset += 32;
-            const eventIndex = decodeU64(data, offset);
+            const event = decodeU64(data, offset);
             offset += 8;
-            statement.proof = { tag: 'onChain', value: { who, blockHash, eventIndex } };
+            statement.proof = { tag: 'OnChain', value: { who, blockHash, event } };
             break;
           }
           default:
@@ -228,7 +233,6 @@ export function decodeStatement(data: Uint8Array): Statement {
         if (fieldIdx !== expected)
           throw new Error(`Expected topic${topicCount + 1}, got topic${fieldIdx - FIELD_TOPIC_BASE + 1}`);
         topicCount++;
-        if (!statement.topics) statement.topics = [];
         statement.topics.push(data.slice(offset, offset + 32));
         offset += 32;
         break;

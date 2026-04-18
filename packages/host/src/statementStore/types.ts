@@ -4,39 +4,23 @@
  * Unified interface for interacting with the statement-store parachain.
  * Used by both the SSO system (pairing + signing) and the host API
  * statement store handlers (product-facing).
- */
-
-// ---------------------------------------------------------------------------
-// Statement types (matching Substrate statement-store wire format)
-// ---------------------------------------------------------------------------
-
-/**
- * SCALE-encoded `sp_statement_store::Proof` variants.
  *
- * `sr25519` / `ed25519` / `ecdsa` carry a cryptographic signature over the
- * statement's signature material. `onChain` says "the authenticity of this
- * statement is established by the fact that a corresponding event at
- * `eventIndex` in `blockHash` was emitted by `who`" — the store verifies
- * this against the chain rather than checking a signature.
+ * Re-exports the SCALE-derived `Statement`, `SignedStatement`, and
+ * `StatementProof` types from `@polkadot/api-protocol` so this adapter
+ * and the TrUAPI wire format share a single type hierarchy — no
+ * conversion needed at the host↔product boundary.
+ *
+ * `StatementProof` variants:
+ * - `Sr25519` / `Ed25519` / `Ecdsa`: cryptographic signature over the
+ *   statement's signature material.
+ * - `OnChain`: authenticity established by a corresponding event at
+ *   `event` in `blockHash` emitted by `who` — verified against the chain
+ *   rather than by signature check.
  */
-export type StatementProof =
-  | { tag: 'sr25519'; value: { signature: Uint8Array; signer: Uint8Array } }
-  | { tag: 'ed25519'; value: { signature: Uint8Array; signer: Uint8Array } }
-  | { tag: 'ecdsa'; value: { signature: Uint8Array; signer: Uint8Array } }
-  | { tag: 'onChain'; value: { who: Uint8Array; blockHash: Uint8Array; eventIndex: bigint } };
 
-export type Statement = {
-  proof?: StatementProof;
-  decryptionKey?: Uint8Array;
-  expiry?: bigint;
-  channel?: Uint8Array;
-  topics?: Uint8Array[];
-  data?: Uint8Array;
-};
+export type { StatementProof, Statement, SignedStatement } from '@polkadot/api-protocol';
 
-export type SignedStatement = Omit<Statement, 'proof'> & {
-  proof: StatementProof;
-};
+import type { Statement, SignedStatement } from '@polkadot/api-protocol';
 
 // ---------------------------------------------------------------------------
 // Adapter interface

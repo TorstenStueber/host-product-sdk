@@ -5,53 +5,11 @@
  * and submit operations. If no adapter is provided, returns stub errors.
  */
 
-import type {
-  HostFacade,
-  SignedStatement as WireSignedStatement,
-  StatementProof as WireStatementProof,
-} from '@polkadot/api-protocol';
-import { errAsync, okAsync } from '@polkadot/api-protocol';
+import type { HostFacade } from '@polkadot/api-protocol';
+import { errAsync } from '@polkadot/api-protocol';
 import { ResultAsync } from 'neverthrow';
-import type { StatementStoreAdapter, Statement, StatementProof } from '../statementStore/types.js';
+import type { StatementStoreAdapter, SignedStatement } from '../statementStore/types.js';
 import type { SsoSigner } from '../auth/sso/transport.js';
-
-// ---------------------------------------------------------------------------
-// Local → wire conversion
-//
-// Local adapter types use camelCase enum tags (`sr25519`, `onChain`, …) and
-// `eventIndex`; the wire types derived from the SCALE `StatementProof` enum
-// use PascalCase tags (`Sr25519`, `OnChain`, …) and `event`. These converters
-// bridge the two so the send boundary is explicit and statically checked
-// instead of hidden behind `as never`.
-// ---------------------------------------------------------------------------
-
-function toWireProof(p: StatementProof): WireStatementProof {
-  switch (p.tag) {
-    case 'sr25519':
-      return { tag: 'Sr25519', value: p.value };
-    case 'ed25519':
-      return { tag: 'Ed25519', value: p.value };
-    case 'ecdsa':
-      return { tag: 'Ecdsa', value: p.value };
-    case 'onChain':
-      return {
-        tag: 'OnChain',
-        value: { who: p.value.who, blockHash: p.value.blockHash, event: p.value.eventIndex },
-      };
-  }
-}
-
-function toWireSignedStatement(s: Statement): WireSignedStatement | undefined {
-  if (!s.proof) return undefined;
-  return {
-    proof: toWireProof(s.proof),
-    decryptionKey: s.decryptionKey,
-    expiry: s.expiry,
-    channel: s.channel,
-    topics: s.topics ?? [],
-    data: s.data,
-  };
-}
 
 export type StatementStoreHandlersConfig = {
   statementStore?: StatementStoreAdapter;
@@ -79,12 +37,9 @@ export function wireStatementStoreHandlers(
         // The protocol receive type is `Vector(SignedStatement)` — each
         // `send()` call must carry the whole batch as an array, not one
         // statement. Unproven statements can't satisfy the `SignedStatement`
-        // shape, so `toWireSignedStatement` returns undefined for them and
-        // we filter those out.
-        const wire: WireSignedStatement[] = statements
-          .map(toWireSignedStatement)
-          .filter((s): s is WireSignedStatement => s !== undefined);
-        if (wire.length > 0) send(wire);
+        // shape (proof is required there), so filter them out.
+        const signed = statements.filter((s): s is SignedStatement => s.proof !== undefined);
+        if (signed.length > 0) send(signed);
       });
 
       return unsub;
@@ -100,8 +55,8 @@ export function wireStatementStoreHandlers(
 
       const s = config.signer;
       // params is [ProductAccountId, Statement] — extract the statement data
-      const statement = (params as [unknown, { data?: Uint8Array }])[1];
-      const dataToSign = statement?.data ?? new Uint8Array(0);
+      const statement = params[1];
+      const dataToSign = statement.data ?? new Uint8Array(0);
 
       // Sign the statement data and return the proof
       return ResultAsync.fromPromise(
@@ -121,8 +76,10 @@ export function wireStatementStoreHandlers(
         return errAsync({ reason: 'Statement store not configured' });
       }
 
-      const stmt = params as { proof: unknown; data?: Uint8Array; topics?: Uint8Array[]; channel?: Uint8Array };
-      return okAsync(adapter.submit(stmt as never)).andThen(() => okAsync(undefined));
+      return ResultAsync.fromPromise(
+        adapter.submit(params).then((): undefined => undefined),
+        e => ({ reason: e instanceof Error ? e.message : String(e) }),
+      );
     }),
   );
 
