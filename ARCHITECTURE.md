@@ -300,11 +300,12 @@ idempotent. Handlers should put teardown in the returned cleanup rather than run
 when `subscribe()` is called. Both sides agree on it: consumers read it from `Subscription.subscriptionId`; producers
 receive it as the fourth handler argument on `handleSubscription`. Multiplexed subscribers (same method+payload) share
 one id. The id is the canonical way for the application protocol to correlate follow-up requests with an active
-subscription -- e.g. the `followSubscriptionId` field on `remote_chain_head_header/_body/_storage/_call/_unpin/_continue/
-_stop_operation` is set to the `subscriptionId` of the originating `remote_chain_head_follow` subscription, and the host
-uses it to look up the real node-assigned `chainHead_v1` subscription. In contrast with JSON-RPC, where the server picks
-the subscription id and returns it in the response, our transport has no response phase for subscriptions -- the id is
-generated on the consumer side and travels with the `_start` message.
+subscription -- e.g. the `followSubscriptionId` field on
+`remote_chain_head_header/_body/_storage/_call/_unpin/_continue/ _stop_operation` is set to the `subscriptionId` of the
+originating `remote_chain_head_follow` subscription, and the host uses it to look up the node-assigned
+`chainHead_v1_follow` id (the `followId`, see 1b.2). In contrast with JSON-RPC, where the server picks the subscription
+id and returns it in the response, our transport has no response phase for subscriptions -- the id is generated on the
+consumer side and travels with the `_start` message.
 
 **Multiplexing**: Two callers subscribing to the same method+payload share one wire subscription. When the last listener
 unsubscribes, `_stop` is sent.
@@ -460,17 +461,23 @@ lazily opens one `JsonRpcProvider` per `genesisHash` (ref-counted across `getOrC
 maintains a request-id map for pending request/response correlation, and a follow map for `chainHead_v1_follow`
 subscriptions.
 
-Key detail: the follow map is keyed by the **transport-level `subscriptionId`** of the originating
-`remote_chain_head_follow` subscription -- the same id the product embeds in `followSubscriptionId` on every subsequent
-chain-op request (`remote_chain_head_header`, `_body`, `_storage`, `_call`, `_unpin`, `_continue`, `_stop_operation`).
-Before issuing a JSON-RPC call, the protocol handler calls `manager.getChainSubId(genesisHash, followSubscriptionId)` to
-translate it into the node-assigned chainHead subscription id and passes that to the node. This is what makes multiple
+Two different "subscription ids" are in play at this boundary and the code keeps them strictly separate:
+
+- **`subscriptionId`** -- the transport-level id of the originating `remote_chain_head_follow` subscription, chosen by
+  the product, the same id it embeds in `followSubscriptionId` on every subsequent chain-op request
+  (`remote_chain_head_header`, `_body`, `_storage`, `_call`, `_unpin`, `_continue`, `_stop_operation`). This is what the
+  follow map is keyed by.
+- **`followId`** -- the `chainHead_v1_follow` subscription id returned by the substrate node. Used on the wire to the
+  node for every `chainHead_v1_*` call and to route incoming notifications back to the right follow.
+
+Before issuing a JSON-RPC call the protocol handler calls `manager.getFollowId(genesisHash, followSubscriptionId)` to
+translate the transport id into the node's `followId` and passes that to the node. This is what makes multiple
 concurrent follows on the same chain route correctly.
 
 `startFollow(genesisHash, subscriptionId, withRuntime, onEvent)` returns a stop function. The stop function is
 idempotent and handles the race where it is called before the node's `chainHead_v1_follow` response has arrived -- in
-that case the deferred `chainHead_v1_unfollow` is sent once the response resolves, and the follow is never inserted
-into the map.
+that case the deferred `chainHead_v1_unfollow` is sent once the response resolves, and the follow is never inserted into
+the map.
 
 ### 1b.3 HostFacade Types (`host-facade/types.ts`)
 
