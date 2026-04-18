@@ -555,20 +555,20 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
       /**
        * Handler-level result for a chain-op request. Typed per method: `value`
        * must match `ResponseOk<M, 'v1'>` on success or `ResponseErr<M, 'v1'>`
-       * on failure. Wrapping into the full `ResponseCodecType<M>` envelope is
-       * done by `wireChainRequest`, not the handler.
+       * on failure. Shape matches the inner `value` of `ResponseCodecType<M>`
+       * so `wireChainRequest` only needs to wrap it in `{tag: 'v1', value}`.
        */
       type ChainRequestResult<M extends RequestMethod> =
-        | { ok: true; value: ResponseOk<M, 'v1'> }
-        | { ok: false; value: ResponseErr<M, 'v1'> };
+        | { success: true; value: ResponseOk<M, 'v1'> }
+        | { success: false; value: ResponseErr<M, 'v1'> };
 
       /**
        * Wire a chain request handler. The handler receives unwrapped v1 params
-       * and returns a typed `ChainRequestResult<M>`. `wireChainRequest` wraps
-       * the inner value into the `{tag: 'v1', value: {success, value}}`
-       * envelope, so the sole untyped boundary is the single
-       * `as ResponseCodecType<M>` cast in the wrapper (TypeScript can't prove
-       * the shape structurally because `wrapOk`/`wrapErr` are generic).
+       * and returns a typed `ChainRequestResult<M>`; `wireChainRequest` wraps
+       * it in the `{tag: 'v1', value: ...}` envelope. The sole untyped boundary
+       * is the single `as ResponseCodecType<M>` cast -- TypeScript can't prove
+       * `{tag: 'v1', value: ChainRequestResult<M>}` matches `ResponseCodecType<M>`
+       * structurally in a generic context.
        *
        * Thrown exceptions are converted to a generic-reason error response --
        * useful for letting network/JSON-RPC rejections flow through without a
@@ -586,9 +586,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
             }
             try {
               const result = await handler(unwrapped.value as RequestParams<M, 'v1'>);
-              return (
-                result.ok ? wrapOk(version, result.value) : wrapErr(version, result.value)
-              ) as ResponseCodecType<M>;
+              return { tag: version, value: result } as ResponseCodecType<M>;
             } catch (e) {
               return errorResult(String(e)) as ResponseCodecType<M>;
             }
@@ -611,7 +609,10 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
         return { ok: true, value: followId };
       }
 
-      const noActiveFollow = { ok: false, value: { reason: 'No active follow for this subscription id' } } as const;
+      const noActiveFollow = {
+        success: false,
+        value: { reason: 'No active follow for this subscription id' },
+      } as const;
 
       // Header
       wireChainRequest('remote_chain_head_header', async value => {
@@ -622,7 +623,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
           follow.value,
           hash,
         ])) as ResponseOk<'remote_chain_head_header', 'v1'>;
-        return { ok: true, value: result };
+        return { success: true, value: result };
       });
 
       // Body
@@ -631,7 +632,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
         const follow = resolveFollowId(genesisHash, followSubscriptionId);
         if (!follow.ok) return noActiveFollow;
         const result = await manager.sendRequest(genesisHash, 'chainHead_v1_body', [follow.value, hash]);
-        return { ok: true, value: manager.convertOperationStartedResult(result) };
+        return { success: true, value: manager.convertOperationStartedResult(result) };
       });
 
       // Storage
@@ -651,7 +652,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
           jsonRpcItems,
           childTrie,
         ]);
-        return { ok: true, value: manager.convertOperationStartedResult(result) };
+        return { success: true, value: manager.convertOperationStartedResult(result) };
       });
 
       // Call
@@ -664,7 +665,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
           value.function,
           value.callParameters,
         ]);
-        return { ok: true, value: manager.convertOperationStartedResult(result) };
+        return { success: true, value: manager.convertOperationStartedResult(result) };
       });
 
       // Unpin
@@ -673,7 +674,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
         const follow = resolveFollowId(genesisHash, followSubscriptionId);
         if (!follow.ok) return noActiveFollow;
         await manager.sendRequest(genesisHash, 'chainHead_v1_unpin', [follow.value, hashes]);
-        return { ok: true, value: undefined };
+        return { success: true, value: undefined };
       });
 
       // Continue
@@ -682,7 +683,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
         const follow = resolveFollowId(genesisHash, followSubscriptionId);
         if (!follow.ok) return noActiveFollow;
         await manager.sendRequest(genesisHash, 'chainHead_v1_continue', [follow.value, operationId]);
-        return { ok: true, value: undefined };
+        return { success: true, value: undefined };
       });
 
       // StopOperation
@@ -691,10 +692,10 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
         const follow = resolveFollowId(genesisHash, followSubscriptionId);
         if (!follow.ok) return noActiveFollow;
         await manager.sendRequest(genesisHash, 'chainHead_v1_stopOperation', [follow.value, operationId]);
-        return { ok: true, value: undefined };
+        return { success: true, value: undefined };
       });
 
-      const chainNotSupported = { ok: false, value: { reason: 'Chain not supported' } } as const;
+      const chainNotSupported = { success: false, value: { reason: 'Chain not supported' } } as const;
 
       // ChainSpec: genesis hash
       wireChainRequest('remote_chain_spec_genesis_hash', async value => {
@@ -706,7 +707,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
             'remote_chain_spec_genesis_hash',
             'v1'
           >;
-          return { ok: true, value: result };
+          return { success: true, value: result };
         } finally {
           manager.releaseChain(genesisHash);
         }
@@ -722,7 +723,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
             'remote_chain_spec_chain_name',
             'v1'
           >;
-          return { ok: true, value: result };
+          return { success: true, value: result };
         } finally {
           manager.releaseChain(genesisHash);
         }
@@ -735,7 +736,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
         if (!entry) return chainNotSupported;
         try {
           const result = await manager.sendRequest(genesisHash, 'chainSpec_v1_properties', []);
-          return { ok: true, value: typeof result === 'string' ? result : JSON.stringify(result) };
+          return { success: true, value: typeof result === 'string' ? result : JSON.stringify(result) };
         } finally {
           manager.releaseChain(genesisHash);
         }
@@ -748,7 +749,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
         if (!entry) return chainNotSupported;
         try {
           const result = await manager.sendRequest(genesisHash, 'transaction_v1_broadcast', [transaction]);
-          return { ok: true, value: (result as string) ?? undefined };
+          return { success: true, value: (result as string) ?? undefined };
         } finally {
           manager.releaseChain(genesisHash);
         }
@@ -761,7 +762,7 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
         if (!entry) return chainNotSupported;
         try {
           await manager.sendRequest(genesisHash, 'transaction_v1_stop', [operationId]);
-          return { ok: true, value: undefined };
+          return { success: true, value: undefined };
         } finally {
           manager.releaseChain(genesisHash);
         }
