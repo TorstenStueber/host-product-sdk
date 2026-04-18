@@ -84,6 +84,28 @@ describe('statementCodec', () => {
       expect(decoded.proof).toEqual(stmt.proof);
     });
 
+    it('onChain proof', () => {
+      const stmt: Statement = {
+        proof: {
+          tag: 'onChain',
+          value: { who: randomBytes(32), blockHash: randomBytes(32), eventIndex: 0xdeadbeefn },
+        },
+      };
+      const decoded = decodeStatement(encodeStatement(stmt));
+      expect(decoded.proof).toEqual(stmt.proof);
+    });
+
+    it('onChain proof with max u64 event index', () => {
+      const stmt: Statement = {
+        proof: {
+          tag: 'onChain',
+          value: { who: zeros(32), blockHash: zeros(32), eventIndex: 0xffffffffffffffffn },
+        },
+      };
+      const decoded = decodeStatement(encodeStatement(stmt));
+      expect(decoded.proof).toEqual(stmt.proof);
+    });
+
     it('1 topic', () => {
       const stmt: Statement = { topics: [randomBytes(32)] };
       const decoded = decodeStatement(encodeStatement(stmt));
@@ -242,8 +264,8 @@ describe('statementCodec', () => {
     });
 
     it('throws on unknown proof type', () => {
-      // compact(1), field_index=0 (proof), proof_type=3 (onChain — not supported)
-      const bad = new Uint8Array([0x04, 0, 3, ...zeros(72)]); // 72 = who(32) + blockHash(32) + event(8)
+      // compact(1), field_index=0 (proof), proof_type=99 (not a valid discriminant)
+      const bad = new Uint8Array([0x04, 0, 99]);
       expect(() => decodeStatement(bad)).toThrow(/proof type/i);
     });
 

@@ -10,10 +10,20 @@
 // Statement types (matching Substrate statement-store wire format)
 // ---------------------------------------------------------------------------
 
+/**
+ * SCALE-encoded `sp_statement_store::Proof` variants.
+ *
+ * `sr25519` / `ed25519` / `ecdsa` carry a cryptographic signature over the
+ * statement's signature material. `onChain` says "the authenticity of this
+ * statement is established by the fact that a corresponding event at
+ * `eventIndex` in `blockHash` was emitted by `who`" — the store verifies
+ * this against the chain rather than checking a signature.
+ */
 export type StatementProof =
   | { tag: 'sr25519'; value: { signature: Uint8Array; signer: Uint8Array } }
   | { tag: 'ed25519'; value: { signature: Uint8Array; signer: Uint8Array } }
-  | { tag: 'ecdsa'; value: { signature: Uint8Array; signer: Uint8Array } };
+  | { tag: 'ecdsa'; value: { signature: Uint8Array; signer: Uint8Array } }
+  | { tag: 'onChain'; value: { who: Uint8Array; blockHash: Uint8Array; eventIndex: bigint } };
 
 export type Statement = {
   proof?: StatementProof;

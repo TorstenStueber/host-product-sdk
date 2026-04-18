@@ -32,7 +32,7 @@ export function wireStatementStoreHandlers(
       }
 
       // params is an array of topic Uint8Arrays
-      const topics = params as Uint8Array[];
+      const topics = params;
       const unsub = adapter.subscribe(topics, statements => {
         // Convert our Statement[] to the protocol's SignedStatement[] format
         // The protocol expects SCALE-encoded statements, but the handler

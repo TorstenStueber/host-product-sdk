@@ -1,11 +1,14 @@
 /**
  * SCALE codec for Substrate statement-store statements.
  *
- * A statement is encoded as a SCALE Vector of Variant fields.
- * Fields must appear in strictly ascending order by variant index:
+ * Matches `sp_statement_store::Statement`'s custom `Encode`/`Decode` impl
+ * (substrate/primitives/statement-store/src/lib.rs): a statement is
+ * encoded as a SCALE `Vec<Field>`. Fields must appear in strictly
+ * ascending order by variant index, and each variant may appear at most
+ * once. Variant indices:
  *
- *   0: proof        — Variant { 0:sr25519, 1:ed25519, 2:ecdsa, 3:onChain }
- *   1: decryptionKey — 32 bytes
+ *   0: proof        — Enum { 0:sr25519, 1:ed25519, 2:ecdsa, 3:onChain }
+ *   1: decryptionKey — 32 bytes (deprecated)
  *   2: expiry       — u64 little-endian
  *   3: channel      — 32 bytes
  *   4: topic1       — 32 bytes
@@ -14,8 +17,10 @@
  *   7: topic4       — 32 bytes
  *   8: data         — compact-length-prefixed bytes
  *
- * Only present fields are encoded. The topics array is expanded into
- * individual topic1..topic4 entries. Max 4 topics.
+ * Only present fields are encoded (except expiry, which Rust emits
+ * unconditionally; this codec emits it only when set — decode is
+ * tolerant either way). The topics array is expanded into individual
+ * topic1..topic4 entries; max 4 topics.
  *
  * Wire format: compact(field_count) || field₀ || field₁ || …
  * Each field:  u8(variant_index) || field_data
@@ -32,15 +37,12 @@ const FIELD_CHANNEL = 3;
 const FIELD_TOPIC_BASE = 4; // topic1=4, topic2=5, topic3=6, topic4=7
 const FIELD_DATA = 8;
 
-// -- Proof type indices ------------------------------------------------------
+// -- Proof variant indices (must match sp_statement_store::Proof) ------------
 
-const PROOF_TAG: Record<string, number> = { sr25519: 0, ed25519: 1, ecdsa: 2 };
-const PROOF_INDEX_TO_TAG = ['sr25519', 'ed25519', 'ecdsa'] as const;
-const PROOF_SIZES: Record<string, { sig: number; signer: number }> = {
-  sr25519: { sig: 64, signer: 32 },
-  ed25519: { sig: 64, signer: 32 },
-  ecdsa: { sig: 65, signer: 33 },
-};
+const PROOF_SR25519 = 0;
+const PROOF_ED25519 = 1;
+const PROOF_ECDSA = 2;
+const PROOF_ON_CHAIN = 3;
 
 // -- SCALE compact -----------------------------------------------------------
 
@@ -98,14 +100,33 @@ function concat(...parts: Uint8Array[]): Uint8Array {
 
 // -- Encode ------------------------------------------------------------------
 
-function encodeProof(proof: StatementProof): Uint8Array {
-  const idx = PROOF_TAG[proof.tag];
-  if (idx === undefined) throw new Error(`Unknown proof tag: ${proof.tag}`);
-  const out = new Uint8Array(1 + proof.value.signature.length + proof.value.signer.length);
+function encodeSigProof(idx: number, signature: Uint8Array, signer: Uint8Array): Uint8Array {
+  const out = new Uint8Array(1 + signature.length + signer.length);
   out[0] = idx;
-  out.set(proof.value.signature, 1);
-  out.set(proof.value.signer, 1 + proof.value.signature.length);
+  out.set(signature, 1);
+  out.set(signer, 1 + signature.length);
   return out;
+}
+
+function encodeProof(proof: StatementProof): Uint8Array {
+  switch (proof.tag) {
+    case 'sr25519':
+      return encodeSigProof(PROOF_SR25519, proof.value.signature, proof.value.signer);
+    case 'ed25519':
+      return encodeSigProof(PROOF_ED25519, proof.value.signature, proof.value.signer);
+    case 'ecdsa':
+      return encodeSigProof(PROOF_ECDSA, proof.value.signature, proof.value.signer);
+    case 'onChain': {
+      const { who, blockHash, eventIndex } = proof.value;
+      // 1-byte discriminant + 32 (who) + 32 (block_hash) + 8 (event_index u64 LE) = 73
+      const out = new Uint8Array(1 + 32 + 32 + 8);
+      out[0] = PROOF_ON_CHAIN;
+      out.set(who, 1);
+      out.set(blockHash, 33);
+      new DataView(out.buffer).setBigUint64(65, eventIndex, true);
+      return out;
+    }
+  }
 }
 
 export function encodeStatement(statement: Statement): Uint8Array {
@@ -159,14 +180,32 @@ export function decodeStatement(data: Uint8Array): Statement {
       case FIELD_PROOF: {
         const proofIdx = data[offset]!;
         offset += 1;
-        const tag = PROOF_INDEX_TO_TAG[proofIdx];
-        if (!tag) throw new Error(`Unknown proof type index ${proofIdx}`);
-        const sizes = PROOF_SIZES[tag]!;
-        const signature = data.slice(offset, offset + sizes.sig);
-        offset += sizes.sig;
-        const signer = data.slice(offset, offset + sizes.signer);
-        offset += sizes.signer;
-        statement.proof = { tag, value: { signature, signer } };
+        switch (proofIdx) {
+          case PROOF_SR25519:
+          case PROOF_ED25519:
+          case PROOF_ECDSA: {
+            const [sigLen, signerLen] = proofIdx === PROOF_ECDSA ? [65, 33] : [64, 32];
+            const tag = proofIdx === PROOF_SR25519 ? 'sr25519' : proofIdx === PROOF_ED25519 ? 'ed25519' : 'ecdsa';
+            const signature = data.slice(offset, offset + sigLen);
+            offset += sigLen;
+            const signer = data.slice(offset, offset + signerLen);
+            offset += signerLen;
+            statement.proof = { tag, value: { signature, signer } };
+            break;
+          }
+          case PROOF_ON_CHAIN: {
+            const who = data.slice(offset, offset + 32);
+            offset += 32;
+            const blockHash = data.slice(offset, offset + 32);
+            offset += 32;
+            const eventIndex = decodeU64(data, offset);
+            offset += 8;
+            statement.proof = { tag: 'onChain', value: { who, blockHash, eventIndex } };
+            break;
+          }
+          default:
+            throw new Error(`Unknown proof type index ${proofIdx}`);
+        }
         break;
       }
       case FIELD_DECRYPTION_KEY:
