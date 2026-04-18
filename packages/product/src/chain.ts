@@ -498,38 +498,37 @@ export function createPapiProvider(
   // Feature check -- verify chain is supported before starting
   // -------------------------------------------------------------------------
 
-  function checkIfReady(): Promise<boolean> {
-    return facade
-      .whenReady()
-      .then(() =>
-        facade.featureSupported({ tag: 'Chain' as const, value: genesisHash }).match(
-          supported => supported,
-          () => false,
-        ),
-      )
-      .catch(() => false);
+  async function checkIfReady(): Promise<boolean> {
+    try {
+      await facade.whenReady();
+      return await facade.featureSupported({ tag: 'Chain' as const, value: genesisHash }).match(
+        supported => supported,
+        () => false,
+      );
+    } catch {
+      return false;
+    }
   }
 
   // -------------------------------------------------------------------------
   // Return a sync provider that lazily initialises
   // -------------------------------------------------------------------------
 
-  return getSyncProvider(() =>
-    checkIfReady().then(ready => {
-      if (ready) return typedProvider;
-      if (__fallback) return __fallback;
+  return getSyncProvider(async () => {
+    const ready = await checkIfReady();
+    if (ready) return typedProvider;
+    if (__fallback) return __fallback;
 
-      // Return a no-op provider when the chain is not supported
-      return () => {
-        return {
-          send() {
-            productLogger.error(`Provider for chain ${genesisHash} was not started because Host doesn't support it`);
-          },
-          disconnect() {
-            /* empty */
-          },
-        };
+    // Return a no-op provider when the chain is not supported
+    return () => {
+      return {
+        send() {
+          productLogger.error(`Provider for chain ${genesisHash} was not started because Host doesn't support it`);
+        },
+        disconnect() {
+          /* empty */
+        },
       };
-    }),
-  );
+    };
+  });
 }
