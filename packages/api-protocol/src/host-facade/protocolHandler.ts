@@ -553,17 +553,30 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
       );
 
       /**
-       * Wire a chain request handler. The handler receives the unwrapped v1
-       * params and returns a versioned response built with wrapOk/wrapErr.
+       * Handler-level result for a chain-op request. Typed per method: `value`
+       * must match `ResponseOk<M, 'v1'>` on success or `ResponseErr<M, 'v1'>`
+       * on failure. Wrapping into the full `ResponseCodecType<M>` envelope is
+       * done by `wireChainRequest`, not the handler.
+       */
+      type ChainRequestResult<M extends RequestMethod> =
+        | { ok: true; value: ResponseOk<M, 'v1'> }
+        | { ok: false; value: ResponseErr<M, 'v1'> };
+
+      /**
+       * Wire a chain request handler. The handler receives unwrapped v1 params
+       * and returns a typed `ChainRequestResult<M>`. `wireChainRequest` wraps
+       * the inner value into the `{tag: 'v1', value: {success, value}}`
+       * envelope, so the sole untyped boundary is the single
+       * `as ResponseCodecType<M>` cast in the wrapper (TypeScript can't prove
+       * the shape structurally because `wrapOk`/`wrapErr` are generic).
        *
-       * Chain handlers interface with the JSON-RPC connection manager which
-       * returns dynamically-typed results, so a single `as ResponseCodecType<M>`
-       * cast at the boundary bridges the untyped JSON-RPC world to the
-       * typed protocol world.
+       * Thrown exceptions are converted to a generic-reason error response --
+       * useful for letting network/JSON-RPC rejections flow through without a
+       * try/catch in every handler.
        */
       function wireChainRequest<M extends RequestMethod>(
         method: M,
-        handler: (value: RequestParams<M, 'v1'>) => Promise<unknown>,
+        handler: (params: RequestParams<M, 'v1'>) => Promise<ChainRequestResult<M>>,
       ): void {
         cleanups.push(
           transport.handleRequest(method, async (message): Promise<ResponseCodecType<M>> => {
@@ -572,7 +585,10 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
               return errorResult(UNSUPPORTED_MESSAGE_FORMAT_ERROR) as ResponseCodecType<M>;
             }
             try {
-              return (await handler(unwrapped.value as RequestParams<M, 'v1'>)) as ResponseCodecType<M>;
+              const result = await handler(unwrapped.value as RequestParams<M, 'v1'>);
+              return (
+                result.ok ? wrapOk(version, result.value) : wrapErr(version, result.value)
+              ) as ResponseCodecType<M>;
             } catch (e) {
               return errorResult(String(e)) as ResponseCodecType<M>;
             }
@@ -595,29 +611,34 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
         return { ok: true, value: followId };
       }
 
+      const noActiveFollow = { ok: false, value: { reason: 'No active follow for this subscription id' } } as const;
+
       // Header
       wireChainRequest('remote_chain_head_header', async value => {
         const { genesisHash, followSubscriptionId, hash } = value;
         const follow = resolveFollowId(genesisHash, followSubscriptionId);
-        if (!follow.ok) return errorResult('No active follow for this subscription id');
-        const result = await manager.sendRequest(genesisHash, 'chainHead_v1_header', [follow.value, hash]);
-        return wrapOk(version, result);
+        if (!follow.ok) return noActiveFollow;
+        const result = (await manager.sendRequest(genesisHash, 'chainHead_v1_header', [
+          follow.value,
+          hash,
+        ])) as ResponseOk<'remote_chain_head_header', 'v1'>;
+        return { ok: true, value: result };
       });
 
       // Body
       wireChainRequest('remote_chain_head_body', async value => {
         const { genesisHash, followSubscriptionId, hash } = value;
         const follow = resolveFollowId(genesisHash, followSubscriptionId);
-        if (!follow.ok) return errorResult('No active follow for this subscription id');
+        if (!follow.ok) return noActiveFollow;
         const result = await manager.sendRequest(genesisHash, 'chainHead_v1_body', [follow.value, hash]);
-        return wrapOk(version, manager.convertOperationStartedResult(result));
+        return { ok: true, value: manager.convertOperationStartedResult(result) };
       });
 
       // Storage
       wireChainRequest('remote_chain_head_storage', async value => {
         const { genesisHash, followSubscriptionId, hash, items, childTrie } = value;
         const follow = resolveFollowId(genesisHash, followSubscriptionId);
-        if (!follow.ok) return errorResult('No active follow for this subscription id');
+        if (!follow.ok) return noActiveFollow;
 
         const jsonRpcItems = items.map(item => ({
           key: item.key,
@@ -630,61 +651,64 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
           jsonRpcItems,
           childTrie,
         ]);
-        return wrapOk(version, manager.convertOperationStartedResult(result));
+        return { ok: true, value: manager.convertOperationStartedResult(result) };
       });
 
       // Call
       wireChainRequest('remote_chain_head_call', async value => {
         const follow = resolveFollowId(value.genesisHash, value.followSubscriptionId);
-        if (!follow.ok) return errorResult('No active follow for this subscription id');
+        if (!follow.ok) return noActiveFollow;
         const result = await manager.sendRequest(value.genesisHash, 'chainHead_v1_call', [
           follow.value,
           value.hash,
           value.function,
           value.callParameters,
         ]);
-        return wrapOk(version, manager.convertOperationStartedResult(result));
+        return { ok: true, value: manager.convertOperationStartedResult(result) };
       });
 
       // Unpin
       wireChainRequest('remote_chain_head_unpin', async value => {
         const { genesisHash, followSubscriptionId, hashes } = value;
         const follow = resolveFollowId(genesisHash, followSubscriptionId);
-        if (!follow.ok) return errorResult('No active follow for this subscription id');
+        if (!follow.ok) return noActiveFollow;
         await manager.sendRequest(genesisHash, 'chainHead_v1_unpin', [follow.value, hashes]);
-        return wrapOk(version, undefined);
+        return { ok: true, value: undefined };
       });
 
       // Continue
       wireChainRequest('remote_chain_head_continue', async value => {
         const { genesisHash, followSubscriptionId, operationId } = value;
         const follow = resolveFollowId(genesisHash, followSubscriptionId);
-        if (!follow.ok) return errorResult('No active follow for this subscription id');
+        if (!follow.ok) return noActiveFollow;
         await manager.sendRequest(genesisHash, 'chainHead_v1_continue', [follow.value, operationId]);
-        return wrapOk(version, undefined);
+        return { ok: true, value: undefined };
       });
 
       // StopOperation
       wireChainRequest('remote_chain_head_stop_operation', async value => {
         const { genesisHash, followSubscriptionId, operationId } = value;
         const follow = resolveFollowId(genesisHash, followSubscriptionId);
-        if (!follow.ok) return errorResult('No active follow for this subscription id');
+        if (!follow.ok) return noActiveFollow;
         await manager.sendRequest(genesisHash, 'chainHead_v1_stopOperation', [follow.value, operationId]);
-        return wrapOk(version, undefined);
+        return { ok: true, value: undefined };
       });
+
+      const chainNotSupported = { ok: false, value: { reason: 'Chain not supported' } } as const;
 
       // ChainSpec: genesis hash
       wireChainRequest('remote_chain_spec_genesis_hash', async value => {
         const genesisHash = value;
         const entry = manager.getOrCreateChain(genesisHash);
-        if (!entry) return errorResult('Chain not supported');
+        if (!entry) return chainNotSupported;
         try {
-          const result = await manager.sendRequest(genesisHash, 'chainSpec_v1_genesisHash', []);
+          const result = (await manager.sendRequest(genesisHash, 'chainSpec_v1_genesisHash', [])) as ResponseOk<
+            'remote_chain_spec_genesis_hash',
+            'v1'
+          >;
+          return { ok: true, value: result };
+        } finally {
           manager.releaseChain(genesisHash);
-          return wrapOk(version, result);
-        } catch (e) {
-          manager.releaseChain(genesisHash);
-          throw e;
         }
       });
 
@@ -692,14 +716,15 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
       wireChainRequest('remote_chain_spec_chain_name', async value => {
         const genesisHash = value;
         const entry = manager.getOrCreateChain(genesisHash);
-        if (!entry) return errorResult('Chain not supported');
+        if (!entry) return chainNotSupported;
         try {
-          const result = await manager.sendRequest(genesisHash, 'chainSpec_v1_chainName', []);
+          const result = (await manager.sendRequest(genesisHash, 'chainSpec_v1_chainName', [])) as ResponseOk<
+            'remote_chain_spec_chain_name',
+            'v1'
+          >;
+          return { ok: true, value: result };
+        } finally {
           manager.releaseChain(genesisHash);
-          return wrapOk(version, result);
-        } catch (e) {
-          manager.releaseChain(genesisHash);
-          throw e;
         }
       });
 
@@ -707,14 +732,12 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
       wireChainRequest('remote_chain_spec_properties', async value => {
         const genesisHash = value;
         const entry = manager.getOrCreateChain(genesisHash);
-        if (!entry) return errorResult('Chain not supported');
+        if (!entry) return chainNotSupported;
         try {
           const result = await manager.sendRequest(genesisHash, 'chainSpec_v1_properties', []);
+          return { ok: true, value: typeof result === 'string' ? result : JSON.stringify(result) };
+        } finally {
           manager.releaseChain(genesisHash);
-          return wrapOk(version, typeof result === 'string' ? result : JSON.stringify(result));
-        } catch (e) {
-          manager.releaseChain(genesisHash);
-          throw e;
         }
       });
 
@@ -722,14 +745,12 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
       wireChainRequest('remote_chain_transaction_broadcast', async value => {
         const { genesisHash, transaction } = value;
         const entry = manager.getOrCreateChain(genesisHash);
-        if (!entry) return errorResult('Chain not supported');
+        if (!entry) return chainNotSupported;
         try {
           const result = await manager.sendRequest(genesisHash, 'transaction_v1_broadcast', [transaction]);
+          return { ok: true, value: (result as string) ?? undefined };
+        } finally {
           manager.releaseChain(genesisHash);
-          return wrapOk(version, (result as string) ?? undefined);
-        } catch (e) {
-          manager.releaseChain(genesisHash);
-          throw e;
         }
       });
 
@@ -737,14 +758,12 @@ export function createHostFacade(options: CreateHostFacadeOptions): HostFacade {
       wireChainRequest('remote_chain_transaction_stop', async value => {
         const { genesisHash, operationId } = value;
         const entry = manager.getOrCreateChain(genesisHash);
-        if (!entry) return errorResult('Chain not supported');
+        if (!entry) return chainNotSupported;
         try {
           await manager.sendRequest(genesisHash, 'transaction_v1_stop', [operationId]);
+          return { ok: true, value: undefined };
+        } finally {
           manager.releaseChain(genesisHash);
-          return wrapOk(version, undefined);
-        } catch (e) {
-          manager.releaseChain(genesisHash);
-          throw e;
         }
       });
 
