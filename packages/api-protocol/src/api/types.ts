@@ -113,12 +113,6 @@ export type { DevicePermissionRequestType as DevicePermissionRequest } from '../
 export type { RemotePermissionRequestType as RemotePermissionRequest } from '../shared/codec/scale/v1/remotePermission.js';
 
 // ---------------------------------------------------------------------------
-// Navigation
-// ---------------------------------------------------------------------------
-
-// NavigateToRequestType was derived from a V1 request codec and has been removed.
-
-// ---------------------------------------------------------------------------
 // Notification
 // ---------------------------------------------------------------------------
 
@@ -161,3 +155,9 @@ export type { CustomRendererNodeType as CustomRendererNode } from '../shared/cod
 // ---------------------------------------------------------------------------
 
 export type { FeatureType as Feature } from '../shared/codec/scale/v1/feature.js';
+
+// ---------------------------------------------------------------------------
+// Common Codecs
+// ---------------------------------------------------------------------------
+
+export type { GenericErrType as GenericErr } from '../shared/codec/scale/v1/commonCodecs.js';

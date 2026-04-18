@@ -109,6 +109,9 @@ export type {
 
   // Feature
   Feature,
+
+  // Common codecs
+  GenericErr,
 } from './api/types.js';
 
 // ===========================================================================

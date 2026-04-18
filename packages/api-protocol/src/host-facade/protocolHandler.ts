@@ -24,6 +24,7 @@ import type {
   SubscriptionParams,
   SubscriptionPayload,
 } from '../api/protocol.js';
+import type { GenericErr } from '../api/types.js';
 import type { Messaging } from '../shared/transport/provider.js';
 import { createTransport } from '../shared/transport/transport.js';
 import { createWindowProvider } from '../shared/transport/windowProvider.js';
@@ -69,7 +70,7 @@ function unwrap<M extends { tag: string; value: unknown }, V extends M['tag']>(
   return { ok: false };
 }
 
-function genericError(reason: string) {
+function genericError(reason: string): GenericErr {
   return { reason };
 }
 
