@@ -1,12 +1,56 @@
 /**
- * SSO session store backed by a ReactiveStorageAdapter.
+ * SSO session store.
  *
+ * Defines the session metadata and session store types, and provides a
+ * concrete implementation backed by a ReactiveStorageAdapter.
  * Serializes PersistedSessionMeta to JSON + UTF-8 bytes for storage.
- * Subscribes to the underlying storage key for change notifications.
  */
 
 import type { ReactiveStorageAdapter } from '../../storage/types.js';
-import type { PersistedSessionMeta, SsoSessionStore } from './transport.js';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal session metadata that survives across page reloads.
+ *
+ * The AES session key is NOT stored here — it is either re-derived
+ * during re-pairing or held in a platform-specific secure store.
+ */
+export type PersistedSessionMeta = {
+  /** Opaque session identifier shared with the mobile wallet. */
+  sessionId: string;
+  /** SS58 address of the paired mobile account. */
+  address: string;
+  /** Human-readable name shown during pairing (e.g. device name). */
+  displayName: string;
+  /** AES session key (32 bytes) — the P-256 ECDH shared secret derived during pairing. */
+  sessionKey: Uint8Array;
+  /** The mobile wallet's sr25519 account ID (32 bytes). */
+  remoteAccountId: Uint8Array;
+};
+
+/**
+ * Persistence adapter for SSO session metadata.
+ *
+ * Implementations store session metadata so the user does not need to
+ * re-pair on every page load. Backed by the ReactiveStorageAdapter.
+ */
+export type SsoSessionStore = {
+  /** Save session metadata, overwriting any existing entry. */
+  save(session: PersistedSessionMeta): Promise<void>;
+  /** Load the previously saved session, or undefined if none. */
+  load(): Promise<PersistedSessionMeta | undefined>;
+  /** Remove any saved session. */
+  clear(): Promise<void>;
+  /** Subscribe to session changes. */
+  subscribe(callback: (session: PersistedSessionMeta | undefined) => void): () => void;
+};
+
+// ---------------------------------------------------------------------------
+// Implementation
+// ---------------------------------------------------------------------------
 
 const SESSION_KEY = 'sso_session';
 

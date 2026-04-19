@@ -9,7 +9,7 @@ import type { HostFacade } from '@polkadot/api-protocol';
 import { errAsync } from '@polkadot/api-protocol';
 import { ResultAsync } from 'neverthrow';
 import type { StatementStoreAdapter, SignedStatement } from '../statementStore/types.js';
-import type { SsoSigner } from '../auth/sso/transport.js';
+import type { SsoSigner } from '../auth/sso/types.js';
 
 export type StatementStoreHandlersConfig = {
   statementStore?: StatementStoreAdapter;

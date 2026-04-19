@@ -8,7 +8,7 @@
 
 import type { HexString, RequestParams } from '@polkadot/api-protocol';
 import type { StatementStoreAdapter } from '../statementStore/types.js';
-import type { SsoSigner } from '../auth/sso/transport.js';
+import type { SsoSigner } from '../auth/sso/types.js';
 import type { StorageAdapter } from '../storage/types.js';
 import type { AuthStatus } from '../auth/authManager.js';
 import type {

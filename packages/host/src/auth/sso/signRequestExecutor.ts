@@ -15,7 +15,7 @@
  */
 
 import type { StatementStoreAdapter, Statement } from '../../statementStore/types.js';
-import type { SsoSigner } from './transport.js';
+import type { SsoSigner } from './types.js';
 import type {
   SignRequestExecutor,
   RemoteSignPayloadRequest,

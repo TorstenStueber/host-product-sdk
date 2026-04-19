@@ -9,7 +9,7 @@
 import { randomBytes } from '@noble/hashes/utils.js';
 import type { StatementStoreAdapter } from '../../statementStore/types.js';
 import type { PairingExecutor, PairingResult } from './manager.js';
-import type { PersistedSessionMeta } from './transport.js';
+import type { PersistedSessionMeta } from './sessionStore.js';
 import { HandshakeData, HandshakeResponsePayload, HandshakeResponseSensitiveData } from './codecs.js';
 import {
   createAccountId,

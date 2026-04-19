@@ -8,7 +8,7 @@
  */
 
 import type { StatementStoreAdapter } from '../../statementStore/types.js';
-import type { SsoSessionStore, PersistedSessionMeta } from './transport.js';
+import type { SsoSessionStore, PersistedSessionMeta } from './sessionStore.js';
 import type { SecretStore, PersistedSecrets } from './secretStore.js';
 
 // ---------------------------------------------------------------------------

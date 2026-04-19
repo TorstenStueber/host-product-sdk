@@ -617,17 +617,14 @@ derivation path `/product/{productId}/{derivationIndex}` and delegates to `sr255
 
 **`pappAdapter.ts`**: Stub interface for QR-code pairing (to be ported from old host-papp).
 
-**`sso/transport.ts`**: SSO adapter interfaces:
+**`sso/types.ts`**: SSO public types hub. Defines `SsoSigner` (sr25519 signing interface: `publicKey`,
+`sign(message)`) inline, and re-exports `SsoSessionStore`, `PersistedSessionMeta` from `sessionStore.ts`, plus all
+other SSO types from their implementation files.
 
-- `SsoSigner`: sr25519 signing for statement proofs (`publicKey`, `sign(message)`).
-- `SsoSessionStore`: persistence for session metadata (`save`, `load`, `clear`, `subscribe`).
-- `PersistedSessionMeta`: minimal session data surviving page reloads (sessionId, address, displayName, remote keys).
-
-The statement store transport is now in `statementStore/` (section 2.5) as a unified adapter serving both SSO and the
-host API statement store handlers.
-
-**`sso/sessionStore.ts`**: `createSsoSessionStore(storage)` — backed by a `ReactiveStorageAdapter`. Serializes
-`PersistedSessionMeta` to JSON bytes. Subscriptions delegate to the underlying reactive storage.
+**`sso/sessionStore.ts`**: Defines `PersistedSessionMeta` (minimal session data surviving page reloads: sessionId,
+address, displayName, sessionKey, remoteAccountId) and `SsoSessionStore` (persistence interface: `save`, `load`,
+`clear`, `subscribe`). Also provides the concrete implementation `createSsoSessionStore(storage)` backed by a
+`ReactiveStorageAdapter`, serializing to JSON bytes. Subscriptions delegate to the underlying reactive storage.
 
 **`sso/manager.ts`**: `createSsoManager(config)` — drives the QR-based pairing lifecycle:
 
