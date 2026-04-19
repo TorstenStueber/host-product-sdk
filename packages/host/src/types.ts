@@ -15,7 +15,7 @@ import type {
   PushNotification,
 } from '@polkadot/api-protocol';
 
-import type { HostFacade } from '@polkadot/api-protocol';
+import type { HostFacade, Messaging } from '@polkadot/api-protocol';
 import type { AuthManager, UserSession, Identity } from './auth/authManager.js';
 
 // ---------------------------------------------------------------------------
@@ -152,14 +152,13 @@ export type HostSdk = {
   readonly auth: AuthManager;
 
   /**
-   * Embed a product in an iframe.
+   * Connect a product via a messaging channel.
    *
-   * @param iframe - The iframe element to load the product into.
-   * @param url - The URL to load in the iframe.
+   * @param messaging - How to reach the product (window postMessage or MessagePort).
    * @param productId - Unique identifier for this product (used for storage scoping).
    * @returns An EmbeddedProduct handle.
    */
-  embed(iframe: HTMLIFrameElement, url: string, productId: string): EmbeddedProduct;
+  embed(messaging: Messaging, productId: string): EmbeddedProduct;
 
   /**
    * Set the authenticated session.

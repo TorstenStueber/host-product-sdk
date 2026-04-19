@@ -9,7 +9,7 @@ A **host** application (like dot.li) embeds third-party **product** dApps inside
 +------------------------------------------+
 |  Host page                               |
 |  createHostSdk({ ... })                  |
-|    sdk.embed(iframe, url, productId)     |
+|    sdk.embed(messaging, productId)       |
 |         |  postMessage                   |
 |  +------v----------------------------+   |
 |  |  Product iframe                   |   |
@@ -744,7 +744,8 @@ const sdk = createHostSdk({
   chainProvider: genesisHash => getSmoldotProvider(genesisHash),
 });
 
-const product = sdk.embed(iframeElement, 'https://dapp.example.com', 'my-dapp');
+iframe.src = 'https://dapp.example.com';
+const product = sdk.embed({ type: 'window', target: iframe.contentWindow! }, 'my-dapp');
 product.dispose();
 sdk.dispose();
 ```
