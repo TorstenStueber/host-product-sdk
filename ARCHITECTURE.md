@@ -742,9 +742,9 @@ product.dispose();
 sdk.dispose();
 ```
 
-When `statementStoreProvider` is provided, `createHostSdk` internally creates:
+`createHostSdk` internally creates:
 
-- `ChainClient` from the provider (transport-agnostic — works with WebSocket or Smoldot)
+- `ChainClient` from the required `statementStoreProvider` (transport-agnostic — works with WebSocket or Smoldot)
 - `SsoManager` with `PairingExecutor`, `SsoSessionStore`, and `SecretStore` (for session reconnection)
 - `IdentityResolver` backed by `createChainIdentityProvider` (queries `Resources.Consumers`)
 - Statement store handlers are wired to the `ChainClient`'s adapter

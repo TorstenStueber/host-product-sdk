@@ -23,6 +23,8 @@ function makeStatement(topicId: number, data: Uint8Array): SignedStatement {
     channel: new Uint8Array(32),
     topics: [topic(topicId)],
     data,
+    decryptionKey: undefined,
+    expiry: undefined,
     proof: {
       tag: 'Sr25519',
       value: {

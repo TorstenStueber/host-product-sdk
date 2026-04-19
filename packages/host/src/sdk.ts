@@ -16,12 +16,9 @@ import type { SigningResult } from '@polkadot/api-protocol';
 import type { HostSdkConfig, HostSdk, EmbeddedProduct } from './types.js';
 
 import { createChainClient } from './statementStore/chainClient.js';
-import type { ChainClient } from './statementStore/chainClient.js';
 import { createSsoManager } from './auth/sso/manager.js';
-import type { SsoManager } from './auth/sso/manager.js';
 import { createSsoSessionStore } from './auth/sso/sessionStore.js';
 import { createSecretStore } from './auth/sso/secretStore.js';
-import type { SecretStore } from './auth/sso/secretStore.js';
 import { createPairingExecutor } from './auth/sso/pairingExecutor.js';
 import { createSignRequestExecutor } from './auth/sso/signRequestExecutor.js';
 import { createRemoteSigner } from './auth/sso/signing.js';
@@ -30,63 +27,54 @@ import { createAccountId, deriveSr25519PublicKey, signWithSr25519 } from './auth
 import { createLocalStorageAdapter } from './storage/localStorage.js';
 import { createIdentityResolver } from './auth/identity/resolver.js';
 import { createChainIdentityProvider } from './auth/identity/chainProvider.js';
-import type { IdentityResolver } from './auth/identity/resolver.js';
 
 export function createHostSdk(config: HostSdkConfig): HostSdk {
   const auth = createAuthManager();
   const embeddedProducts = new Set<EmbeddedProduct>();
 
-  // --- Optional: chain client for statement store + identity ---
-  let chainClient: ChainClient | undefined;
-  let ssoManager: SsoManager | undefined;
-  let secretStoreInstance: SecretStore | undefined;
-  let identityResolver: IdentityResolver | undefined;
+  // --- Chain client for statement store + identity ---
+  const chainClient = createChainClient(config.statementStoreProvider);
+
+  const ssoStorage = createLocalStorageAdapter(config.appId + ':sso:');
+  const sessionStore = createSsoSessionStore(ssoStorage);
+  const secretStoreInstance = createSecretStore(ssoStorage);
+
+  const ssoManager = createSsoManager({
+    statementStore: chainClient.statementStore,
+    sessionStore,
+    secretStore: secretStoreInstance,
+    pairingExecutor: createPairingExecutor({
+      metadata: config.pairingMetadata ?? '',
+      getUnsafeApi: () => chainClient.getUnsafeApi(),
+    }),
+  });
+
+  const identityResolver = createIdentityResolver(createChainIdentityProvider(() => chainClient.getUnsafeApi()));
+
   let remoteSigner: RemoteSigner | undefined;
 
-  if (config.statementStoreProvider) {
-    chainClient = createChainClient(config.statementStoreProvider);
+  // Auto-restore session and build remote signer
+  void ssoManager.restoreSession().then(() => buildRemoteSignerAndSetAuth());
 
-    const storage = createLocalStorageAdapter(config.appId + ':sso:');
-    const sessionStore = createSsoSessionStore(storage);
-    secretStoreInstance = createSecretStore(storage);
-
-    ssoManager = createSsoManager({
-      statementStore: chainClient.statementStore,
-      sessionStore,
-      secretStore: secretStoreInstance,
-      pairingExecutor: createPairingExecutor({
-        metadata: config.pairingMetadata ?? '',
-        getUnsafeApi: () => chainClient!.getUnsafeApi(),
-      }),
-    });
-
-    identityResolver = createIdentityResolver(createChainIdentityProvider(() => chainClient!.getUnsafeApi()));
-
-    // Auto-restore session and build remote signer
-    void ssoManager.restoreSession().then(() => buildRemoteSignerAndSetAuth());
-
-    // Sync SSO state changes to auth manager
-    ssoManager.subscribe(state => {
-      if (state.status === 'paired') {
-        void buildRemoteSignerAndSetAuth();
-      } else if (state.status === 'idle' && auth.getState().status === 'authenticated') {
-        remoteSigner = undefined;
-        auth.setState({ status: 'idle' });
-      } else if (state.status === 'awaiting_scan') {
-        auth.setState({ status: 'pairing', payload: state.qrPayload });
-      } else if (state.status === 'failed') {
-        auth.setState({ status: 'error', message: state.reason });
-      }
-    });
-  }
+  // Sync SSO state changes to auth manager
+  ssoManager.subscribe(state => {
+    if (state.status === 'paired') {
+      void buildRemoteSignerAndSetAuth();
+    } else if (state.status === 'idle' && auth.getState().status === 'authenticated') {
+      remoteSigner = undefined;
+      auth.setState({ status: 'idle' });
+    } else if (state.status === 'awaiting_scan') {
+      auth.setState({ status: 'pairing', payload: state.qrPayload });
+    } else if (state.status === 'failed') {
+      auth.setState({ status: 'error', message: state.reason });
+    }
+  });
 
   /**
    * Build a RemoteSigner from persisted secrets and set the auth state.
    * Called after pairing success or session restore.
    */
   async function buildRemoteSignerAndSetAuth(): Promise<void> {
-    if (!ssoManager || !chainClient || !secretStoreInstance) return;
-
     const state = ssoManager.getState();
     if (state.status !== 'paired') return;
 
@@ -130,7 +118,7 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
     let identity: Identity | undefined;
     try {
       const hexId = bytesToHex(state.session.remoteAccountId);
-      const resolved = await identityResolver?.getIdentity(hexId);
+      const resolved = await identityResolver.getIdentity(hexId);
       if (resolved) {
         identity = {
           liteUsername: resolved.liteUsername,
@@ -229,7 +217,7 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
         : undefined,
 
       chainProvider: config.chainProvider,
-      statementStore: chainClient?.statementStore,
+      statementStore: chainClient.statementStore,
     };
   }
 
@@ -270,19 +258,17 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
     },
 
     clearSession() {
-      if (ssoManager) {
-        void ssoManager.unpair();
-      }
+      void ssoManager.unpair();
       remoteSigner = undefined;
       auth.setState({ status: 'idle' });
     },
 
     pair() {
-      ssoManager?.pair();
+      ssoManager.pair();
     },
 
     cancelPairing() {
-      ssoManager?.cancelPairing();
+      ssoManager.cancelPairing();
     },
 
     dispose() {
@@ -290,8 +276,8 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
         product.dispose();
       }
       embeddedProducts.clear();
-      ssoManager?.dispose();
-      chainClient?.dispose();
+      ssoManager.dispose();
+      chainClient.dispose();
       remoteSigner = undefined;
       auth.dispose();
     },
