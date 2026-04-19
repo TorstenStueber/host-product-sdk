@@ -40,12 +40,18 @@
 
 ## After implementing a feature
 
+**MANDATORY. NO EXCEPTIONS. DO NOT SKIP ANY STEP. DO NOT REPORT COMPLETION UNTIL EVERY STEP IS DONE.**
+
+If you make code changes and do not complete this checklist, that is a failure. Do not wait for the user to remind you.
+
 Do these steps in order before reporting completion:
 
 1. **Write tests.** Think about new tests that cover the happy path, error cases, and edge cases. Include e2e tests when
    the feature affects host-product communication. Be creative but write meaningful tests — don't just test the obvious.
-2. **Run all tests.** `npm test` (unit) and `npm run test:e2e` (e2e). All must be green.
-3. **Format.** `npm run format`.
-4. **Update ARCHITECTURE.md.** If the change affects anything described there (types, file structure, counts, behavior),
+2. **Run ALL tests.** `npm test` (unit) AND `npm run test:e2e` (e2e). Both are required. All must be green.
+3. **Typecheck.** `npx tsc --noEmit`. Fix ALL errors — not just ones you introduced. Zero errors is the only acceptable
+   result.
+4. **Format.** `npm run format`.
+5. **Update ARCHITECTURE.md.** If the change affects anything described there (types, file structure, counts, behavior),
    correct it so it stays in sync with the code.
-5. **Commit.**
+6. **Commit.** This is part of the checklist. A code change without a commit is incomplete work.
