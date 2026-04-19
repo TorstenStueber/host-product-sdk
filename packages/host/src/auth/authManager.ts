@@ -16,8 +16,6 @@ export type UserSession = {
   rootPublicKey: Uint8Array;
   /** Optional display name resolved from identity. */
   displayName?: string;
-  /** Raw remote account data (adapter-specific). */
-  remoteAccount?: unknown;
 };
 
 export type Identity = {

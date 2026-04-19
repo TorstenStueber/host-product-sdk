@@ -672,16 +672,16 @@ wallet:
 - `SigningPayloadRequestCodec` / `SigningRawRequestCodec` / `SigningResponseCodec`: signing request/response.
 - `RemoteMessageCodec`: versioned envelope `{ messageId, data: v1 { Disconnected | SignRequest | SignResponse } }`.
 
-**`sso/attestation.ts`**: `runAttestation(candidate, getPeopleChainUnsafeApi, signal)` — registers a lite person on the People
-pallet. Lazy-loads `verifiablejs` WASM (5.8 MB Bandersnatch ring-VRF), derives VRF key and proof-of-ownership, builds
-consumer registration signature, submits `PeopleLite.attest` extrinsic with custom signed extensions
+**`sso/attestation.ts`**: `runAttestation(candidate, getPeopleChainUnsafeApi, signal)` — registers a lite person on the
+People pallet. Lazy-loads `verifiablejs` WASM (5.8 MB Bandersnatch ring-VRF), derives VRF key and proof-of-ownership,
+builds consumer registration signature, submits `PeopleLite.attest` extrinsic with custom signed extensions
 (`VerifyMultiSignature`, `AsPerson`). Uses a hardcoded sudo Alice verifier (testnet only).
 
 **`sso/pairingExecutor.ts`**: Defines the `PairingExecutor` interface and `PairingResult` type, plus the concrete
 `createPairingExecutor(config)` implementing the full QR-code handshake: generates mnemonic, derives sr25519 at
 `//wallet//sso` + P-256 keys, builds SCALE-encoded `HandshakeData`, publishes to statement-store topic, waits for mobile
-response, performs P-256 ECDH to decrypt session credentials. When `config.getPeopleChainUnsafeApi` is provided, runs attestation
-in parallel with the handshake — both must complete before the session is returned.
+response, performs P-256 ECDH to decrypt session credentials. When `config.getPeopleChainUnsafeApi` is provided, runs
+attestation in parallel with the handshake — both must complete before the session is returned.
 
 **`sso/signRequestExecutor.ts`**: Defines the `SignRequestExecutor` interface and `RemoteSign*` types, plus the concrete
 `createSignRequestExecutor(config)` implementing encrypted sign request round-trips: SCALE-encodes `RemoteMessage` with
@@ -772,9 +772,9 @@ Statement store `handleStatementStoreCreateProof` is wired to sign with the sr25
 `clearSession()` calls `ssoManager.unpair()` to clear both session metadata and secrets.
 
 **`types.ts`**: `HostSdkConfig` with all options: `appId`, `ssoStorage` (ReactiveStorageAdapter, required),
-`productStorage` (factory: `(productId: string) => StorageAdapter`, required), `peopleChainProvider`,
-`pairingMetadata` (required — URL to `{ name, icon }` JSON; treated as a hard pairing dependency by the wallet),
-`chainProvider`, signing callbacks, permission callbacks, UI callbacks.
+`productStorage` (factory: `(productId: string) => StorageAdapter`, required), `peopleChainProvider`, `pairingMetadata`
+(required — URL to `{ name, icon }` JSON; treated as a hard pairing dependency by the wallet), `chainProvider`, signing
+callbacks, permission callbacks, UI callbacks.
 
 **`constants.ts`**: `PEOPLE_PARACHAIN_ENDPOINTS` — default WebSocket endpoints for the People parachain (POP3 testnet).
 

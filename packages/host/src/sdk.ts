@@ -127,7 +127,6 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
     const session: UserSession = {
       rootPublicKey: state.session.remoteAccountId,
       displayName: state.session.displayName,
-      remoteAccount: { accountId: state.session.remoteAccountId, ...state.session },
     };
 
     let identity: Identity | undefined;
