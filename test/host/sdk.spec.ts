@@ -95,7 +95,7 @@ describe('Host SDK (auth manager integration)', () => {
         appId: 'dot.li',
         ssoStorage: { read: vi.fn(), write: vi.fn(), clear: vi.fn(), subscribe: vi.fn() },
         productStorage: (_productId: string) => mockAdapter,
-        statementStoreProvider: vi.fn(),
+        peopleChainProvider: vi.fn(),
       };
       expect(config.ssoStorage).toBeDefined();
       expect(typeof config.productStorage).toBe('function');

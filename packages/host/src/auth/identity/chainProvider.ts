@@ -33,13 +33,13 @@ export type ResolvedIdentity = {
 /**
  * Create an identity provider that queries the People parachain.
  *
- * @param getUnsafeApi - Function that returns the polkadot-api unsafe API.
- *   Typically `statementStoreClient.getUnsafeApi`.
+ * @param getPeopleChainUnsafeApi - Function that returns the polkadot-api unsafe API
+ *   for the People parachain.
  */
-export function createChainIdentityProvider(getUnsafeApi: () => unknown): IdentityProvider {
+export function createChainIdentityProvider(getPeopleChainUnsafeApi: () => unknown): IdentityProvider {
   return {
     async getIdentity(accountIdHex: string): Promise<ResolvedIdentity | undefined> {
-      const api = getUnsafeApi() as {
+      const api = getPeopleChainUnsafeApi() as {
         query?: {
           Resources?: {
             Consumers?: {

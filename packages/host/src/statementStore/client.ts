@@ -1,18 +1,11 @@
 /**
- * Lazy statement store client for the People parachain.
+ * Statement store client for the People parachain.
  *
- * Creates a polkadot-api client from the caller-provided JsonRpcProvider
- * on first use. Provides both the statement store adapter (for SSO and
- * host API handlers) and raw RPC access (for identity resolution).
- *
- * The provider is transport-agnostic: it can be backed by a WebSocket
- * connection (via `getWsProvider`) or an in-process Smoldot light client
- * (via `getSmProvider`). Both support the `statement_submit` and
- * `statement_subscribeStatement` RPCs.
+ * Wraps a polkadot-api client (provided by the caller) into a
+ * StatementStoreAdapter that exposes subscribe, submit, and query
+ * operations over the statement-store RPCs.
  */
 
-import { createClient } from 'polkadot-api';
-import type { JsonRpcProvider } from 'polkadot-api';
 import { bytesToHex, hexToBytes } from '@polkadot/api-protocol';
 
 import type { StatementStoreAdapter, Statement, SignedStatement } from './types.js';
@@ -40,57 +33,38 @@ type Observable<T> = {
   subscribe(observer: { next(value: T): void; error(err: unknown): void }): Subscription;
 };
 
+/**
+ * Minimal interface for the polkadot-api client's escape-hatch methods
+ * used by the statement store. The caller creates the actual client
+ * (via `createClient` from `polkadot-api`) and passes it here.
+ */
+export type PeopleChainClient = {
+  _request: <T>(method: string, params: unknown[]) => Promise<T>;
+  _subscribe: <T>(method: string, unsubMethod: string, params: unknown[]) => Observable<T>;
+};
+
 // ---------------------------------------------------------------------------
-// Chain client
+// Statement store client
 // ---------------------------------------------------------------------------
 
 export type StatementStoreClient = {
   /** Statement store adapter for SSO and host API handlers. */
   statementStore: StatementStoreAdapter;
-
-  /**
-   * Get the polkadot-api unsafe API for direct storage queries.
-   * Used by the identity resolver to query Resources.Consumers.
-   */
-  getUnsafeApi(): unknown;
-
-  /** Dispose the connection and all resources. */
-  dispose(): void;
 };
 
 /**
- * Create a lazy statement store client from a JSON-RPC provider.
+ * Create a statement store client from a polkadot-api client.
  *
- * The provider can be any `JsonRpcProvider` — a WebSocket connection
- * (via `getWsProvider`) or a Smoldot light client (via `getSmProvider`).
- * The polkadot-api client is created on first use. Both the statement
- * store and identity resolution share this single connection.
- *
- * @param provider - A `JsonRpcProvider` connected to the People parachain.
+ * @param peopleChainClient - A polkadot-api client connected to the People parachain.
+ *   Must expose `_request` and `_subscribe` escape-hatch methods.
  */
-export function createStatementStoreClient(provider: JsonRpcProvider): StatementStoreClient {
-  let client: ReturnType<typeof createClient> | undefined;
-
-  function ensureClient(): ReturnType<typeof createClient> {
-    if (client) return client;
-    client = createClient(provider);
-    return client;
-  }
-
-  /** Access the polkadot-api client's internal `_request` for one-shot RPCs. */
+export function createStatementStoreClient(peopleChainClient: PeopleChainClient): StatementStoreClient {
   function rpcRequest<T>(method: string, params: unknown[]): Promise<T> {
-    const c = ensureClient() as unknown as {
-      _request: <R>(method: string, params: unknown[]) => Promise<R>;
-    };
-    return c._request<T>(method, params);
+    return peopleChainClient._request<T>(method, params);
   }
 
-  /** Access the polkadot-api client's internal `_subscribe` for subscription RPCs. */
   function rpcSubscribe<T>(method: string, unsubMethod: string, params: unknown[]): Observable<T> {
-    const c = ensureClient() as unknown as {
-      _subscribe: <R>(method: string, unsubMethod: string, params: unknown[]) => Observable<R>;
-    };
-    return c._subscribe<T>(method, unsubMethod, params);
+    return peopleChainClient._subscribe<T>(method, unsubMethod, params);
   }
 
   function buildFilter(topics: Uint8Array[]): TopicFilter {
@@ -173,16 +147,5 @@ export function createStatementStoreClient(provider: JsonRpcProvider): Statement
     },
   };
 
-  return {
-    statementStore,
-
-    getUnsafeApi(): unknown {
-      return ensureClient().getUnsafeApi();
-    },
-
-    dispose() {
-      client?.destroy();
-      client = undefined;
-    },
-  };
+  return { statementStore };
 }

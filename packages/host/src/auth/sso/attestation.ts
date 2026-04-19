@@ -31,7 +31,7 @@ import {
 
 export type AttestationConfig = {
   /** Function returning the polkadot-api unsafe API for the People parachain. */
-  getUnsafeApi: () => unknown;
+  getPeopleChainUnsafeApi: () => unknown;
 };
 
 export type DerivedAccount = {
@@ -121,12 +121,12 @@ function createPeopleSigner(account: DerivedAccount): PolkadotSigner {
  * the QR code, so the latency is masked by user interaction.
  *
  * @param candidate - The sr25519 account derived from the pairing mnemonic.
- * @param getUnsafeApi - Returns the polkadot-api unsafe API for the People parachain.
+ * @param getPeopleChainUnsafeApi - Returns the polkadot-api unsafe API for the People parachain.
  * @param signal - Abort signal for cancellation.
  */
 export async function runAttestation(
   candidate: DerivedAccount,
-  getUnsafeApi: () => unknown,
+  getPeopleChainUnsafeApi: () => unknown,
   signal: AbortSignal,
 ): Promise<void> {
   // Lazy-load verifiablejs WASM (5.8 MB) — only when actually pairing
@@ -135,7 +135,7 @@ export async function runAttestation(
   if (signal.aborted) return;
 
   const accountId = AccountId();
-  const api = getUnsafeApi() as {
+  const api = getPeopleChainUnsafeApi() as {
     query?: {
       PeopleLite?: {
         AttestationAllowance?: {

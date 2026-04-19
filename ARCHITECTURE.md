@@ -672,7 +672,7 @@ wallet:
 - `SigningPayloadRequestCodec` / `SigningRawRequestCodec` / `SigningResponseCodec`: signing request/response.
 - `RemoteMessageCodec`: versioned envelope `{ messageId, data: v1 { Disconnected | SignRequest | SignResponse } }`.
 
-**`sso/attestation.ts`**: `runAttestation(candidate, getUnsafeApi, signal)` — registers a lite person on the People
+**`sso/attestation.ts`**: `runAttestation(candidate, getPeopleChainUnsafeApi, signal)` — registers a lite person on the People
 pallet. Lazy-loads `verifiablejs` WASM (5.8 MB Bandersnatch ring-VRF), derives VRF key and proof-of-ownership, builds
 consumer registration signature, submits `PeopleLite.attest` extrinsic with custom signed extensions
 (`VerifyMultiSignature`, `AsPerson`). Uses a hardcoded sudo Alice verifier (testnet only).
@@ -680,7 +680,7 @@ consumer registration signature, submits `PeopleLite.attest` extrinsic with cust
 **`sso/pairingExecutor.ts`**: Defines the `PairingExecutor` interface and `PairingResult` type, plus the concrete
 `createPairingExecutor(config)` implementing the full QR-code handshake: generates mnemonic, derives sr25519 at
 `//wallet//sso` + P-256 keys, builds SCALE-encoded `HandshakeData`, publishes to statement-store topic, waits for mobile
-response, performs P-256 ECDH to decrypt session credentials. When `config.getUnsafeApi` is provided, runs attestation
+response, performs P-256 ECDH to decrypt session credentials. When `config.getPeopleChainUnsafeApi` is provided, runs attestation
 in parallel with the handshake — both must complete before the session is returned.
 
 **`sso/signRequestExecutor.ts`**: Defines the `SignRequestExecutor` interface and `RemoteSign*` types, plus the concrete
@@ -690,7 +690,7 @@ message ID, decrypts and returns signature.
 
 **`identity/chainProvider.ts`**: Defines the `IdentityProvider` interface (`getIdentity(accountIdHex)`) and
 `ResolvedIdentity` type (liteUsername, fullUsername, chainIdentity), plus the concrete
-`createChainIdentityProvider(getUnsafeApi)` that queries People parachain's `Resources.Consumers` storage.
+`createChainIdentityProvider(getPeopleChainUnsafeApi)` that queries People parachain's `Resources.Consumers` storage.
 
 **`identity/resolver.ts`**: `createIdentityResolver(provider)` — wraps an `IdentityProvider` with in-memory caching and
 concurrent-request deduplication. Failed requests are not cached so transient errors are retried. Supports
@@ -704,17 +704,17 @@ Unified statement-store parachain adapter used by both SSO (pairing/signing) and
 `submit(statement)`, and `query(topics)`. `Statement` and `SignedStatement` types with tagged `StatementProof` union
 (sr25519/ed25519/ecdsa).
 
-**`statementStore/client.ts`**: `createStatementStoreClient(provider)` — creates a lazy polkadot-api client from any
-`JsonRpcProvider`. The provider is transport-agnostic: it can be a WebSocket connection (via `getWsProvider`) or a
-Smoldot light client (via `getSmProvider`). The polkadot-api client is created on first use. Returns
-`StatementStoreClient` with:
+**`statementStore/client.ts`**: `createStatementStoreClient(peopleChainClient)` — wraps a polkadot-api client (provided
+by the caller) into a `StatementStoreClient` with a single field:
 
 - `statementStore`: the `StatementStoreAdapter` (for SSO and host API handlers)
-- `getUnsafeApi()`: polkadot-api unsafe API (for identity resolution via `Resources.Consumers`)
-- `dispose()`: tears down the connection
+
+The `PeopleChainClient` type defines the minimal interface (`_request`, `_subscribe`) expected from the polkadot-api
+client. The actual client is created lazily in `createHostSdk` and shared for both the statement store and identity
+resolution (via `getPeopleChainUnsafeApi`).
 
 Uses `polkadot-api`'s `_request`/`_subscribe` escape hatches for direct `statement_submit` and
-`statement_subscribeStatement` RPC access, and the same client's typed/untyped API for storage queries.
+`statement_subscribeStatement` RPC access.
 
 **`statementStore/codec.ts`**: SCALE encode/decode for Substrate statements. Statements are encoded as a `Vector` of
 `Variant` fields in strictly ascending index order (proof=0, decryptionKey=1, expiry=2, channel=3, topic1–4=4–7,
@@ -739,7 +739,7 @@ Auto-creates `createHostFacade` + `wireAllHandlers` bridge for each nested dApp.
 ```typescript
 const sdk = createHostSdk({
   appId: 'dot.li',
-  statementStoreProvider: getWsProvider(PEOPLE_PARACHAIN_ENDPOINTS),
+  peopleChainProvider: getWsProvider(PEOPLE_PARACHAIN_ENDPOINTS),
   pairingMetadata: 'https://dot.li/metadata.json',
   chainProvider: genesisHash => getSmoldotProvider(genesisHash),
 });
@@ -751,8 +751,9 @@ sdk.dispose();
 
 `createHostSdk` internally creates:
 
-- `StatementStoreClient` from the required `statementStoreProvider` (transport-agnostic — works with WebSocket or
-  Smoldot)
+- A lazy polkadot-api client from the required `peopleChainProvider` (transport-agnostic — works with WebSocket or
+  Smoldot), shared for statement store and identity resolution
+- `StatementStoreClient` wrapping the polkadot-api client
 - `SsoSessionStore` and `SecretStore` backed by the required `ssoStorage` (ReactiveStorageAdapter)
 - `SsoManager` with `PairingExecutor`
 - `IdentityResolver` backed by `createChainIdentityProvider` (queries `Resources.Consumers`)
@@ -771,7 +772,7 @@ Statement store `handleStatementStoreCreateProof` is wired to sign with the sr25
 `clearSession()` calls `ssoManager.unpair()` to clear both session metadata and secrets.
 
 **`types.ts`**: `HostSdkConfig` with all options: `appId`, `ssoStorage` (ReactiveStorageAdapter, required),
-`productStorage` (factory: `(productId: string) => StorageAdapter`, required), `statementStoreProvider`,
+`productStorage` (factory: `(productId: string) => StorageAdapter`, required), `peopleChainProvider`,
 `pairingMetadata` (required — URL to `{ name, icon }` JSON; treated as a hard pairing dependency by the wallet),
 `chainProvider`, signing callbacks, permission callbacks, UI callbacks.
 

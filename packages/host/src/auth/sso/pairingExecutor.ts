@@ -76,7 +76,7 @@ export type PairingExecutorConfig = {
    * Function returning the polkadot-api unsafe API for the People parachain.
    * Required for attestation. If not provided, attestation is skipped.
    */
-  getUnsafeApi?: () => unknown;
+  getPeopleChainUnsafeApi?: () => unknown;
 };
 
 // ---------------------------------------------------------------------------
@@ -141,14 +141,14 @@ export function createPairingExecutor(config: PairingExecutorConfig): PairingExe
 
       // 6. Start attestation in parallel with the handshake (if API provided)
       let attestationPromise: Promise<void> | undefined;
-      if (config.getUnsafeApi) {
+      if (config.getPeopleChainUnsafeApi) {
         const candidate: DerivedAccount = {
           secret: ssSecret,
           publicKey: ssPublicKey,
           entropy,
           sign: (message: Uint8Array) => signWithSr25519(ssSecret, message),
         };
-        attestationPromise = runAttestation(candidate, config.getUnsafeApi, signal).catch(e => {
+        attestationPromise = runAttestation(candidate, config.getPeopleChainUnsafeApi, signal).catch(e => {
           console.warn('[sso] Attestation failed (non-fatal):', e instanceof Error ? e.message : e);
         });
       }

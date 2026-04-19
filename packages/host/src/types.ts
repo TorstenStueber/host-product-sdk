@@ -43,18 +43,19 @@ export type HostSdkConfig = {
    */
   productStorage: (productId: string) => StorageAdapter;
 
-  // -- Statement store / SSO -------------------------------------------------
+  // -- People parachain -------------------------------------------------------
   /**
-   * JSON-RPC provider for the People/statement-store parachain.
+   * JSON-RPC provider for the People parachain.
    *
    * Can be any `JsonRpcProvider` — a WebSocket connection (via
    * `getWsProvider` from `@polkadot-api/ws-provider`) or a Smoldot
    * light client (via `getSmProvider` from `@polkadot-api/sm-provider`).
    *
-   * The SDK creates a StatementStoreClient and wires SSO pairing, remote signing,
-   * identity resolution, and statement store handlers automatically.
+   * The SDK lazily creates a polkadot-api client from this provider and
+   * uses it for the statement store, SSO pairing, remote signing, identity
+   * resolution, and attestation.
    */
-  statementStoreProvider: JsonRpcProvider;
+  peopleChainProvider: JsonRpcProvider;
 
   /**
    * URL to a publicly reachable JSON document describing this host to the mobile wallet.

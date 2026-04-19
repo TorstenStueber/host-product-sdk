@@ -15,7 +15,9 @@ import type { StorageAdapter } from './storage/types.js';
 import type { SigningResult } from '@polkadot/api-protocol';
 import type { HostSdkConfig, HostSdk, EmbeddedProduct } from './types.js';
 
+import { createClient } from 'polkadot-api';
 import { createStatementStoreClient } from './statementStore/client.js';
+import type { PeopleChainClient } from './statementStore/client.js';
 import { createSsoManager } from './auth/sso/manager.js';
 import { createSsoSessionStore } from './auth/sso/sessionStore.js';
 import { createSecretStore } from './auth/sso/secretStore.js';
@@ -31,8 +33,23 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
   const auth = createAuthManager();
   const embeddedProducts = new Set<EmbeddedProduct>();
 
-  // --- Statement store client (also used for identity resolution) ---
-  const statementStoreClient = createStatementStoreClient(config.statementStoreProvider);
+  // --- Lazy polkadot-api client for the People parachain ---
+  let rawPeopleChainClient: ReturnType<typeof createClient> | undefined;
+  function ensurePeopleChainClient(): ReturnType<typeof createClient> {
+    if (!rawPeopleChainClient) {
+      rawPeopleChainClient = createClient(config.peopleChainProvider);
+    }
+    return rawPeopleChainClient;
+  }
+  function getPeopleChainClient(): PeopleChainClient {
+    return ensurePeopleChainClient() as unknown as PeopleChainClient;
+  }
+  function getPeopleChainUnsafeApi(): unknown {
+    return ensurePeopleChainClient().getUnsafeApi();
+  }
+
+  // --- Statement store client ---
+  const statementStoreClient = createStatementStoreClient(getPeopleChainClient());
 
   const sessionStore = createSsoSessionStore(config.ssoStorage);
   const secretStoreInstance = createSecretStore(config.ssoStorage);
@@ -43,13 +60,11 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
     pairingExecutor: createPairingExecutor({
       statementStore: statementStoreClient.statementStore,
       metadata: config.pairingMetadata,
-      getUnsafeApi: () => statementStoreClient.getUnsafeApi(),
+      getPeopleChainUnsafeApi,
     }),
   });
 
-  const identityResolver = createIdentityResolver(
-    createChainIdentityProvider(() => statementStoreClient.getUnsafeApi()),
-  );
+  const identityResolver = createIdentityResolver(createChainIdentityProvider(getPeopleChainUnsafeApi));
 
   let remoteSigner: RemoteSigner | undefined;
 
@@ -276,7 +291,8 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
       }
       embeddedProducts.clear();
       ssoManager.dispose();
-      statementStoreClient.dispose();
+      rawPeopleChainClient?.destroy();
+      rawPeopleChainClient = undefined;
       remoteSigner = undefined;
       auth.dispose();
     },
