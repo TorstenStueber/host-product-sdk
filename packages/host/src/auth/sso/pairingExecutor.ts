@@ -30,11 +30,7 @@ export type PairingResult = {
  * Pluggable pairing protocol.
  */
 export type PairingExecutor = {
-  execute(
-    statementStore: StatementStoreAdapter,
-    onQrPayload: (payload: string) => void,
-    signal: AbortSignal,
-  ): Promise<PairingResult | undefined>;
+  execute(onQrPayload: (payload: string) => void, signal: AbortSignal): Promise<PairingResult | undefined>;
 };
 
 // ---------------------------------------------------------------------------
@@ -61,6 +57,8 @@ import { signWithSr25519 } from './crypto.js';
 // ---------------------------------------------------------------------------
 
 export type PairingExecutorConfig = {
+  /** Statement store adapter for the pairing handshake. */
+  statementStore: StatementStoreAdapter;
   /** URL to the host metadata JSON (shown to the mobile wallet). */
   metadata: string;
   /** Optional host version string. */
@@ -97,14 +95,11 @@ function createDeeplink(payload: Uint8Array): string {
 // ---------------------------------------------------------------------------
 
 export function createPairingExecutor(config: PairingExecutorConfig): PairingExecutor {
+  const { statementStore } = config;
   const accountIdCodec = AccountId();
 
   return {
-    async execute(
-      statementStore: StatementStoreAdapter,
-      onQrPayload: (payload: string) => void,
-      signal: AbortSignal,
-    ): Promise<PairingResult | undefined> {
+    async execute(onQrPayload: (payload: string) => void, signal: AbortSignal): Promise<PairingResult | undefined> {
       // 1. Generate fresh 16 bytes of entropy and derive keys
       //    (equivalent to mnemonicToEntropy(generateMnemonic()) — the mnemonic
       //    is never displayed or stored, so the BIP-39 round-trip is redundant)

@@ -38,10 +38,10 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
   const secretStoreInstance = createSecretStore(config.ssoStorage);
 
   const ssoManager = createSsoManager({
-    statementStore: statementStoreClient.statementStore,
     sessionStore,
     secretStore: secretStoreInstance,
     pairingExecutor: createPairingExecutor({
+      statementStore: statementStoreClient.statementStore,
       metadata: config.pairingMetadata ?? '',
       getUnsafeApi: () => statementStoreClient.getUnsafeApi(),
     }),

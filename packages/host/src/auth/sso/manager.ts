@@ -7,7 +7,6 @@
  * handshake is delegated to an injected PairingExecutor.
  */
 
-import type { StatementStoreAdapter } from '../../statementStore/types.js';
 import type { SsoSessionStore, PersistedSessionMeta } from './sessionStore.js';
 import type { SecretStore, PersistedSecrets } from './secretStore.js';
 import type { PairingExecutor } from './pairingExecutor.js';
@@ -28,8 +27,6 @@ export type SsoState =
 // ---------------------------------------------------------------------------
 
 export type SsoManagerConfig = {
-  /** Statement store adapter for messaging. */
-  statementStore: StatementStoreAdapter;
   /** Session metadata persistence. */
   sessionStore: SsoSessionStore;
   /** Cryptographic secret persistence. */
@@ -83,7 +80,7 @@ export type SsoManager = {
 };
 
 export function createSsoManager(config: SsoManagerConfig): SsoManager {
-  const { statementStore, sessionStore, secretStore, pairingExecutor } = config;
+  const { sessionStore, secretStore, pairingExecutor } = config;
 
   let currentState: SsoState = { status: 'idle' };
   const listeners = new Set<(state: SsoState) => void>();
@@ -117,15 +114,11 @@ export function createSsoManager(config: SsoManagerConfig): SsoManager {
     setState({ status: 'pairing' });
 
     void pairingExecutor
-      .execute(
-        statementStore,
-        qrPayload => {
-          if (!signal.aborted) {
-            setState({ status: 'awaiting_scan', qrPayload });
-          }
-        },
-        signal,
-      )
+      .execute(qrPayload => {
+        if (!signal.aborted) {
+          setState({ status: 'awaiting_scan', qrPayload });
+        }
+      }, signal)
       .then(
         async result => {
           if (signal.aborted || disposed) return;

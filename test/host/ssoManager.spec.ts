@@ -6,13 +6,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import {
-  createSsoManager,
-  createSsoSessionStore,
-  createSecretStore,
-  createMemoryStorageAdapter,
-  createMemoryStatementStore,
-} from '@polkadot/host';
+import { createSsoManager, createSsoSessionStore, createSecretStore, createMemoryStorageAdapter } from '@polkadot/host';
 import type { PairingExecutor, PairingResult, PersistedSessionMeta, PersistedSecrets, SsoState } from '@polkadot/host';
 
 // ---------------------------------------------------------------------------
@@ -47,7 +41,7 @@ function makeResult(id: string = 'session-1'): PairingResult {
 /** Executor that succeeds immediately with a QR payload. */
 function immediateExecutor(result: PairingResult): PairingExecutor {
   return {
-    async execute(_transport, onQrPayload, _signal) {
+    async execute(onQrPayload, _signal) {
       onQrPayload('qr://test-payload');
       return result;
     },
@@ -68,7 +62,7 @@ function deferredExecutor(): {
   });
   return {
     executor: {
-      async execute(_transport, onQrPayload, _signal) {
+      async execute(onQrPayload, _signal) {
         onQrPayload('qr://deferred');
         return promise;
       },
@@ -81,7 +75,7 @@ function deferredExecutor(): {
 /** Executor that never resolves (for cancellation tests). */
 function hangingExecutor(): PairingExecutor {
   return {
-    execute(_transport, onQrPayload, signal) {
+    execute(onQrPayload, signal) {
       onQrPayload('qr://hanging');
       return new Promise<PairingResult | undefined>((_resolve, _reject) => {
         signal.addEventListener('abort', () => _resolve(undefined));
@@ -103,11 +97,8 @@ function createTestManager(executor: PairingExecutor) {
   const storage = createMemoryStorageAdapter();
   const sessionStore = createSsoSessionStore(storage);
   const secrets = createSecretStore(storage);
-  const bus = createMemoryStatementStore();
-  const adapter = bus.createAdapter();
   return {
     manager: createSsoManager({
-      statementStore: adapter,
       sessionStore,
       secretStore: secrets,
       pairingExecutor: executor,
@@ -262,14 +253,12 @@ describe('createSsoManager', () => {
     const storage = createMemoryStorageAdapter();
     const sessionStore = createSsoSessionStore(storage);
     const secrets = createSecretStore(storage);
-    const bus = createMemoryStatementStore();
 
     // Pre-persist session AND secrets
     await sessionStore.save(makeMeta('restored'));
     await secrets.save('restored', makeSecrets());
 
     const manager = createSsoManager({
-      statementStore: bus.createAdapter(),
       sessionStore,
       secretStore: secrets,
       pairingExecutor: immediateExecutor(makeResult()),
@@ -287,13 +276,11 @@ describe('createSsoManager', () => {
     const storage = createMemoryStorageAdapter();
     const sessionStore = createSsoSessionStore(storage);
     const secrets = createSecretStore(storage);
-    const bus = createMemoryStatementStore();
 
     // Pre-persist session but NOT secrets
     await sessionStore.save(makeMeta('orphaned'));
 
     const manager = createSsoManager({
-      statementStore: bus.createAdapter(),
       sessionStore,
       secretStore: secrets,
       pairingExecutor: immediateExecutor(makeResult()),
@@ -316,13 +303,11 @@ describe('createSsoManager', () => {
     const storage = createMemoryStorageAdapter();
     const sessionStore = createSsoSessionStore(storage);
     const secrets = createSecretStore(storage);
-    const bus = createMemoryStatementStore();
 
     await sessionStore.save(makeMeta('stored'));
     await secrets.save('stored', makeSecrets());
 
     const manager = createSsoManager({
-      statementStore: bus.createAdapter(),
       sessionStore,
       secretStore: secrets,
       pairingExecutor: immediateExecutor(makeResult('from-pairing')),

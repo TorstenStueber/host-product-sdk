@@ -50,7 +50,7 @@ function makeResult(): PairingResult {
 
 function immediateExecutor(): PairingExecutor {
   return {
-    async execute(_transport, onQr) {
+    async execute(onQr) {
       onQr('qr://test');
       return makeResult();
     },
@@ -124,7 +124,6 @@ async function createPairedSetup(signExecutor?: SignRequestExecutor) {
   const bus = createMemoryStatementStore();
   const adapter = bus.createAdapter();
   const manager = createSsoManager({
-    statementStore: adapter,
     sessionStore,
     secretStore: createSecretStore(storage),
     pairingExecutor: immediateExecutor(),
@@ -156,7 +155,6 @@ describe('createRemoteSigner', () => {
     const bus = createMemoryStatementStore();
     const adapter = bus.createAdapter();
     const manager = createSsoManager({
-      statementStore: adapter,
       sessionStore,
       secretStore: createSecretStore(storage),
       pairingExecutor: immediateExecutor(),
@@ -177,7 +175,6 @@ describe('createRemoteSigner', () => {
     const bus = createMemoryStatementStore();
     const adapter = bus.createAdapter();
     const manager = createSsoManager({
-      statementStore: adapter,
       sessionStore,
       secretStore: createSecretStore(storage),
       pairingExecutor: immediateExecutor(),

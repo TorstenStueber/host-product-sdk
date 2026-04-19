@@ -667,16 +667,15 @@ consumer registration signature, submits `PeopleLite.attest` extrinsic with cust
 (`VerifyMultiSignature`, `AsPerson`). Uses a hardcoded sudo Alice verifier (testnet only).
 
 **`sso/pairingExecutor.ts`**: Defines the `PairingExecutor` interface and `PairingResult` type, plus the concrete
-`createPairingExecutor(config)` implementing the full QR-code
-handshake: generates mnemonic, derives sr25519 at `//wallet//sso` + P-256 keys, builds SCALE-encoded `HandshakeData`,
-publishes to statement-store topic, waits for mobile response, performs P-256 ECDH to decrypt session credentials. When
-`config.getUnsafeApi` is provided, runs attestation in parallel with the handshake — both must complete before the
-session is returned.
+`createPairingExecutor(config)` implementing the full QR-code handshake: generates mnemonic, derives sr25519 at
+`//wallet//sso` + P-256 keys, builds SCALE-encoded `HandshakeData`, publishes to statement-store topic, waits for mobile
+response, performs P-256 ECDH to decrypt session credentials. When `config.getUnsafeApi` is provided, runs attestation
+in parallel with the handshake — both must complete before the session is returned.
 
 **`sso/signRequestExecutor.ts`**: Defines the `SignRequestExecutor` interface and `RemoteSign*` types, plus the concrete
-`createSignRequestExecutor(config)` implementing
-encrypted sign request round-trips: SCALE-encodes `RemoteMessage` with `SignRequest`, encrypts with AES-GCM session key,
-publishes to session topic, waits for `SignResponse` matching the message ID, decrypts and returns signature.
+`createSignRequestExecutor(config)` implementing encrypted sign request round-trips: SCALE-encodes `RemoteMessage` with
+`SignRequest`, encrypts with AES-GCM session key, publishes to session topic, waits for `SignResponse` matching the
+message ID, decrypts and returns signature.
 
 **`identity/types.ts`**: `IdentityProvider` interface (`getIdentity(accountIdHex)`) and `ResolvedIdentity` type
 (liteUsername, fullUsername, chainIdentity). Implementations query a chain (e.g. People parachain's
