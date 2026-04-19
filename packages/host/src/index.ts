@@ -25,7 +25,6 @@ export type {
   Identity,
   HostFacade,
   HandlersConfig,
-  UserSessionInfo,
   StorageAdapter,
   ReactiveStorageAdapter,
 } from './types.js';

@@ -34,14 +34,7 @@ import { wireChatHandlers } from './chat.js';
 import { wireStatementStoreHandlers } from './statementStore.js';
 import { wirePreimageHandlers } from './preimage.js';
 
-// ---------------------------------------------------------------------------
-// Session type used by handlers
-// ---------------------------------------------------------------------------
-
-export type UserSessionInfo = {
-  rootPublicKey: Uint8Array;
-  displayName?: string;
-};
+import type { UserSession } from '../auth/authManager.js';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -53,7 +46,7 @@ export type HandlersConfig = {
 
   // -- Session access -------------------------------------------------------
   /** Returns the current user session, or undefined if not authenticated. */
-  getSession?: () => UserSessionInfo | undefined;
+  getSession?: () => UserSession | undefined;
 
   /** Subscribe to auth state changes. Callback receives the auth status. */
   subscribeAuthState: (callback: (status: AuthStatus) => void) => () => void;
@@ -79,20 +72,20 @@ export type HandlersConfig = {
 
   // -- Signing callbacks ----------------------------------------------------
   /** Handle signing a structured payload. Must return the signing result. */
-  onSignPayload?: (session: UserSessionInfo, payload: SigningPayloadRequest) => SigningResult | Promise<SigningResult>;
+  onSignPayload?: (session: UserSession, payload: SigningPayloadRequest) => SigningResult | Promise<SigningResult>;
 
   /** Handle signing raw data. Must return the signing result. */
-  onSignRaw?: (session: UserSessionInfo, payload: SigningRawRequest) => SigningResult | Promise<SigningResult>;
+  onSignRaw?: (session: UserSession, payload: SigningRawRequest) => SigningResult | Promise<SigningResult>;
 
   /** Handle creating a transaction. Must return the signed transaction hex. */
   onCreateTransaction?: (
-    session: UserSessionInfo,
+    session: UserSession,
     params: RequestParams<'host_create_transaction', 'v1'>,
   ) => ResponseOk<'host_create_transaction', 'v1'> | Promise<ResponseOk<'host_create_transaction', 'v1'>>;
 
   /** Handle creating a transaction with a non-product account. Must return the signed transaction hex. */
   onCreateTransactionWithNonProductAccount?: (
-    session: UserSessionInfo,
+    session: UserSession,
     payload: RequestParams<'host_create_transaction_with_non_product_account', 'v1'>,
   ) =>
     | ResponseOk<'host_create_transaction_with_non_product_account', 'v1'>
