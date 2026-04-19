@@ -1,13 +1,34 @@
 /**
- * Chain-based identity provider.
+ * Identity provider.
  *
- * Queries Resources.Consumers on the People parachain via the unsafe API
- * from a StatementStoreClient. Returns structured identity data (lite/full username,
- * credibility).
+ * Defines the IdentityProvider interface and ResolvedIdentity type, and provides
+ * the concrete chain-based implementation that queries Resources.Consumers on
+ * the People parachain via the unsafe API from a StatementStoreClient.
  */
 
-import type { IdentityProvider, ResolvedIdentity } from './types.js';
 import { hexToBytes } from '@polkadot/api-protocol';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export type IdentityProvider = {
+  /** Resolve a user's identity from their public key. */
+  getIdentity(accountIdHex: string): Promise<ResolvedIdentity | undefined>;
+};
+
+export type ResolvedIdentity = {
+  /** Short username (e.g., the lite/anonymous username). */
+  liteUsername: string;
+  /** Full display name if available. */
+  fullUsername?: string;
+  /** Chain-specific identity fields. */
+  chainIdentity?: Record<string, unknown>;
+};
+
+// ---------------------------------------------------------------------------
+// Implementation
+// ---------------------------------------------------------------------------
 
 /**
  * Create an identity provider that queries the People parachain.

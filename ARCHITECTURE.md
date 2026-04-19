@@ -677,9 +677,9 @@ in parallel with the handshake — both must complete before the session is retu
 `SignRequest`, encrypts with AES-GCM session key, publishes to session topic, waits for `SignResponse` matching the
 message ID, decrypts and returns signature.
 
-**`identity/types.ts`**: `IdentityProvider` interface (`getIdentity(accountIdHex)`) and `ResolvedIdentity` type
-(liteUsername, fullUsername, chainIdentity). Implementations query a chain (e.g. People parachain's
-`Resources.Consumers` storage) and return structured identity data.
+**`identity/chainProvider.ts`**: Defines the `IdentityProvider` interface (`getIdentity(accountIdHex)`) and
+`ResolvedIdentity` type (liteUsername, fullUsername, chainIdentity), plus the concrete
+`createChainIdentityProvider(getUnsafeApi)` that queries People parachain's `Resources.Consumers` storage.
 
 **`identity/resolver.ts`**: `createIdentityResolver(provider)` — wraps an `IdentityProvider` with in-memory caching and
 concurrent-request deduplication. Failed requests are not cached so transient errors are retried. Supports
@@ -761,7 +761,8 @@ Statement store `handleStatementStoreCreateProof` is wired to sign with the sr25
 
 **`types.ts`**: `HostSdkConfig` with all options: `appId`, `ssoStorage` (ReactiveStorageAdapter, required),
 `productStorage` (factory: `(productId: string) => StorageAdapter`, required), `statementStoreProvider`,
-`pairingMetadata`, `chainProvider`, signing callbacks, permission callbacks, UI callbacks.
+`pairingMetadata` (required — URL to `{ name, icon }` JSON; treated as a hard pairing dependency by the wallet),
+`chainProvider`, signing callbacks, permission callbacks, UI callbacks.
 
 **`constants.ts`**: `PEOPLE_PARACHAIN_ENDPOINTS` — default WebSocket endpoints for the People parachain (POP3 testnet).
 

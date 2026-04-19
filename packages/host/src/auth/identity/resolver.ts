@@ -6,7 +6,7 @@
  * chain queries. The cache can be explicitly invalidated.
  */
 
-import type { IdentityProvider, ResolvedIdentity } from './types.js';
+import type { IdentityProvider, ResolvedIdentity } from './chainProvider.js';
 
 export type IdentityResolver = IdentityProvider & {
   /** Invalidate the cache for a specific account. */

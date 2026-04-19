@@ -87,7 +87,7 @@ export type { PappAdapter, PappAdapterConfig, PairingStatus, AttestationStatus }
 // Identity
 // ---------------------------------------------------------------------------
 
-export type { IdentityProvider, ResolvedIdentity } from './auth/identity/types.js';
+export type { IdentityProvider, ResolvedIdentity } from './auth/identity/chainProvider.js';
 export type { IdentityResolver } from './auth/identity/resolver.js';
 export { createIdentityResolver } from './auth/identity/resolver.js';
 export { createChainIdentityProvider } from './auth/identity/chainProvider.js';
