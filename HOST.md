@@ -71,24 +71,24 @@ When `statementStoreEndpoints` is provided, the SDK automatically:
 
 ### `HostSdkConfig`
 
-| Option                                     | Type                                                            | Default        | Description                                                                  |
-| ------------------------------------------ | --------------------------------------------------------------- | -------------- | ---------------------------------------------------------------------------- |
-| `appId`                                    | `string`                                                        | _required_     | Application identifier. Used for storage scoping and auth.                   |
-| `storagePrefix`                            | `string`                                                        | `${appId}:`    | Prefix for localStorage keys.                                                |
-| `statementStoreEndpoints`                  | `string[]`                                                      | -              | WebSocket URLs for the People parachain. Enables SSO, signing, identity.     |
-| `statementStoreHeartbeatTimeout`           | `number`                                                        | `120000`       | WebSocket heartbeat timeout in ms.                                           |
-| `pairingMetadata`                          | `string`                                                        | `''`           | URL to host metadata JSON shown during QR pairing.                           |
-| `chainProvider`                            | `(genesisHash) => JsonRpcProvider \| undefined`                 | -              | Factory for chain connections. Called when a product requests chain data.    |
-| `onSignPayload`                            | `(session, payload) => SigningResult \| Promise<SigningResult>` | remote signing | Override: handle payload signing yourself.                                   |
-| `onSignRaw`                                | `(session, payload) => SigningResult \| Promise<SigningResult>` | remote signing | Override: handle raw signing yourself.                                       |
-| `onSignApproval`                           | `(payload) => boolean \| Promise<boolean>`                      | auto-approve   | Gate for remote signing. Show a modal, return true/false.                    |
-| `onCreateTransaction`                      | callback                                                        | -              | Handle transaction creation.                                                 |
-| `onCreateTransactionWithNonProductAccount` | callback                                                        | -              | Handle transaction creation for non-product accounts.                        |
-| `onFeatureSupported`                       | `(feature) => boolean`                                          | chain check    | Custom feature support. Default checks `chainProvider` for `Chain` features. |
-| `onDevicePermission`                       | `(permission) => boolean \| Promise<boolean>`                   | `false`        | Device permission handler.                                                   |
-| `onPermission`                             | `(request) => boolean \| Promise<boolean>`                      | `false`        | Remote permission handler.                                                   |
-| `onNavigateTo`                             | `(url) => void`                                                 | `window.open`  | Navigation handler.                                                          |
-| `onPushNotification`                       | `(notification) => void`                                        | `console.warn` | Push notification handler.                                                   |
+| Option                                     | Type                                                            | Default        | Description                                                                             |
+| ------------------------------------------ | --------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------- |
+| `appId`                                    | `string`                                                        | _required_     | Application identifier. Used for storage scoping and auth.                              |
+| `storagePrefix`                            | `string`                                                        | `${appId}:`    | Prefix for localStorage keys.                                                           |
+| `statementStoreEndpoints`                  | `string[]`                                                      | -              | WebSocket URLs for the People parachain. Enables SSO, signing, identity.                |
+| `statementStoreHeartbeatTimeout`           | `number`                                                        | `120000`       | WebSocket heartbeat timeout in ms.                                                      |
+| `pairingMetadata`                          | `string`                                                        | _required_     | URL to host metadata JSON shown during QR pairing. See [Metadata JSON](#metadata-json). |
+| `chainProvider`                            | `(genesisHash) => JsonRpcProvider \| undefined`                 | -              | Factory for chain connections. Called when a product requests chain data.               |
+| `onSignPayload`                            | `(session, payload) => SigningResult \| Promise<SigningResult>` | remote signing | Override: handle payload signing yourself.                                              |
+| `onSignRaw`                                | `(session, payload) => SigningResult \| Promise<SigningResult>` | remote signing | Override: handle raw signing yourself.                                                  |
+| `onSignApproval`                           | `(payload) => boolean \| Promise<boolean>`                      | auto-approve   | Gate for remote signing. Show a modal, return true/false.                               |
+| `onCreateTransaction`                      | callback                                                        | -              | Handle transaction creation.                                                            |
+| `onCreateTransactionWithNonProductAccount` | callback                                                        | -              | Handle transaction creation for non-product accounts.                                   |
+| `onFeatureSupported`                       | `(feature) => boolean`                                          | chain check    | Custom feature support. Default checks `chainProvider` for `Chain` features.            |
+| `onDevicePermission`                       | `(permission) => boolean \| Promise<boolean>`                   | `false`        | Device permission handler.                                                              |
+| `onPermission`                             | `(request) => boolean \| Promise<boolean>`                      | `false`        | Remote permission handler.                                                              |
+| `onNavigateTo`                             | `(url) => void`                                                 | `window.open`  | Navigation handler.                                                                     |
+| `onPushNotification`                       | `(notification) => void`                                        | `console.warn` | Push notification handler.                                                              |
 
 ## `HostSdk` API
 
@@ -448,7 +448,8 @@ const unsub = local.subscribe('myKey', value => {
 
 ## Metadata JSON
 
-The `pairingMetadata` URL should serve a JSON file with this structure:
+`pairingMetadata` is **mandatory**. It must be a publicly reachable URL (e.g. `https://dot.li/metadata.json`) that
+serves a JSON file with this structure:
 
 ```json
 {
@@ -457,8 +458,13 @@ The `pairingMetadata` URL should serve a JSON file with this structure:
 }
 ```
 
-The icon should be a rasterized image (PNG/JPEG) with a minimum size of 256x256 pixels. This is displayed on the mobile
-wallet during the QR pairing flow.
+The icon should be a rasterized image (PNG/JPEG) with a minimum size of 256x256 pixels. The wallet displays the name and
+icon on the pairing approval screen and in its connected-hosts list.
+
+The mobile wallet treats this endpoint as a hard dependency of pairing: it aborts the pairing with a generic failure if
+the URL is invalid, the HTTP fetch returns non-2xx, the JSON is missing or malformed, either field is absent, or the
+`icon` URL is unreachable. There is no fallback — a host with valid crypto identity but a broken metadata endpoint
+cannot pair.
 
 ## Protocol Compatibility
 

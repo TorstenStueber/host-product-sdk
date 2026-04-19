@@ -42,7 +42,7 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
     secretStore: secretStoreInstance,
     pairingExecutor: createPairingExecutor({
       statementStore: statementStoreClient.statementStore,
-      metadata: config.pairingMetadata ?? '',
+      metadata: config.pairingMetadata,
       getUnsafeApi: () => statementStoreClient.getUnsafeApi(),
     }),
   });

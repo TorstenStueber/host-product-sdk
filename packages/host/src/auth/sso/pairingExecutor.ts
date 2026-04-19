@@ -59,14 +59,19 @@ import { signWithSr25519 } from './crypto.js';
 export type PairingExecutorConfig = {
   /** Statement store adapter for the pairing handshake. */
   statementStore: StatementStoreAdapter;
-  /** URL to the host metadata JSON (shown to the mobile wallet). */
+  /**
+   * URL to a publicly reachable JSON document describing this host to the mobile wallet.
+   *
+   * The wallet fetches the URL during pairing, decodes it as `{ name: string, icon: string }`,
+   * then fetches the `icon` URL, and displays the resulting name + image on the pairing
+   * approval screen and in its connected-hosts list. Example: `https://dot.li/metadata.json`.
+   *
+   * This field is mandatory and is treated as a hard dependency by the wallet: pairing aborts
+   * with a generic failure if the URL is invalid, the HTTP fetch is non-2xx, the JSON is
+   * missing/malformed, either field is absent, or the `icon` URL is unreachable. There is no
+   * fallback — a host with valid crypto identity but a broken metadata endpoint cannot pair.
+   */
   metadata: string;
-  /** Optional host version string. */
-  hostVersion?: string;
-  /** Optional OS type string. */
-  osType?: string;
-  /** Optional OS version string. */
-  osVersion?: string;
   /**
    * Function returning the polkadot-api unsafe API for the People parachain.
    * Required for attestation. If not provided, attestation is skipped.
@@ -119,9 +124,9 @@ export function createPairingExecutor(config: PairingExecutorConfig): PairingExe
           ssPublicKey,
           encrPublicKey,
           metadata: config.metadata,
-          hostVersion: config.hostVersion,
-          osType: config.osType,
-          osVersion: config.osVersion,
+          hostVersion: undefined,
+          osType: undefined,
+          osVersion: undefined,
         },
       });
 
