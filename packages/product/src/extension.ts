@@ -12,7 +12,7 @@
 
 import { injectExtension } from '@polkadot/extension-inject/bundle';
 import type { InjectedAccount } from '@polkadot/extension-inject/types';
-import { AccountId } from '@polkadot-api/substrate-bindings';
+import { AccountId } from 'polkadot-api';
 
 // ---------------------------------------------------------------------------
 // Polkadot-js signer types (inlined to avoid @polkadot/types dependency)

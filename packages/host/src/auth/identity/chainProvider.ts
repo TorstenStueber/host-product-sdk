@@ -55,7 +55,7 @@ export function createChainIdentityProvider(getUnsafeApi: () => unknown): Identi
       }
 
       // polkadot-api's AccountId codec
-      const { AccountId } = await import('@polkadot-api/substrate-bindings');
+      const { AccountId } = await import('polkadot-api');
       const accCodec = AccountId();
 
       // Decode hex to SS58 address for the query

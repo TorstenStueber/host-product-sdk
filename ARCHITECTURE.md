@@ -26,12 +26,23 @@ Three npm packages:
 | `@polkadot/host`         | Yes                 | Handlers, auth, storage, SDK entry point                                 |
 | `@polkadot/product`      | Yes                 | Domain modules: accounts, chain, chat, storage, etc.                     |
 
-Runtime dependencies of api-protocol: `scale-ts`, `nanoevents`, `neverthrow`, `@polkadot-api/json-rpc-provider`.
+Runtime dependencies of api-protocol: `scale-ts`, `nanoevents`, `neverthrow`. Peer dependency: `polkadot-api` (provides
+the `JsonRpcProvider` type).
 
 Runtime dependencies of host (in addition to api-protocol): `@noble/ciphers`, `@noble/hashes`, `@noble/curves` (AES-GCM,
 HKDF, blake2b, P-256 ECDH), `@scure/sr25519` (sr25519 signing), `@polkadot-labs/hdkd-helpers` (BIP-39 mnemonics, HDKD),
-`@polkadot-api/substrate-bindings` (AccountId SS58 codec), `@polkadot-api/json-rpc-provider` (transport interface),
-`polkadot-api` (chain client), `verifiablejs` (Bandersnatch ring-VRF WASM for attestation).
+`polkadot-api` (chain client; also re-exports the `AccountId` SS58 codec and `JsonRpcProvider` type we use),
+`verifiablejs` (Bandersnatch ring-VRF WASM for attestation).
+
+Runtime dependencies of product: `@polkadot/extension-inject` (injected-account bridge),
+`@polkadot-api/json-rpc-provider-proxy` (`getSyncProvider` — not re-exported by `polkadot-api`),
+`@polkadot-api/json-rpc-provider` (required at runtime by `json-rpc-provider-proxy@0.3.1`, which declares it as a devDep
+rather than a peerDep). Peer dependency: `polkadot-api` (provides the `JsonRpcProvider` type and `AccountId` codec).
+
+The packages deliberately avoid pinning `@polkadot-api/*` sub-packages that `polkadot-api` itself re-exports
+(`json-rpc-provider`, `substrate-bindings`). Importing those symbols from `polkadot-api` keeps a single version in any
+consumer's install tree — pinning the sub-packages directly caused parallel installs of different (incompatible)
+versions.
 
 ---
 

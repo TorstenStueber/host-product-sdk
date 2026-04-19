@@ -11,7 +11,7 @@
  */
 
 import type { SubscriptionPayload, RuntimeType, OperationStartedResult } from '@polkadot/api-protocol';
-import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
+import type { JsonRpcProvider } from 'polkadot-api';
 import { getSyncProvider } from '@polkadot-api/json-rpc-provider-proxy';
 
 import type { ProductFacade } from '@polkadot/api-protocol';
@@ -57,23 +57,21 @@ export function createPapiProvider(
     // -- JSON-RPC response helpers ------------------------------------------
 
     function sendJsonRpcResponse(id: number | string, result: unknown): void {
-      onMessage(JSON.stringify({ jsonrpc: '2.0', id, result }));
+      onMessage({ jsonrpc: '2.0', id, result });
     }
 
     function sendJsonRpcError(id: number | string, code: number, message: string, data?: unknown): void {
       const error: { code: number; message: string; data?: unknown } = { code, message };
       if (data !== undefined) error.data = data;
-      onMessage(JSON.stringify({ jsonrpc: '2.0', id, error }));
+      onMessage({ jsonrpc: '2.0', id, error });
     }
 
     function sendFollowEvent(syntheticSubId: string, event: unknown): void {
-      onMessage(
-        JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'chainHead_v1_followEvent',
-          params: { subscription: syntheticSubId, result: event },
-        }),
-      );
+      onMessage({
+        jsonrpc: '2.0',
+        method: 'chainHead_v1_followEvent',
+        params: { subscription: syntheticSubId, result: event },
+      });
     }
 
     // -- Event conversion ---------------------------------------------------
@@ -231,15 +229,8 @@ export function createPapiProvider(
 
     // -- Message handler ----------------------------------------------------
 
-    function handleMessage(message: string): void {
-      let parsed: { id: number | string; method: string; params: unknown[] };
-      try {
-        parsed = JSON.parse(message);
-      } catch {
-        return;
-      }
-
-      const { id, method, params } = parsed;
+    function handleMessage(message: { id: number | string; method: string; params: unknown[] }): void {
+      const { id, method, params } = message;
 
       switch (method) {
         // -- chainHead_v1_follow --------------------------------------------
@@ -468,8 +459,8 @@ export function createPapiProvider(
 
     // Return the connection handle
     return {
-      send(message: string): void {
-        handleMessage(message);
+      send(message): void {
+        handleMessage(message as { id: number | string; method: string; params: unknown[] });
       },
       disconnect(): void {
         // Clean up all active follow subscriptions
@@ -514,21 +505,29 @@ export function createPapiProvider(
   // Return a sync provider that lazily initialises
   // -------------------------------------------------------------------------
 
-  return getSyncProvider(async () => {
-    const ready = await checkIfReady();
-    if (ready) return typedProvider;
-    if (__fallback) return __fallback;
-
-    // Return a no-op provider when the chain is not supported
+  return getSyncProvider(onResult => {
+    let cancelled = false;
+    void (async () => {
+      const ready = await checkIfReady();
+      if (cancelled) return;
+      if (ready) {
+        onResult(onMessage => typedProvider(onMessage));
+      } else if (__fallback) {
+        const fallback = __fallback;
+        onResult(onMessage => fallback(onMessage));
+      } else {
+        onResult(() => ({
+          send() {
+            productLogger.error(`Provider for chain ${genesisHash} was not started because Host doesn't support it`);
+          },
+          disconnect() {
+            /* empty */
+          },
+        }));
+      }
+    })();
     return () => {
-      return {
-        send() {
-          productLogger.error(`Provider for chain ${genesisHash} was not started because Host doesn't support it`);
-        },
-        disconnect() {
-          /* empty */
-        },
-      };
+      cancelled = true;
     };
   });
 }

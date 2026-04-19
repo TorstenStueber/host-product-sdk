@@ -21,7 +21,7 @@ import type {
   SigningResult,
   ResponseOk,
 } from '@polkadot/api-protocol';
-import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
+import type { JsonRpcProvider } from 'polkadot-api';
 
 import type { HostFacade } from '@polkadot/api-protocol';
 import { wireHostHandlers } from './host.js';

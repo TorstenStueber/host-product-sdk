@@ -23,7 +23,7 @@ import type {
   SubscriptionMethod,
 } from '../api/protocol.js';
 import type { ResultAsync } from 'neverthrow';
-import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
+import type { JsonRpcProvider } from 'polkadot-api';
 
 // ---------------------------------------------------------------------------
 // Protocol-derived handler types

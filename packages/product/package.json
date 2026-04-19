@@ -20,9 +20,11 @@
   "dependencies": {
     "@polkadot/api-protocol": "0.1.0",
     "@polkadot/extension-inject": "^0.62.6",
-    "@polkadot-api/json-rpc-provider": "^0.0.4",
-    "@polkadot-api/json-rpc-provider-proxy": "^0.2.7",
-    "@polkadot-api/substrate-bindings": "^0.17.0",
+    "@polkadot-api/json-rpc-provider": "^0.1.0",
+    "@polkadot-api/json-rpc-provider-proxy": "^0.3.1",
     "neverthrow": "^8.2.0"
+  },
+  "peerDependencies": {
+    "polkadot-api": "^2.0.0-rc.5"
   }
 }

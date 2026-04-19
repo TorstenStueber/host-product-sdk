@@ -3,8 +3,7 @@
  */
 
 import type { HexString, ResponseOk, RequestParams } from '@polkadot/api-protocol';
-import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
-import type { JsonRpcProvider as PapiJsonRpcProvider } from 'polkadot-api';
+import type { JsonRpcProvider } from 'polkadot-api';
 import type { StorageAdapter, ReactiveStorageAdapter } from './storage/types.js';
 import type {
   SigningPayloadRequest,
@@ -55,7 +54,7 @@ export type HostSdkConfig = {
    * The SDK creates a StatementStoreClient and wires SSO pairing, remote signing,
    * identity resolution, and statement store handlers automatically.
    */
-  statementStoreProvider: PapiJsonRpcProvider;
+  statementStoreProvider: JsonRpcProvider;
 
   /** URL to the host metadata JSON (shown to the mobile wallet during pairing). */
   pairingMetadata?: string;

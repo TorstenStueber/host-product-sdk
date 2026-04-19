@@ -21,8 +21,6 @@
     "@noble/ciphers": "^2.1.1",
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^2.0.1",
-    "@polkadot-api/json-rpc-provider": "^0.0.4",
-    "@polkadot-api/substrate-bindings": "^0.17.0",
     "@polkadot-labs/hdkd-helpers": "^0.0.28",
     "@polkadot/api-protocol": "0.1.0",
     "@scure/sr25519": "^0.2.0",

@@ -8,7 +8,7 @@
 
 import type { HexString } from '../shared/codec/scale/primitives.js';
 import type { ChainHeadEvent, OperationStartedResult, RuntimeType } from '../api/types.js';
-import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
+import type { JsonRpcProvider } from 'polkadot-api';
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -31,7 +31,7 @@ type FollowSubscription = {
 };
 
 type ChainEntry = {
-  connection: { send: (msg: string) => void; disconnect: () => void };
+  connection: ReturnType<JsonRpcProvider>;
   pendingRequests: Map<string, PendingRequest>;
   /**
    * Active follow subscriptions keyed by the transport-level
@@ -77,13 +77,8 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
       refCount: 1,
     };
 
-    entry.connection = provider((message: string) => {
-      let parsed: Record<string, unknown>;
-      try {
-        parsed = JSON.parse(message);
-      } catch {
-        return;
-      }
+    entry.connection = provider(message => {
+      const parsed = message as Record<string, unknown>;
 
       // Request-response (has 'id' field)
       if ('id' in parsed && parsed.id != null) {
@@ -145,7 +140,7 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
     return new Promise((resolve, reject) => {
       entry.pendingRequests.set(id, { resolve, reject });
       try {
-        entry.connection.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }));
+        entry.connection.send({ jsonrpc: '2.0', id, method, params });
       } catch (e) {
         entry.pendingRequests.delete(id);
         reject(transportError(e));
@@ -210,9 +205,7 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
       },
     });
     try {
-      entry.connection.send(
-        JSON.stringify({ jsonrpc: '2.0', id: requestId, method: 'chainHead_v1_follow', params: [withRuntime] }),
-      );
+      entry.connection.send({ jsonrpc: '2.0', id: requestId, method: 'chainHead_v1_follow', params: [withRuntime] });
     } catch (e) {
       entry.pendingRequests.delete(requestId);
       onRejected(transportError(e));
@@ -233,7 +226,7 @@ export function createChainConnectionManager(factory: (genesisHash: HexString) =
 
   function sendUnfollow(entry: ChainEntry, followId: string): void {
     const id = getNextId();
-    entry.connection.send(JSON.stringify({ jsonrpc: '2.0', id, method: 'chainHead_v1_unfollow', params: [followId] }));
+    entry.connection.send({ jsonrpc: '2.0', id, method: 'chainHead_v1_unfollow', params: [followId] });
   }
 
   /**

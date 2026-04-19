@@ -47,7 +47,7 @@ import {
   deriveSr25519PublicKey,
   getP256PublicKey,
 } from './crypto.js';
-import { AccountId } from '@polkadot-api/substrate-bindings';
+import { AccountId } from 'polkadot-api';
 import { runAttestation } from './attestation.js';
 import type { DerivedAccount } from './attestation.js';
 import { signWithSr25519 } from './crypto.js';
