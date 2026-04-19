@@ -224,13 +224,13 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
   const sdk: HostSdk = {
     auth,
 
-    embed(iframe: HTMLIFrameElement, url: string): EmbeddedProduct {
+    embed(iframe: HTMLIFrameElement, url: string, productId: string): EmbeddedProduct {
       iframe.src = url;
       const container = createHostFacade({
         messaging: { type: 'window', target: iframe.contentWindow! },
       });
 
-      const handlersConfig = buildHandlersConfig(config.productStorage);
+      const handlersConfig = buildHandlersConfig(config.productStorage(productId));
       const cleanupHandlers = wireAllHandlers(container, handlersConfig);
 
       const product: EmbeddedProduct = {

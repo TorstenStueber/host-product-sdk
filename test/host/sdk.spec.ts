@@ -89,16 +89,17 @@ describe('Host SDK (auth manager integration)', () => {
   });
 
   describe('SDK config patterns', () => {
-    it('HostSdkConfig requires ssoStorage and productStorage', () => {
-      // Verify the config shape expects both storage adapters
+    it('HostSdkConfig requires ssoStorage and productStorage factory', () => {
+      const mockAdapter = { read: vi.fn(), write: vi.fn(), clear: vi.fn() };
       const config = {
         appId: 'dot.li',
         ssoStorage: { read: vi.fn(), write: vi.fn(), clear: vi.fn(), subscribe: vi.fn() },
-        productStorage: { read: vi.fn(), write: vi.fn(), clear: vi.fn() },
+        productStorage: (_productId: string) => mockAdapter,
         statementStoreProvider: vi.fn(),
       };
       expect(config.ssoStorage).toBeDefined();
-      expect(config.productStorage).toBeDefined();
+      expect(typeof config.productStorage).toBe('function');
+      expect(config.productStorage('my-dapp')).toBe(mockAdapter);
       expect(typeof config.ssoStorage.subscribe).toBe('function');
     });
   });

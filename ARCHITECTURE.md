@@ -9,7 +9,7 @@ A **host** application (like dot.li) embeds third-party **product** dApps inside
 +------------------------------------------+
 |  Host page                               |
 |  createHostSdk({ ... })                  |
-|    sdk.embed(iframe, url)                |
+|    sdk.embed(iframe, url, productId)     |
 |         |  postMessage                   |
 |  +------v----------------------------+   |
 |  |  Product iframe                   |   |
@@ -738,7 +738,7 @@ const sdk = createHostSdk({
   chainProvider: genesisHash => getSmoldotProvider(genesisHash),
 });
 
-const product = sdk.embed(iframeElement, 'https://dapp.example.com');
+const product = sdk.embed(iframeElement, 'https://dapp.example.com', 'my-dapp');
 product.dispose();
 sdk.dispose();
 ```
@@ -751,7 +751,7 @@ sdk.dispose();
 - `SsoManager` with `PairingExecutor`
 - `IdentityResolver` backed by `createChainIdentityProvider` (queries `Resources.Consumers`)
 - Statement store handlers are wired to the `StatementStoreClient`'s adapter
-- Product-facing storage uses the required `productStorage` (StorageAdapter)
+- Per-product storage resolved from the required `productStorage(productId)` factory
 
 The SSO manager auto-restores persisted sessions on creation. SSO state changes are synced to the `AuthManager`.
 
@@ -765,8 +765,8 @@ Statement store `handleStatementStoreCreateProof` is wired to sign with the sr25
 `clearSession()` calls `ssoManager.unpair()` to clear both session metadata and secrets.
 
 **`types.ts`**: `HostSdkConfig` with all options: `appId`, `ssoStorage` (ReactiveStorageAdapter, required),
-`productStorage` (StorageAdapter, required), `statementStoreProvider`, `pairingMetadata`, `chainProvider`, signing
-callbacks, permission callbacks, UI callbacks.
+`productStorage` (factory: `(productId: string) => StorageAdapter`, required), `statementStoreProvider`,
+`pairingMetadata`, `chainProvider`, signing callbacks, permission callbacks, UI callbacks.
 
 **`constants.ts`**: `PEOPLE_PARACHAIN_ENDPOINTS` — default WebSocket endpoints for the People parachain (POP3 testnet).
 

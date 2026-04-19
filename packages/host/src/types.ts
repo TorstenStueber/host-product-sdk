@@ -36,12 +36,13 @@ export type HostSdkConfig = {
   ssoStorage: ReactiveStorageAdapter;
 
   /**
-   * Storage adapter for product-facing localStorage operations.
+   * Factory that returns a storage adapter for a given product ID.
    *
-   * Passed to `HandlersConfig.storage` when embedding products.
-   * Typically `createLocalStorageAdapter(appId + ':')`.
+   * Called once per `embed()` invocation. The returned adapter is passed
+   * to `HandlersConfig.storage` for that product's localStorage operations.
+   * Typically `(productId) => createLocalStorageAdapter(appId + ':' + productId + ':')`.
    */
-  productStorage: StorageAdapter;
+  productStorage: (productId: string) => StorageAdapter;
 
   // -- Statement store / SSO -------------------------------------------------
   /**
@@ -144,9 +145,10 @@ export type HostSdk = {
    *
    * @param iframe - The iframe element to load the product into.
    * @param url - The URL to load in the iframe.
+   * @param productId - Unique identifier for this product (used for storage scoping).
    * @returns An EmbeddedProduct handle.
    */
-  embed(iframe: HTMLIFrameElement, url: string): EmbeddedProduct;
+  embed(iframe: HTMLIFrameElement, url: string, productId: string): EmbeddedProduct;
 
   /**
    * Set the authenticated session.
