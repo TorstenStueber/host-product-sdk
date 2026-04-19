@@ -5,6 +5,7 @@
 import type { HexString, ResponseOk, RequestParams } from '@polkadot/api-protocol';
 import type { JsonRpcProvider } from '@polkadot-api/json-rpc-provider';
 import type { JsonRpcProvider as PapiJsonRpcProvider } from 'polkadot-api';
+import type { StorageAdapter, ReactiveStorageAdapter } from './storage/types.js';
 import type {
   SigningPayloadRequest,
   SigningRawRequest,
@@ -23,11 +24,24 @@ import type { AuthManager, UserSession, Identity } from './auth/authManager.js';
 // ---------------------------------------------------------------------------
 
 export type HostSdkConfig = {
-  /** Application identifier (e.g., 'dot.li'). Used for storage scoping and auth. */
+  /** Application identifier (e.g., 'dot.li'). Used for auth. */
   appId: string;
 
-  /** Storage key prefix. Defaults to `${appId}:`. */
-  storagePrefix?: string;
+  /**
+   * Reactive storage adapter for SSO session and secret persistence.
+   *
+   * Must support `subscribe()` for reactive session change notifications.
+   * Typically `createLocalStorageAdapter(appId + ':sso:')`.
+   */
+  ssoStorage: ReactiveStorageAdapter;
+
+  /**
+   * Storage adapter for product-facing localStorage operations.
+   *
+   * Passed to `HandlersConfig.storage` when embedding products.
+   * Typically `createLocalStorageAdapter(appId + ':')`.
+   */
+  productStorage: StorageAdapter;
 
   // -- Statement store / SSO -------------------------------------------------
   /**

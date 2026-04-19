@@ -24,7 +24,6 @@ import { createSignRequestExecutor } from './auth/sso/signRequestExecutor.js';
 import { createRemoteSigner } from './auth/sso/signing.js';
 import type { RemoteSigner } from './auth/sso/signing.js';
 import { createAccountId, deriveSr25519PublicKey, signWithSr25519 } from './auth/sso/crypto.js';
-import { createLocalStorageAdapter } from './storage/localStorage.js';
 import { createIdentityResolver } from './auth/identity/resolver.js';
 import { createChainIdentityProvider } from './auth/identity/chainProvider.js';
 
@@ -35,9 +34,8 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
   // --- Statement store client (also used for identity resolution) ---
   const statementStoreClient = createStatementStoreClient(config.statementStoreProvider);
 
-  const ssoStorage = createLocalStorageAdapter(config.appId + ':sso:');
-  const sessionStore = createSsoSessionStore(ssoStorage);
-  const secretStoreInstance = createSecretStore(ssoStorage);
+  const sessionStore = createSsoSessionStore(config.ssoStorage);
+  const secretStoreInstance = createSecretStore(config.ssoStorage);
 
   const ssoManager = createSsoManager({
     statementStore: statementStoreClient.statementStore,
@@ -228,12 +226,11 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
 
     embed(iframe: HTMLIFrameElement, url: string): EmbeddedProduct {
       iframe.src = url;
-      const storage = createLocalStorageAdapter(config.storagePrefix ?? `${config.appId}:`);
       const container = createHostFacade({
         messaging: { type: 'window', target: iframe.contentWindow! },
       });
 
-      const handlersConfig = buildHandlersConfig(storage);
+      const handlersConfig = buildHandlersConfig(config.productStorage);
       const cleanupHandlers = wireAllHandlers(container, handlersConfig);
 
       const product: EmbeddedProduct = {

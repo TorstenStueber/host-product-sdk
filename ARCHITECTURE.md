@@ -747,9 +747,11 @@ sdk.dispose();
 
 - `StatementStoreClient` from the required `statementStoreProvider` (transport-agnostic — works with WebSocket or
   Smoldot)
-- `SsoManager` with `PairingExecutor`, `SsoSessionStore`, and `SecretStore` (for session reconnection)
+- `SsoSessionStore` and `SecretStore` backed by the required `ssoStorage` (ReactiveStorageAdapter)
+- `SsoManager` with `PairingExecutor`
 - `IdentityResolver` backed by `createChainIdentityProvider` (queries `Resources.Consumers`)
 - Statement store handlers are wired to the `StatementStoreClient`'s adapter
+- Product-facing storage uses the required `productStorage` (StorageAdapter)
 
 The SSO manager auto-restores persisted sessions on creation. SSO state changes are synced to the `AuthManager`.
 
@@ -762,8 +764,9 @@ Statement store `handleStatementStoreCreateProof` is wired to sign with the sr25
 
 `clearSession()` calls `ssoManager.unpair()` to clear both session metadata and secrets.
 
-**`types.ts`**: `HostSdkConfig` with all options: `appId`, `statementStoreProvider`, `pairingMetadata`, `chainProvider`,
-signing callbacks, permission callbacks, UI callbacks.
+**`types.ts`**: `HostSdkConfig` with all options: `appId`, `ssoStorage` (ReactiveStorageAdapter, required),
+`productStorage` (StorageAdapter, required), `statementStoreProvider`, `pairingMetadata`, `chainProvider`, signing
+callbacks, permission callbacks, UI callbacks.
 
 **`constants.ts`**: `PEOPLE_PARACHAIN_ENDPOINTS` — default WebSocket endpoints for the People parachain (POP3 testnet).
 

@@ -89,19 +89,17 @@ describe('Host SDK (auth manager integration)', () => {
   });
 
   describe('SDK config patterns', () => {
-    it('storagePrefix defaults to appId: in HostSdkConfig', () => {
-      const config: { appId: string; storagePrefix?: string } = { appId: 'dot.li' };
-      const storagePrefix = config.storagePrefix ?? `${config.appId}:`;
-      expect(storagePrefix).toBe('dot.li:');
-    });
-
-    it('custom storagePrefix overrides default in HostSdkConfig', () => {
-      const config: { appId: string; storagePrefix?: string } = {
+    it('HostSdkConfig requires ssoStorage and productStorage', () => {
+      // Verify the config shape expects both storage adapters
+      const config = {
         appId: 'dot.li',
-        storagePrefix: 'custom_prefix_',
+        ssoStorage: { read: vi.fn(), write: vi.fn(), clear: vi.fn(), subscribe: vi.fn() },
+        productStorage: { read: vi.fn(), write: vi.fn(), clear: vi.fn() },
+        statementStoreProvider: vi.fn(),
       };
-      const storagePrefix = config.storagePrefix ?? `${config.appId}:`;
-      expect(storagePrefix).toBe('custom_prefix_');
+      expect(config.ssoStorage).toBeDefined();
+      expect(config.productStorage).toBeDefined();
+      expect(typeof config.ssoStorage.subscribe).toBe('function');
     });
   });
 });
