@@ -170,12 +170,7 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
       storage,
 
       getSession() {
-        const session = auth.getSession();
-        if (!session) return undefined;
-        return {
-          rootPublicKey: session.rootPublicKey,
-          displayName: session.displayName,
-        };
+        return auth.getSession();
       },
 
       subscribeAuthState(callback) {
@@ -192,42 +187,42 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
       // with optional approval gate
       onSignPayload: config.onSignPayload
         ? (_sessionInfo, payload) => {
-          const session = auth.getSession();
-          if (!session) throw new Error('No session');
-          return config.onSignPayload!(session, payload);
-        }
+            const session = auth.getSession();
+            if (!session) throw new Error('No session');
+            return config.onSignPayload!(session, payload);
+          }
         : remoteSigner
           ? (_sessionInfo, payload) => {
-            return approveAndRemoteSign(payload, () => remoteSigner!.signPayload(payload as never));
-          }
+              return approveAndRemoteSign(payload, () => remoteSigner!.signPayload(payload as never));
+            }
           : undefined,
 
       onSignRaw: config.onSignRaw
         ? (_sessionInfo, payload) => {
-          const session = auth.getSession();
-          if (!session) throw new Error('No session');
-          return config.onSignRaw!(session, payload);
-        }
+            const session = auth.getSession();
+            if (!session) throw new Error('No session');
+            return config.onSignRaw!(session, payload);
+          }
         : remoteSigner
           ? (_sessionInfo, payload) => {
-            return approveAndRemoteSign(payload, () => remoteSigner!.signRaw(payload as never));
-          }
+              return approveAndRemoteSign(payload, () => remoteSigner!.signRaw(payload as never));
+            }
           : undefined,
 
       onCreateTransaction: config.onCreateTransaction
         ? (_sessionInfo, params) => {
-          const session = auth.getSession();
-          if (!session) throw new Error('No session');
-          return config.onCreateTransaction!(session, params);
-        }
+            const session = auth.getSession();
+            if (!session) throw new Error('No session');
+            return config.onCreateTransaction!(session, params);
+          }
         : undefined,
 
       onCreateTransactionWithNonProductAccount: config.onCreateTransactionWithNonProductAccount
         ? (_sessionInfo, payload) => {
-          const session = auth.getSession();
-          if (!session) throw new Error('No session');
-          return config.onCreateTransactionWithNonProductAccount!(session, payload);
-        }
+            const session = auth.getSession();
+            if (!session) throw new Error('No session');
+            return config.onCreateTransactionWithNonProductAccount!(session, payload);
+          }
         : undefined,
 
       chainProvider: config.chainProvider,
