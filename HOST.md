@@ -322,7 +322,7 @@ container.dispose();
 
 ```typescript
 import {
-  createChainClient,
+  createStatementStoreClient,
   createSsoManager,
   createSsoSessionStore,
   createSecretStore,
@@ -332,7 +332,7 @@ import {
 } from '@polkadot/host';
 
 // 1. Chain client (single WebSocket for everything)
-const chain = createChainClient(PEOPLE_PARACHAIN_ENDPOINTS);
+const chain = createStatementStoreClient(PEOPLE_PARACHAIN_ENDPOINTS);
 
 // 2. Persistence
 const storage = createLocalStorageAdapter('my-host:sso:');
@@ -402,9 +402,9 @@ resolver.invalidateAll();
 ### Statement Store (Direct Access)
 
 ```typescript
-import { createChainClient, PEOPLE_PARACHAIN_ENDPOINTS } from '@polkadot/host';
+import { createStatementStoreClient, PEOPLE_PARACHAIN_ENDPOINTS } from '@polkadot/host';
 
-const chain = createChainClient(PEOPLE_PARACHAIN_ENDPOINTS);
+const chain = createStatementStoreClient(PEOPLE_PARACHAIN_ENDPOINTS);
 
 // Subscribe to statements on a topic
 const unsub = chain.statementStore.subscribe(

@@ -1,5 +1,5 @@
 /**
- * Lazy chain client for the People/statement-store parachain.
+ * Lazy statement store client for the People parachain.
  *
  * Creates a polkadot-api client from the caller-provided JsonRpcProvider
  * on first use. Provides both the statement store adapter (for SSO and
@@ -44,7 +44,7 @@ type Observable<T> = {
 // Chain client
 // ---------------------------------------------------------------------------
 
-export type ChainClient = {
+export type StatementStoreClient = {
   /** Statement store adapter for SSO and host API handlers. */
   statementStore: StatementStoreAdapter;
 
@@ -59,7 +59,7 @@ export type ChainClient = {
 };
 
 /**
- * Create a lazy chain client from a JSON-RPC provider.
+ * Create a lazy statement store client from a JSON-RPC provider.
  *
  * The provider can be any `JsonRpcProvider` — a WebSocket connection
  * (via `getWsProvider`) or a Smoldot light client (via `getSmProvider`).
@@ -68,7 +68,7 @@ export type ChainClient = {
  *
  * @param provider - A `JsonRpcProvider` connected to the People parachain.
  */
-export function createChainClient(provider: JsonRpcProvider): ChainClient {
+export function createStatementStoreClient(provider: JsonRpcProvider): StatementStoreClient {
   let client: ReturnType<typeof createClient> | undefined;
 
   function ensureClient(): ReturnType<typeof createClient> {

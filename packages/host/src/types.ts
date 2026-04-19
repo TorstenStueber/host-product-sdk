@@ -37,7 +37,7 @@ export type HostSdkConfig = {
    * `getWsProvider` from `@polkadot-api/ws-provider`) or a Smoldot
    * light client (via `getSmProvider` from `@polkadot-api/sm-provider`).
    *
-   * The SDK creates a ChainClient and wires SSO pairing, remote signing,
+   * The SDK creates a StatementStoreClient and wires SSO pairing, remote signing,
    * identity resolution, and statement store handlers automatically.
    */
   statementStoreProvider: PapiJsonRpcProvider;

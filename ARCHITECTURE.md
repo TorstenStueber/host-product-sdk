@@ -698,9 +698,10 @@ Unified statement-store parachain adapter used by both SSO (pairing/signing) and
 `submit(statement)`, and `query(topics)`. `Statement` and `SignedStatement` types with tagged `StatementProof` union
 (sr25519/ed25519/ecdsa).
 
-**`statementStore/chainClient.ts`**: `createChainClient(provider)` — creates a lazy polkadot-api client from any
+**`statementStore/client.ts`**: `createStatementStoreClient(provider)` — creates a lazy polkadot-api client from any
 `JsonRpcProvider`. The provider is transport-agnostic: it can be a WebSocket connection (via `getWsProvider`) or a
-Smoldot light client (via `getSmProvider`). The polkadot-api client is created on first use. Returns `ChainClient` with:
+Smoldot light client (via `getSmProvider`). The polkadot-api client is created on first use. Returns
+`StatementStoreClient` with:
 
 - `statementStore`: the `StatementStoreAdapter` (for SSO and host API handlers)
 - `getUnsafeApi()`: polkadot-api unsafe API (for identity resolution via `Resources.Consumers`)
@@ -744,10 +745,11 @@ sdk.dispose();
 
 `createHostSdk` internally creates:
 
-- `ChainClient` from the required `statementStoreProvider` (transport-agnostic — works with WebSocket or Smoldot)
+- `StatementStoreClient` from the required `statementStoreProvider` (transport-agnostic — works with WebSocket or
+  Smoldot)
 - `SsoManager` with `PairingExecutor`, `SsoSessionStore`, and `SecretStore` (for session reconnection)
 - `IdentityResolver` backed by `createChainIdentityProvider` (queries `Resources.Consumers`)
-- Statement store handlers are wired to the `ChainClient`'s adapter
+- Statement store handlers are wired to the `StatementStoreClient`'s adapter
 
 The SSO manager auto-restores persisted sessions on creation. SSO state changes are synced to the `AuthManager`.
 

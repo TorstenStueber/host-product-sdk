@@ -2,7 +2,7 @@
  * Chain-based identity provider.
  *
  * Queries Resources.Consumers on the People parachain via the unsafe API
- * from a ChainClient. Returns structured identity data (lite/full username,
+ * from a StatementStoreClient. Returns structured identity data (lite/full username,
  * credibility).
  */
 
@@ -13,7 +13,7 @@ import { hexToBytes } from '@polkadot/api-protocol';
  * Create an identity provider that queries the People parachain.
  *
  * @param getUnsafeApi - Function that returns the polkadot-api unsafe API.
- *   Typically `chainClient.getUnsafeApi`.
+ *   Typically `statementStoreClient.getUnsafeApi`.
  */
 export function createChainIdentityProvider(getUnsafeApi: () => unknown): IdentityProvider {
   return {

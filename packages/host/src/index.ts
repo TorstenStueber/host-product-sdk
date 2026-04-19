@@ -97,8 +97,8 @@ export { createChainIdentityProvider } from './auth/identity/chainProvider.js';
 // ---------------------------------------------------------------------------
 
 export type { StatementStoreAdapter, Statement, SignedStatement, StatementProof } from './statementStore/types.js';
-export type { ChainClient } from './statementStore/chainClient.js';
-export { createChainClient } from './statementStore/chainClient.js';
+export type { StatementStoreClient } from './statementStore/client.js';
+export { createStatementStoreClient } from './statementStore/client.js';
 export { PEOPLE_PARACHAIN_ENDPOINTS } from './constants.js';
 
 // ---------------------------------------------------------------------------
