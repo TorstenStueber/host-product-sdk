@@ -1,15 +1,45 @@
 /**
- * Concrete PairingExecutor implementation.
+ * Pairing executor.
  *
- * Implements the QR-code-based pairing handshake following triangle-js-sdks'
+ * Defines the PairingExecutor interface and PairingResult type, and provides
+ * the concrete QR-code-based implementation following triangle-js-sdks'
  * wire format exactly. Generates fresh entropy, derives sr25519 and P-256 keys,
  * publishes the handshake payload, and waits for the mobile wallet's response.
  */
 
 import { randomBytes } from '@noble/hashes/utils.js';
 import type { StatementStoreAdapter } from '../../statementStore/types.js';
-import type { PairingExecutor, PairingResult } from './manager.js';
 import type { PersistedSessionMeta } from './sessionStore.js';
+import type { PersistedSecrets } from './secretStore.js';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of a successful pairing handshake.
+ */
+export type PairingResult = {
+  /** Session metadata to persist. */
+  session: PersistedSessionMeta;
+  /** Cryptographic secrets to persist for session reconnection. */
+  secrets: PersistedSecrets;
+};
+
+/**
+ * Pluggable pairing protocol.
+ */
+export type PairingExecutor = {
+  execute(
+    statementStore: StatementStoreAdapter,
+    onQrPayload: (payload: string) => void,
+    signal: AbortSignal,
+  ): Promise<PairingResult | undefined>;
+};
+
+// ---------------------------------------------------------------------------
+// Implementation
+// ---------------------------------------------------------------------------
 import { HandshakeData, HandshakeResponsePayload, HandshakeResponseSensitiveData } from './codecs.js';
 import {
   createAccountId,

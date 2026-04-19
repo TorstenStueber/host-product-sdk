@@ -1,11 +1,12 @@
 /**
- * Concrete SignRequestExecutor implementation.
+ * Sign request executor.
  *
- * Routes sign requests through the SSO encrypted channel following
- * triangle-js-sdks' wire format. Encodes the request as a RemoteMessage
- * wrapped in a StatementData request, encrypts with AES-GCM using the
- * session key, publishes as a statement, and waits for the mobile wallet's
- * signed response.
+ * Defines the SignRequestExecutor interface and remote sign types, and provides
+ * the concrete implementation that routes sign requests through the SSO
+ * encrypted channel following triangle-js-sdks' wire format. Encodes the
+ * request as a RemoteMessage wrapped in a StatementData request, encrypts with
+ * AES-GCM using the session key, publishes as a statement, and waits for the
+ * mobile wallet's signed response.
  *
  * Session topology matches triangle-js-sdks:
  * - outgoingSessionId = createSessionId(sessionKey, localAccountId, remoteAccountId)
@@ -16,14 +17,34 @@
 
 import type { StatementStoreAdapter, Statement } from '../../statementStore/types.js';
 import type { SsoSigner } from './types.js';
-import type {
-  SignRequestExecutor,
-  RemoteSignPayloadRequest,
-  RemoteSignRawRequest,
-  RemoteSignResult,
-} from './signing.js';
+import type { SigningPayloadRequest, SigningRawRequest, SigningPayloadResponseData } from './codecs.js';
 import { RemoteMessageCodec, StatementDataCodec } from './codecs.js';
 import { createEncryption, createSessionId, createRequestChannel } from './crypto.js';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export type RemoteSignPayloadRequest = SigningPayloadRequest;
+export type RemoteSignRawRequest = SigningRawRequest;
+export type RemoteSignResult = SigningPayloadResponseData;
+
+/**
+ * Pluggable sign request executor.
+ *
+ * Implementations handle encrypting the sign request with the AES session
+ * key, publishing it to the statement-store topic, waiting for the wallet's
+ * response, and decrypting the signature.
+ */
+export type SignRequestExecutor = {
+  signPayload(
+    store: StatementStoreAdapter,
+    request: RemoteSignPayloadRequest,
+    signal: AbortSignal,
+  ): Promise<RemoteSignResult>;
+
+  signRaw(store: StatementStoreAdapter, request: RemoteSignRawRequest, signal: AbortSignal): Promise<RemoteSignResult>;
+};
 
 // ---------------------------------------------------------------------------
 // Config

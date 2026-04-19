@@ -24,18 +24,18 @@ export type SsoSigner = {
 
 export type { SsoSessionStore, PersistedSessionMeta } from './sessionStore.js';
 
-export type { SsoState, SsoManager, SsoManagerConfig, PairingExecutor, PairingResult } from './manager.js';
+export type { SsoState, SsoManager, SsoManagerConfig } from './manager.js';
 
 export type { SecretStore, PersistedSecrets } from './secretStore.js';
 
+export type { PairingExecutor, PairingResult, PairingExecutorConfig } from './pairingExecutor.js';
+
 export type {
-  RemoteSigner,
-  RemoteSigningConfig,
   SignRequestExecutor,
   RemoteSignPayloadRequest,
   RemoteSignRawRequest,
   RemoteSignResult,
-} from './signing.js';
+  SignRequestExecutorConfig,
+} from './signRequestExecutor.js';
 
-export type { PairingExecutorConfig } from './pairingExecutor.js';
-export type { SignRequestExecutorConfig } from './signRequestExecutor.js';
+export type { RemoteSigner, RemoteSigningConfig } from './signing.js';

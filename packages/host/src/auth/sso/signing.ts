@@ -10,36 +10,12 @@
 
 import type { StatementStoreAdapter } from '../../statementStore/types.js';
 import type { SsoManager } from './manager.js';
-import type { SigningPayloadRequest, SigningRawRequest, SigningPayloadResponseData } from './codecs.js';
-
-// ---------------------------------------------------------------------------
-// Sign request/response types (derived from SCALE codecs)
-// ---------------------------------------------------------------------------
-
-export type RemoteSignPayloadRequest = SigningPayloadRequest;
-export type RemoteSignRawRequest = SigningRawRequest;
-export type RemoteSignResult = SigningPayloadResponseData;
-
-// ---------------------------------------------------------------------------
-// Sign request executor (injected crypto/framing)
-// ---------------------------------------------------------------------------
-
-/**
- * Pluggable sign request executor.
- *
- * Implementations handle encrypting the sign request with the AES session
- * key, publishing it to the statement-store topic, waiting for the wallet's
- * response, and decrypting the signature.
- */
-export type SignRequestExecutor = {
-  signPayload(
-    store: StatementStoreAdapter,
-    request: RemoteSignPayloadRequest,
-    signal: AbortSignal,
-  ): Promise<RemoteSignResult>;
-
-  signRaw(store: StatementStoreAdapter, request: RemoteSignRawRequest, signal: AbortSignal): Promise<RemoteSignResult>;
-};
+import type {
+  SignRequestExecutor,
+  RemoteSignPayloadRequest,
+  RemoteSignRawRequest,
+  RemoteSignResult,
+} from './signRequestExecutor.js';
 
 // ---------------------------------------------------------------------------
 // Remote signing bridge

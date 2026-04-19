@@ -10,6 +10,7 @@
 import type { StatementStoreAdapter } from '../../statementStore/types.js';
 import type { SsoSessionStore, PersistedSessionMeta } from './sessionStore.js';
 import type { SecretStore, PersistedSecrets } from './secretStore.js';
+import type { PairingExecutor } from './pairingExecutor.js';
 
 // ---------------------------------------------------------------------------
 // SSO state
@@ -21,31 +22,6 @@ export type SsoState =
   | { status: 'pairing' }
   | { status: 'paired'; session: PersistedSessionMeta }
   | { status: 'failed'; reason: string };
-
-// ---------------------------------------------------------------------------
-// Pairing executor (injected crypto protocol)
-// ---------------------------------------------------------------------------
-
-/**
- * Result of a successful pairing handshake.
- */
-export type PairingResult = {
-  /** Session metadata to persist. */
-  session: PersistedSessionMeta;
-  /** Cryptographic secrets to persist for session reconnection. */
-  secrets: PersistedSecrets;
-};
-
-/**
- * Pluggable pairing protocol.
- */
-export type PairingExecutor = {
-  execute(
-    statementStore: StatementStoreAdapter,
-    onQrPayload: (payload: string) => void,
-    signal: AbortSignal,
-  ): Promise<PairingResult | undefined>;
-};
 
 // ---------------------------------------------------------------------------
 // Manager config

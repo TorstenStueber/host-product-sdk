@@ -617,9 +617,9 @@ derivation path `/product/{productId}/{derivationIndex}` and delegates to `sr255
 
 **`pappAdapter.ts`**: Stub interface for QR-code pairing (to be ported from old host-papp).
 
-**`sso/types.ts`**: SSO public types hub. Defines `SsoSigner` (sr25519 signing interface: `publicKey`,
-`sign(message)`) inline, and re-exports `SsoSessionStore`, `PersistedSessionMeta` from `sessionStore.ts`, plus all
-other SSO types from their implementation files.
+**`sso/types.ts`**: SSO public types hub. Defines `SsoSigner` (sr25519 signing interface: `publicKey`, `sign(message)`)
+inline, and re-exports `SsoSessionStore`, `PersistedSessionMeta` from `sessionStore.ts`, plus all other SSO types from
+their implementation files.
 
 **`sso/sessionStore.ts`**: Defines `PersistedSessionMeta` (minimal session data surviving page reloads: sessionId,
 address, displayName, sessionKey, remoteAccountId) and `SsoSessionStore` (persistence interface: `save`, `load`,
@@ -634,17 +634,14 @@ address, displayName, sessionKey, remoteAccountId) and `SsoSessionStore` (persis
 - `unpair()`: clears persisted session and transitions to `idle`.
 - `restoreSession()`: loads a persisted session and transitions directly to `paired`.
 - `subscribe(callback)`: fires on every state transition.
-- `PairingExecutor` is the pluggable crypto protocol — implementations handle mnemonic generation, P-256 ECDH,
-  statement-store key exchange, and attestation. The manager only drives the state machine and persistence.
+- The manager only drives the state machine and persistence — it delegates the cryptographic handshake to a
+  `PairingExecutor` (defined in `pairingExecutor.ts`).
 
 **`sso/signing.ts`**: `createRemoteSigner(config)` — routes sign requests through the SSO transport to the paired mobile
 wallet:
 
 - `signPayload(request)` / `signRaw(request)`: guards that the manager is paired, delegates to an injected
-  `SignRequestExecutor` (which handles AES encryption, statement framing, and response correlation), and applies a
-  configurable timeout (default 90s).
-- `SignRequestExecutor` is the pluggable crypto layer — implementations encrypt the payload with the session key,
-  publish to the statement-store topic, wait for the wallet's signed response, and decrypt it.
+  `SignRequestExecutor` (defined in `signRequestExecutor.ts`), and applies a configurable timeout (default 90s).
 - `RemoteSigner` can be wired as the `onSignPayload`/`onSignRaw` callbacks in `HandlersConfig`.
 
 **`sso/crypto.ts`**: SSO cryptographic primitives — all wire-compatible with triangle-js-sdks:
@@ -669,13 +666,15 @@ pallet. Lazy-loads `verifiablejs` WASM (5.8 MB Bandersnatch ring-VRF), derives V
 consumer registration signature, submits `PeopleLite.attest` extrinsic with custom signed extensions
 (`VerifyMultiSignature`, `AsPerson`). Uses a hardcoded sudo Alice verifier (testnet only).
 
-**`sso/pairingExecutor.ts`**: `createPairingExecutor(config)` — concrete `PairingExecutor` implementing the full QR-code
+**`sso/pairingExecutor.ts`**: Defines the `PairingExecutor` interface and `PairingResult` type, plus the concrete
+`createPairingExecutor(config)` implementing the full QR-code
 handshake: generates mnemonic, derives sr25519 at `//wallet//sso` + P-256 keys, builds SCALE-encoded `HandshakeData`,
 publishes to statement-store topic, waits for mobile response, performs P-256 ECDH to decrypt session credentials. When
 `config.getUnsafeApi` is provided, runs attestation in parallel with the handshake — both must complete before the
 session is returned.
 
-**`sso/signRequestExecutor.ts`**: `createSignRequestExecutor(config)` — concrete `SignRequestExecutor` implementing
+**`sso/signRequestExecutor.ts`**: Defines the `SignRequestExecutor` interface and `RemoteSign*` types, plus the concrete
+`createSignRequestExecutor(config)` implementing
 encrypted sign request round-trips: SCALE-encodes `RemoteMessage` with `SignRequest`, encrypts with AES-GCM session key,
 publishes to session topic, waits for `SignResponse` matching the message ID, decrypts and returns signature.
 
