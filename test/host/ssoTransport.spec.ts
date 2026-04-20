@@ -130,15 +130,72 @@ describe('createMemoryStatementStore', () => {
     }
   });
 
-  it('subscriber with multiple topics matches any', async () => {
+  it('matchAll: subscriber with multiple topics requires the statement to carry all of them', async () => {
     const bus = createMemoryStatementStore();
     const transport = bus.createAdapter();
     const callback = vi.fn();
 
     transport.subscribe([topic(1), topic(2)], callback);
+    // Statement with only topic(2) → should NOT match
     await transport.submit(makeStatement(2, new Uint8Array([1])));
 
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it('matchAll: subscriber matches when statement carries a superset of the filter topics', async () => {
+    const bus = createMemoryStatementStore();
+    const transport = bus.createAdapter();
+    const callback = vi.fn();
+
+    // Subscribe on two topics
+    transport.subscribe([topic(1), topic(2)], callback);
+
+    // Submit a statement that carries BOTH topics — should match
+    const stmt: SignedStatement = {
+      channel: new Uint8Array(32),
+      topics: [topic(1), topic(2), topic(3)],
+      data: new Uint8Array([0xff]),
+      decryptionKey: undefined,
+      expiry: undefined,
+      proof: { tag: 'Sr25519', value: { signature: new Uint8Array(64), signer: new Uint8Array(32) } },
+    };
+    await transport.submit(stmt);
+
     expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it('matchAll: empty filter matches every statement', async () => {
+    const bus = createMemoryStatementStore();
+    const transport = bus.createAdapter();
+    const callback = vi.fn();
+
+    transport.subscribe([], callback);
+    await transport.submit(makeStatement(7, new Uint8Array([1])));
+    await transport.submit(makeStatement(99, new Uint8Array([2])));
+
+    expect(callback).toHaveBeenCalledTimes(2);
+  });
+
+  it('submit returns an Ok ResultAsync', async () => {
+    const bus = createMemoryStatementStore();
+    const transport = bus.createAdapter();
+    const result = await transport.submit(makeStatement(1, new Uint8Array([1])));
+    expect(result.isOk()).toBe(true);
+  });
+
+  it('query returns statements matching the filter (matchAll)', async () => {
+    const bus = createMemoryStatementStore();
+    const a = bus.createAdapter();
+    const b = bus.createAdapter();
+
+    await a.submit(makeStatement(1, new Uint8Array([1])));
+    await a.submit(makeStatement(2, new Uint8Array([2])));
+
+    const result = await b.query([topic(1)]);
+    expect(result.isOk()).toBe(true);
+    const statements = result._unsafeUnwrap();
+    expect(statements).toHaveLength(1);
+    expect(statements[0]!.data).toEqual(new Uint8Array([1]));
   });
 });
 

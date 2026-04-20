@@ -146,10 +146,15 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
     auth.setState({ status: 'authenticated', session, identity });
   }
 
-  // Helper: check approval gate, then route through remote signer
+  // Helper: check approval gate, then route through remote signer.
+  // Bridges the executor's ResultAsync failure modes to the handler
+  // callback contract (which throws on failure — see wireSigningHandlers).
   async function approveAndRemoteSign(
     payload: unknown,
-    doSign: () => Promise<{ signature: Uint8Array; signedTransaction: Uint8Array | undefined }>,
+    doSign: () => import('neverthrow').ResultAsync<
+      { signature: Uint8Array; signedTransaction: Uint8Array | undefined },
+      import('./auth/sso/signRequestExecutor.js').RemoteSignError
+    >,
   ): Promise<SigningResult> {
     if (config.onSignApproval) {
       const approved = await config.onSignApproval(payload as never);
@@ -157,11 +162,30 @@ export function createHostSdk(config: HostSdkConfig): HostSdk {
         throw new Error('Rejected');
       }
     }
-    const result = await doSign();
-    return {
-      signature: bytesToHex(result.signature) as `0x${string}`,
-      signedTransaction: result.signedTransaction ? (bytesToHex(result.signedTransaction) as `0x${string}`) : undefined,
-    };
+    return doSign().match(
+      result => ({
+        signature: bytesToHex(result.signature) as `0x${string}`,
+        signedTransaction: result.signedTransaction
+          ? (bytesToHex(result.signedTransaction) as `0x${string}`)
+          : undefined,
+      }),
+      e => {
+        switch (e.tag) {
+          case 'Aborted':
+            throw new Error('Aborted');
+          case 'Timeout':
+            throw new Error('Sign request timed out — the wallet did not respond');
+          case 'NotPaired':
+            throw new Error('Cannot sign: SSO manager is not paired');
+          case 'Rejected':
+            throw new Error(e.reason);
+          case 'StatementStore':
+            throw new Error(`Statement store failure: ${e.cause.tag}`);
+          case 'Unknown':
+            throw new Error(e.detail);
+        }
+      },
+    );
   }
 
   // Build handler config from SDK config + auth manager

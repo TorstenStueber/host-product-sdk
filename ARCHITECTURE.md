@@ -652,8 +652,13 @@ address, displayName, sessionKey, remoteAccountId) and `SsoSessionStore` (persis
 wallet:
 
 - `signPayload(request)` / `signRaw(request)`: guards that the manager is paired, delegates to an injected
-  `SignRequestExecutor` (defined in `signRequestExecutor.ts`), and applies a configurable timeout (default 90s).
-- `RemoteSigner` can be wired as the `onSignPayload`/`onSignRaw` callbacks in `HandlersConfig`.
+  `SignRequestExecutor` (defined in `signRequestExecutor.ts`), and applies a configurable timeout (default 90s). Both
+  return `ResultAsync<RemoteSignResult, RemoteSignError>`. `RemoteSignError` is the flat discriminated union
+  `{ Aborted | NotPaired | Timeout | Rejected | StatementStore | Unknown }` — `StatementStore` wraps a
+  `StatementStoreError` so submit failures surface with full detail.
+- The `createHostSdk` wrapper (`approveAndRemoteSign` in `sdk.ts`) bridges this `ResultAsync` to the handler callback
+  contract (which throws on failure) by mapping each tag to an `Error` message. Everywhere inside the signing path is
+  neverthrow; the throwing boundary is at the wire-handler surface.
 
 **`sso/crypto.ts`**: SSO cryptographic primitives — all wire-compatible with triangle-js-sdks:
 
@@ -700,9 +705,19 @@ concurrent-request deduplication. Failed requests are not cached so transient er
 
 Unified statement-store parachain adapter used by both SSO (pairing/signing) and the host API statement store handlers.
 
-**`statementStore/types.ts`**: `StatementStoreAdapter` interface with `subscribe(topics, callback)`,
-`submit(statement)`, and `query(topics)`. `Statement` and `SignedStatement` types with tagged `StatementProof` union
-(sr25519/ed25519/ecdsa).
+**`statementStore/types.ts`**: `StatementStoreAdapter` interface with:
+
+- `subscribe(topics, callback) -> unsubscribe` (synchronous; errors during the subscription lifetime are logged)
+- `submit(statement): ResultAsync<void, StatementStoreError>`
+- `query(topics): ResultAsync<Statement[], StatementStoreError>`
+
+`Statement` and `SignedStatement` types with tagged `StatementProof` union (sr25519/ed25519/ecdsa/onchain).
+
+**`StatementStoreError`** is a flat discriminated union covering every failure mode of the adapter. Tags:
+`DataTooLarge | ExpiryTooLow | AccountFull | StorageFull | NoAllowance | NoProof | BadProof | EncodingTooLarge | AlreadyExpired | KnownExpired | InternalStore | Transport | Unknown`.
+Each carries structured fields where relevant (e.g. `DataTooLarge` has `submitted` and `available` sizes). Callers
+narrow with a `switch` on `.tag`. No Error classes — the object shape works directly with `neverthrow`'s `.match()` /
+`.mapErr()` and survives structured clone.
 
 **`statementStore/client.ts`**: `createStatementStoreClient(peopleChainClient)` — wraps a polkadot-api client (provided
 by the caller) into a `StatementStoreClient` with a single field:
@@ -716,12 +731,25 @@ resolution (via `getPeopleChainUnsafeApi`).
 Uses `polkadot-api`'s `_request`/`_subscribe` escape hatches for direct `statement_submit` and
 `statement_subscribeStatement` RPC access.
 
+**Topic filter semantics**: `buildFilter(topics)` emits `{ matchAll: hex[] }` so a subscription/query narrows on the
+intersection of topics (statements must carry ALL of the filter topics). An empty topic list becomes `'any'`.
+
+**Subscription multiplexing**: subscriptions are keyed by `topics.map(toHex).sort().join('|')`. Multiple callers
+requesting the same topic set share one upstream RPC subscription; the upstream is torn down only when the last listener
+unsubscribes. A fresh subscribe after full teardown opens a new upstream.
+
+**Submit-response mapping**: every substrate `statement_submit` response status is mapped to either success (`new`,
+`known`, or a null response) or one of the `StatementStoreError` tags. `knownExpired` is surfaced as an error — it
+signals that the statement is too stale to stay in the store, which callers generally want to know.
+
 **`statementStore/codec.ts`**: SCALE encode/decode for Substrate statements. Statements are encoded as a `Vector` of
 `Variant` fields in strictly ascending index order (proof=0, decryptionKey=1, expiry=2, channel=3, topic1–4=4–7,
 data=8). Only present fields are included. Topics are expanded from an array into individual `topic1`..`topic4` entries.
 
 **`testing/memoryStatementStore.ts`**: `createMemoryStatementStore()` — in-memory `StatementStoreAdapter` for testing.
-All adapters created from the same factory share a single in-memory bus.
+All adapters created from the same factory share a single in-memory bus. Topic matching uses the same `matchAll`
+semantics as the real client (empty filter matches everything). `submit` and `query` return `okAsync(...)` for API
+parity.
 
 ### 2.6 Webview Port
 

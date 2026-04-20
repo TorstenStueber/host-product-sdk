@@ -2,21 +2,38 @@
  * In-memory statement store adapter for testing.
  *
  * Provides a shared bus where all adapters see each other's statements.
- * Replaces the old memoryTransport.
+ *
+ * Topic matching uses the same `matchAll` semantics as the real adapter:
+ * a statement is delivered to a subscriber when the subscriber's topic
+ * set is a subset of the statement's topics (empty subscriber topics
+ * match everything).
  */
 
-import type { StatementStoreAdapter, Statement, SignedStatement } from '../statementStore/types.js';
+import { okAsync } from 'neverthrow';
+import type {
+  StatementStoreAdapter,
+  Statement,
+  SignedStatement,
+  StatementStoreError,
+} from '../statementStore/types.js';
 
 type Subscriber = {
   topics: Uint8Array[];
   callback: (statements: Statement[]) => void;
 };
 
-function topicsMatch(statementTopics: Uint8Array[] | undefined, filterTopics: Uint8Array[]): boolean {
-  if (!statementTopics) return false;
-  return filterTopics.some(filter =>
-    statementTopics.some(topic => topic.length === filter.length && topic.every((b, i) => b === filter[i])),
-  );
+function topicEquals(a: Uint8Array, b: Uint8Array): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
+}
+
+/**
+ * `matchAll` semantics: every filter topic must appear in the
+ * statement's topics. Empty filter matches any statement.
+ */
+function matchAll(statementTopics: Uint8Array[] | undefined, filterTopics: Uint8Array[]): boolean {
+  if (filterTopics.length === 0) return true;
+  if (!statementTopics || statementTopics.length === 0) return false;
+  return filterTopics.every(filter => statementTopics.some(topic => topicEquals(topic, filter)));
 }
 
 /**
@@ -40,18 +57,19 @@ export function createMemoryStatementStore(): {
         };
       },
 
-      async submit(statement: SignedStatement): Promise<void> {
+      submit(statement: SignedStatement) {
         const stmt: Statement = { ...statement };
         allStatements.push(stmt);
         for (const sub of subscribers) {
-          if (topicsMatch(statement.topics, sub.topics)) {
+          if (matchAll(statement.topics, sub.topics)) {
             sub.callback([stmt]);
           }
         }
+        return okAsync<void, StatementStoreError>(undefined);
       },
 
-      async query(topics: Uint8Array[]): Promise<Statement[]> {
-        return allStatements.filter(s => topicsMatch(s.topics, topics));
+      query(topics: Uint8Array[]) {
+        return okAsync<Statement[], StatementStoreError>(allStatements.filter(s => matchAll(s.topics, topics)));
       },
     };
   }

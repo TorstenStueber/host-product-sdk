@@ -21,6 +21,39 @@
 export type { StatementProof, Statement, SignedStatement } from '@polkadot/api-protocol';
 
 import type { Statement, SignedStatement } from '@polkadot/api-protocol';
+import type { ResultAsync } from 'neverthrow';
+
+// ---------------------------------------------------------------------------
+// Error union
+// ---------------------------------------------------------------------------
+
+/**
+ * Flat discriminated union covering every failure mode of the statement
+ * store adapter, tagged so callers can narrow with a simple `switch`.
+ *
+ * Works naturally with `neverthrow`'s `.match()` / `.mapErr()` and
+ * survives structured clone (unlike Error classes).
+ */
+export type StatementStoreError =
+  // -- Submission rejections (substrate returns status='rejected') --------
+  | { tag: 'DataTooLarge'; submitted: number; available: number }
+  | { tag: 'ExpiryTooLow'; submitted: bigint; min: bigint }
+  | { tag: 'AccountFull'; submitted: bigint; min: bigint }
+  | { tag: 'StorageFull' }
+  | { tag: 'NoAllowance' }
+  // -- Submission invalid (substrate returns status='invalid') -----------
+  | { tag: 'NoProof' }
+  | { tag: 'BadProof' }
+  | { tag: 'EncodingTooLarge'; submitted: number; max: number }
+  | { tag: 'AlreadyExpired' }
+  // -- Submission known-but-expired (status='knownExpired') --------------
+  | { tag: 'KnownExpired' }
+  // -- Store internal errors --------------------------------------------
+  | { tag: 'InternalStore'; detail: string }
+  // -- RPC / transport failures -----------------------------------------
+  | { tag: 'Transport'; message: string }
+  // -- Unmapped status / reason -----------------------------------------
+  | { tag: 'Unknown'; detail: string };
 
 // ---------------------------------------------------------------------------
 // Adapter interface
@@ -28,20 +61,28 @@ import type { Statement, SignedStatement } from '@polkadot/api-protocol';
 
 export type StatementStoreAdapter = {
   /**
-   * Subscribe to statements matching the given topics.
-   * Callback receives batches of matching statements.
-   * @returns Unsubscribe function.
+   * Subscribe to statements whose topic set is a superset of the given
+   * topics (i.e. statements carrying ALL of `topics`, matching the
+   * substrate `matchAll` filter semantics).
+   *
+   * The callback receives batches of matching statements as they arrive.
+   * Errors during the subscription lifetime are logged; the returned
+   * unsubscribe function is always safe to call (idempotent).
    */
   subscribe(topics: Uint8Array[], callback: (statements: Statement[]) => void): () => void;
 
   /**
    * Submit a signed statement to the store.
-   * Resolves on success, rejects on failure.
+   *
+   * Errors produced by the substrate RPC are mapped into the
+   * {@link StatementStoreError} union — callers do not need to parse
+   * status strings.
    */
-  submit(statement: SignedStatement): Promise<void>;
+  submit(statement: SignedStatement): ResultAsync<void, StatementStoreError>;
 
   /**
-   * Query existing statements matching the given topics.
+   * Query existing statements whose topic set is a superset of the given
+   * topics (matches the subscribe semantics).
    */
-  query(topics: Uint8Array[]): Promise<Statement[]>;
+  query(topics: Uint8Array[]): ResultAsync<Statement[], StatementStoreError>;
 };

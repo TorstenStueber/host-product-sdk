@@ -1,10 +1,12 @@
 /**
  * Remote signing tests.
  *
- * Tests for createRemoteSigner: guards, timeout, and delegation to executor.
+ * Tests for createRemoteSigner: guards, timeout, and delegation to the
+ * executor. All signer methods return neverthrow `ResultAsync`.
  */
 
 import { describe, it, expect, vi } from 'vitest';
+import { ResultAsync, errAsync, okAsync } from 'neverthrow';
 import {
   createRemoteSigner,
   createSsoManager,
@@ -21,6 +23,7 @@ import type {
   RemoteSignPayloadRequest,
   RemoteSignRawRequest,
   RemoteSignResult,
+  RemoteSignError,
 } from '@polkadot/host';
 
 // ---------------------------------------------------------------------------
@@ -94,28 +97,23 @@ function makeSignResult(): RemoteSignResult {
 
 function immediateSignExecutor(result: RemoteSignResult = makeSignResult()): SignRequestExecutor {
   return {
-    async signPayload() {
-      return result;
-    },
-    async signRaw() {
-      return result;
-    },
+    signPayload: () => okAsync(result),
+    signRaw: () => okAsync(result),
   };
 }
 
 function hangingSignExecutor(): SignRequestExecutor {
-  return {
-    signPayload(_t, _r, signal) {
-      return new Promise<RemoteSignResult>((_resolve, _reject) => {
+  // Resolves only when the signal aborts; surfaces as err(Aborted) inside
+  // the executor, but the outer withTimeout should intercept with Timeout
+  // first.
+  const hang = (_t: unknown, _r: unknown, signal: AbortSignal): ResultAsync<RemoteSignResult, RemoteSignError> => {
+    return ResultAsync.fromSafePromise(
+      new Promise<never>((_resolve, _reject) => {
         signal.addEventListener('abort', () => _reject(new Error('aborted')));
-      });
-    },
-    signRaw(_t, _r, signal) {
-      return new Promise<RemoteSignResult>((_resolve, _reject) => {
-        signal.addEventListener('abort', () => _reject(new Error('aborted')));
-      });
-    },
+      }).catch(() => ({ signature: new Uint8Array(64), signedTransaction: undefined })) as Promise<RemoteSignResult>,
+    );
   };
+  return { signPayload: hang, signRaw: hang };
 }
 
 async function createPairedSetup(signExecutor?: SignRequestExecutor) {
@@ -149,7 +147,7 @@ async function createPairedSetup(signExecutor?: SignRequestExecutor) {
 describe('createRemoteSigner', () => {
   // ── Guard: must be paired ─────────────────────────────────
 
-  it('signPayload throws when manager is not paired', async () => {
+  it('signPayload returns NotPaired when manager is not paired', async () => {
     const storage = createMemoryStorageAdapter();
     const sessionStore = createSsoSessionStore(storage);
     const bus = createMemoryStatementStore();
@@ -166,10 +164,12 @@ describe('createRemoteSigner', () => {
       executor: immediateSignExecutor(),
     });
 
-    await expect(signer.signPayload(makePayloadRequest())).rejects.toThrow('Cannot sign');
+    const result = await signer.signPayload(makePayloadRequest());
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().tag).toBe('NotPaired');
   });
 
-  it('signRaw throws when manager is not paired', async () => {
+  it('signRaw returns NotPaired when manager is not paired', async () => {
     const storage = createMemoryStorageAdapter();
     const sessionStore = createSsoSessionStore(storage);
     const bus = createMemoryStatementStore();
@@ -186,7 +186,9 @@ describe('createRemoteSigner', () => {
       executor: immediateSignExecutor(),
     });
 
-    await expect(signer.signRaw(makeRawRequest())).rejects.toThrow('Cannot sign');
+    const result = await signer.signRaw(makeRawRequest());
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().tag).toBe('NotPaired');
   });
 
   // ── Happy path ────────────────────────────────────────────
@@ -196,7 +198,8 @@ describe('createRemoteSigner', () => {
     const { signer } = await createPairedSetup(immediateSignExecutor(result));
 
     const signed = await signer.signPayload(makePayloadRequest());
-    expect(signed.signature).toEqual(result.signature);
+    expect(signed.isOk()).toBe(true);
+    expect(signed._unsafeUnwrap().signature).toEqual(result.signature);
   });
 
   it('signRaw returns signature from executor', async () => {
@@ -204,21 +207,21 @@ describe('createRemoteSigner', () => {
     const { signer } = await createPairedSetup(immediateSignExecutor(result));
 
     const signed = await signer.signRaw(makeRawRequest());
-    expect(signed.signature).toEqual(result.signature);
+    expect(signed.isOk()).toBe(true);
+    expect(signed._unsafeUnwrap().signature).toEqual(result.signature);
   });
 
   it('signPayload passes request to executor', async () => {
-    const executorFn = vi.fn().mockResolvedValue(makeSignResult());
+    const executorFn = vi.fn().mockReturnValue(okAsync(makeSignResult()));
     const executor: SignRequestExecutor = {
       signPayload: executorFn,
-      async signRaw() {
-        return makeSignResult();
-      },
+      signRaw: () => okAsync(makeSignResult()),
     };
 
     const { signer } = await createPairedSetup(executor);
     const req = makePayloadRequest();
-    await signer.signPayload(req);
+    const result = await signer.signPayload(req);
+    expect(result.isOk()).toBe(true);
 
     expect(executorFn).toHaveBeenCalledTimes(1);
     expect(executorFn.mock.calls[0]![1]).toEqual(req);
@@ -226,32 +229,36 @@ describe('createRemoteSigner', () => {
 
   // ── Timeout ───────────────────────────────────────────────
 
-  it('signPayload rejects on timeout', async () => {
+  it('signPayload returns Timeout when the executor hangs', async () => {
     const { signer } = await createPairedSetup(hangingSignExecutor());
 
-    await expect(signer.signPayload(makePayloadRequest())).rejects.toThrow('timed out');
+    const result = await signer.signPayload(makePayloadRequest());
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().tag).toBe('Timeout');
   });
 
-  it('signRaw rejects on timeout', async () => {
+  it('signRaw returns Timeout when the executor hangs', async () => {
     const { signer } = await createPairedSetup(hangingSignExecutor());
 
-    await expect(signer.signRaw(makeRawRequest())).rejects.toThrow('timed out');
+    const result = await signer.signRaw(makeRawRequest());
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().tag).toBe('Timeout');
   });
 
   // ── Executor error ────────────────────────────────────────
 
   it('signPayload propagates executor errors', async () => {
     const failExecutor: SignRequestExecutor = {
-      async signPayload() {
-        throw new Error('wallet rejected');
-      },
-      async signRaw() {
-        return makeSignResult();
-      },
+      signPayload: () => errAsync({ tag: 'Rejected', reason: 'wallet rejected' }),
+      signRaw: () => okAsync(makeSignResult()),
     };
 
     const { signer } = await createPairedSetup(failExecutor);
-    await expect(signer.signPayload(makePayloadRequest())).rejects.toThrow('wallet rejected');
+    const result = await signer.signPayload(makePayloadRequest());
+    expect(result.isErr()).toBe(true);
+    const e = result._unsafeUnwrapErr();
+    expect(e.tag).toBe('Rejected');
+    if (e.tag === 'Rejected') expect(e.reason).toBe('wallet rejected');
   });
 
   // ── signedTransaction ─────────────────────────────────────
@@ -264,6 +271,7 @@ describe('createRemoteSigner', () => {
 
     const { signer } = await createPairedSetup(immediateSignExecutor(result));
     const signed = await signer.signPayload(makePayloadRequest());
-    expect(signed.signedTransaction).toEqual(new Uint8Array([0xde, 0xad]));
+    expect(signed.isOk()).toBe(true);
+    expect(signed._unsafeUnwrap().signedTransaction).toEqual(new Uint8Array([0xde, 0xad]));
   });
 });

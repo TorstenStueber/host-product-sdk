@@ -6,15 +6,45 @@
  */
 
 import type { HostFacade } from '@polkadot/api-protocol';
-import { errAsync } from '@polkadot/api-protocol';
-import { ResultAsync } from 'neverthrow';
-import type { StatementStoreAdapter, SignedStatement } from '../statementStore/types.js';
+import { errAsync, ResultAsync } from '@polkadot/api-protocol';
+import type { StatementStoreAdapter, SignedStatement, StatementStoreError } from '../statementStore/types.js';
 import type { SsoSigner } from '../auth/sso/types.js';
 
 export type StatementStoreHandlersConfig = {
   statementStore?: StatementStoreAdapter;
   signer?: SsoSigner;
 };
+
+function storeErrorReason(err: StatementStoreError): string {
+  switch (err.tag) {
+    case 'DataTooLarge':
+      return `Data too large (${err.submitted}/${err.available})`;
+    case 'ExpiryTooLow':
+      return `Expiry too low (${err.submitted} < ${err.min})`;
+    case 'AccountFull':
+      return `Account full (${err.submitted} < ${err.min})`;
+    case 'StorageFull':
+      return 'Storage full';
+    case 'NoAllowance':
+      return 'No allowance';
+    case 'NoProof':
+      return 'No proof';
+    case 'BadProof':
+      return 'Bad proof';
+    case 'EncodingTooLarge':
+      return `Encoding too large (${err.submitted}/${err.max})`;
+    case 'AlreadyExpired':
+      return 'Already expired';
+    case 'KnownExpired':
+      return 'Known but expired';
+    case 'InternalStore':
+      return `Internal store error: ${err.detail}`;
+    case 'Transport':
+      return `Transport error: ${err.message}`;
+    case 'Unknown':
+      return `Unknown error: ${err.detail}`;
+  }
+}
 
 export function wireStatementStoreHandlers(
   container: HostFacade,
@@ -75,11 +105,10 @@ export function wireStatementStoreHandlers(
       if (!adapter) {
         return errAsync({ reason: 'Statement store not configured' });
       }
-
-      return ResultAsync.fromPromise(
-        adapter.submit(params).then((): undefined => undefined),
-        e => ({ reason: e instanceof Error ? e.message : String(e) }),
-      );
+      return adapter
+        .submit(params)
+        .map((): undefined => undefined)
+        .mapErr(err => ({ reason: storeErrorReason(err) }));
     }),
   );
 

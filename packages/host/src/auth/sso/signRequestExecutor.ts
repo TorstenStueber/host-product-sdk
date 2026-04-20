@@ -13,9 +13,13 @@
  * - incomingSessionId = createSessionId(sessionKey, remoteAccountId, localAccountId)
  * - Host submits on outgoingSessionId topic, request channel
  * - Host subscribes to incomingSessionId topic for wallet responses
+ *
+ * All failures are returned as a flat {@link RemoteSignError} union via
+ * neverthrow's `ResultAsync`.
  */
 
-import type { StatementStoreAdapter, Statement } from '../../statementStore/types.js';
+import { ResultAsync, err, ok, type Result } from 'neverthrow';
+import type { StatementStoreAdapter, Statement, StatementStoreError } from '../../statementStore/types.js';
 import type { SsoSigner } from './types.js';
 import type { SigningPayloadRequest, SigningRawRequest, SigningPayloadResponseData } from './codecs.js';
 import { RemoteMessageCodec, StatementDataCodec } from './codecs.js';
@@ -30,20 +34,36 @@ export type RemoteSignRawRequest = SigningRawRequest;
 export type RemoteSignResult = SigningPayloadResponseData;
 
 /**
- * Pluggable sign request executor.
+ * Flat discriminated union of remote-signing failure modes.
  *
- * Implementations handle encrypting the sign request with the AES session
- * key, publishing it to the statement-store topic, waiting for the wallet's
- * response, and decrypting the signature.
+ * Callers use `.match()` or a `switch` on `.tag` to branch.
+ */
+export type RemoteSignError =
+  | { tag: 'Aborted' }
+  | { tag: 'NotPaired' }
+  | { tag: 'Timeout' }
+  /** The mobile wallet returned an error payload in its SignResponse. */
+  | { tag: 'Rejected'; reason: string }
+  /** The statement-store adapter rejected the outgoing submit. */
+  | { tag: 'StatementStore'; cause: StatementStoreError }
+  /** Anything else (signer threw, unexpected shape, etc.). */
+  | { tag: 'Unknown'; detail: string };
+
+/**
+ * Pluggable sign request executor.
  */
 export type SignRequestExecutor = {
   signPayload(
     store: StatementStoreAdapter,
     request: RemoteSignPayloadRequest,
     signal: AbortSignal,
-  ): Promise<RemoteSignResult>;
+  ): ResultAsync<RemoteSignResult, RemoteSignError>;
 
-  signRaw(store: StatementStoreAdapter, request: RemoteSignRawRequest, signal: AbortSignal): Promise<RemoteSignResult>;
+  signRaw(
+    store: StatementStoreAdapter,
+    request: RemoteSignRawRequest,
+    signal: AbortSignal,
+  ): ResultAsync<RemoteSignResult, RemoteSignError>;
 };
 
 // ---------------------------------------------------------------------------
@@ -82,6 +102,10 @@ function nextExpiry(): bigint {
   return (BigInt(sevenDays) << 32n) | BigInt(expirySequence++);
 }
 
+function unknownError(e: unknown): RemoteSignError {
+  return { tag: 'Unknown', detail: e instanceof Error ? e.message : String(e) };
+}
+
 // ---------------------------------------------------------------------------
 // Implementation
 // ---------------------------------------------------------------------------
@@ -96,12 +120,12 @@ export function createSignRequestExecutor(config: SignRequestExecutorConfig): Si
   // Derive channel for outgoing requests
   const outgoingRequestChannel = createRequestChannel(outgoingSessionId);
 
-  async function sendAndWait(
+  function sendAndWait(
     store: StatementStoreAdapter,
     messageId: string,
     encodedRemoteMessage: Uint8Array,
     signal: AbortSignal,
-  ): Promise<RemoteSignResult> {
+  ): ResultAsync<RemoteSignResult, RemoteSignError> {
     // Wrap in StatementData request (matches triangle-js-sdks session.submitRequestMessage)
     const statementData = StatementDataCodec.enc({
       tag: 'request',
@@ -110,93 +134,112 @@ export function createSignRequestExecutor(config: SignRequestExecutorConfig): Si
 
     const encrypted = encryption.encrypt(statementData);
 
-    // Subscribe for response BEFORE sending the request.
-    // The wallet responds on the incomingSessionId topic with a StatementData::request
-    // containing a RemoteMessage with SignResponse.
-    return new Promise<RemoteSignResult>((resolve, reject) => {
-      const unsub = store.subscribe([incomingSessionId], (statements: Statement[]) => {
+    // The orchestration below can finish in any of four ways:
+    //   1. matching SignResponse decoded from an incoming statement → ok / err
+    //   2. signal aborted                                            → err(Aborted)
+    //   3. store.submit() rejected                                   → err(StatementStore)
+    //   4. signer.sign() threw                                       → err(Unknown)
+    // We fold all of them into a single Promise<Result<...>> and lift it into
+    // a ResultAsync so callers can compose with `.andThen` / `.mapErr`.
+    const promise = new Promise<Result<RemoteSignResult, RemoteSignError>>(resolve => {
+      let settled = false;
+      let unsub: () => void = () => {};
+      let abortHandler: () => void = () => {};
+      const settle = (r: Result<RemoteSignResult, RemoteSignError>) => {
+        if (settled) return;
+        settled = true;
+        signal.removeEventListener('abort', abortHandler);
+        unsub();
+        resolve(r);
+      };
+
+      unsub = store.subscribe([incomingSessionId], (statements: Statement[]) => {
         if (signal.aborted) {
-          unsub();
-          reject(new Error('Sign request aborted'));
+          settle(err({ tag: 'Aborted' }));
           return;
         }
 
         for (const statement of statements) {
           if (!statement.data || statement.data.length === 0) continue;
 
+          let statementData;
           try {
             const decrypted = encryption.decrypt(statement.data);
-            const statementData = StatementDataCodec.dec(decrypted);
-
-            // The wallet sends the SignResponse as a StatementData::request
-            if (statementData.tag !== 'request') continue;
-
-            for (const payload of statementData.value.data) {
-              try {
-                const decoded = RemoteMessageCodec.dec(payload);
-
-                if (decoded.data.tag !== 'v1' || decoded.data.value.tag !== 'SignResponse') {
-                  continue;
-                }
-
-                const response = decoded.data.value.value;
-                if (response.respondingTo !== messageId) continue;
-
-                unsub();
-
-                if (response.payload.success) {
-                  resolve({
-                    signature: response.payload.value.signature,
-                    signedTransaction: response.payload.value.signedTransaction,
-                  });
-                } else {
-                  reject(new Error(response.payload.value));
-                }
-                return;
-              } catch {
-                // Ignore unparseable payloads within the StatementData
-              }
-            }
+            statementData = StatementDataCodec.dec(decrypted);
           } catch {
-            // Ignore malformed/undecryptable statements
+            // Malformed / not-for-us — keep scanning.
+            continue;
+          }
+
+          if (statementData.tag !== 'request') continue;
+
+          for (const payload of statementData.value.data) {
+            let decoded;
+            try {
+              decoded = RemoteMessageCodec.dec(payload);
+            } catch {
+              continue;
+            }
+            if (decoded.data.tag !== 'v1' || decoded.data.value.tag !== 'SignResponse') continue;
+
+            const response = decoded.data.value.value;
+            if (response.respondingTo !== messageId) continue;
+
+            if (response.payload.success) {
+              settle(
+                ok({
+                  signature: response.payload.value.signature,
+                  signedTransaction: response.payload.value.signedTransaction,
+                }),
+              );
+            } else {
+              settle(err({ tag: 'Rejected', reason: response.payload.value }));
+            }
+            return;
           }
         }
       });
 
-      signal.addEventListener('abort', () => {
-        unsub();
-        reject(new Error('Sign request aborted'));
-      });
+      abortHandler = () => settle(err({ tag: 'Aborted' }));
+      if (signal.aborted) {
+        settle(err({ tag: 'Aborted' }));
+        return;
+      }
+      signal.addEventListener('abort', abortHandler);
 
-      // Sign and submit the request on the outgoing session
+      // Sign and submit the request on the outgoing session. Both the
+      // signer and the store-submit can fail independently.
       config.signer
         .sign(encrypted)
         .then(signature =>
-          store.submit({
-            expiry: nextExpiry(),
-            channel: outgoingRequestChannel,
-            topics: [outgoingSessionId],
-            data: encrypted,
-            decryptionKey: undefined,
-            proof: {
-              tag: 'Sr25519',
-              value: {
-                signer: config.signer.publicKey,
-                signature,
+          store
+            .submit({
+              expiry: nextExpiry(),
+              channel: outgoingRequestChannel,
+              topics: [outgoingSessionId],
+              data: encrypted,
+              decryptionKey: undefined,
+              proof: {
+                tag: 'Sr25519',
+                value: { signer: config.signer.publicKey, signature },
               },
-            },
-          }),
+            })
+            .match(
+              () => {
+                // Submit OK — wait for the response to arrive through the
+                // subscribe path. Nothing to do here.
+              },
+              storeErr => settle(err({ tag: 'StatementStore', cause: storeErr })),
+            ),
         )
-        .catch(reject);
+        .catch(e => settle(err(unknownError(e))));
     });
+
+    return ResultAsync.fromSafePromise(promise).andThen(r => r);
   }
 
   return {
-    async signPayload(
-      store: StatementStoreAdapter,
-      request: RemoteSignPayloadRequest,
-      signal: AbortSignal,
-    ): Promise<RemoteSignResult> {
+    signPayload(store, request, signal) {
       const messageId = generateMessageId();
       const encoded = RemoteMessageCodec.enc({
         messageId,
@@ -204,21 +247,14 @@ export function createSignRequestExecutor(config: SignRequestExecutorConfig): Si
           tag: 'v1',
           value: {
             tag: 'SignRequest',
-            value: {
-              tag: 'Payload',
-              value: request as never,
-            },
+            value: { tag: 'Payload', value: request as never },
           },
         },
       });
       return sendAndWait(store, messageId, encoded, signal);
     },
 
-    async signRaw(
-      store: StatementStoreAdapter,
-      request: RemoteSignRawRequest,
-      signal: AbortSignal,
-    ): Promise<RemoteSignResult> {
+    signRaw(store, request, signal) {
       const messageId = generateMessageId();
       const encoded = RemoteMessageCodec.enc({
         messageId,
@@ -226,10 +262,7 @@ export function createSignRequestExecutor(config: SignRequestExecutorConfig): Si
           tag: 'v1',
           value: {
             tag: 'SignRequest',
-            value: {
-              tag: 'Raw',
-              value: request,
-            },
+            value: { tag: 'Raw', value: request },
           },
         },
       });

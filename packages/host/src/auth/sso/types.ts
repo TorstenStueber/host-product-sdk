@@ -35,6 +35,7 @@ export type {
   RemoteSignPayloadRequest,
   RemoteSignRawRequest,
   RemoteSignResult,
+  RemoteSignError,
   SignRequestExecutorConfig,
 } from './signRequestExecutor.js';
 
