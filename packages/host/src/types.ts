@@ -4,7 +4,7 @@
 
 import type { HexString, ResponseOk, RequestParams } from '@polkadot/api-protocol';
 import type { JsonRpcProvider } from 'polkadot-api';
-import type { StorageAdapter, ReactiveStorageAdapter } from './storage/types.js';
+import type { StorageAdapter } from './storage/types.js';
 import type {
   SigningPayloadRequest,
   SigningRawRequest,
@@ -27,12 +27,12 @@ export type HostSdkConfig = {
   appId: string;
 
   /**
-   * Reactive storage adapter for SSO session and secret persistence.
+   * Storage adapter for SSO session and secret persistence.
    *
-   * Must support `subscribe()` for reactive session change notifications.
+   * Subscribers are notified of session changes via `subscribe()`.
    * Typically `createLocalStorageAdapter(appId + ':sso:')`.
    */
-  ssoStorage: ReactiveStorageAdapter;
+  ssoStorage: StorageAdapter;
 
   /**
    * Factory that returns a storage adapter for a given product ID.
@@ -195,4 +195,4 @@ export type HostSdk = {
 export type { AuthState, AuthStatus, UserSession, Identity } from './auth/authManager.js';
 export type { HostFacade } from '@polkadot/api-protocol';
 export type { HandlersConfig } from './handlers/registry.js';
-export type { StorageAdapter, ReactiveStorageAdapter } from './storage/types.js';
+export type { StorageAdapter } from './storage/types.js';

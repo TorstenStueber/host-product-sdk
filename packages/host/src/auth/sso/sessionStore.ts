@@ -2,11 +2,11 @@
  * SSO session store.
  *
  * Defines the session metadata and session store types, and provides a
- * concrete implementation backed by a ReactiveStorageAdapter.
- * Serializes PersistedSessionMeta to JSON + UTF-8 bytes for storage.
+ * concrete implementation backed by a StorageAdapter. Serializes
+ * PersistedSessionMeta to JSON + UTF-8 bytes for storage.
  */
 
-import type { ReactiveStorageAdapter } from '../../storage/types.js';
+import type { StorageAdapter } from '../../storage/types.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,7 +35,7 @@ export type PersistedSessionMeta = {
  * Persistence adapter for SSO session metadata.
  *
  * Implementations store session metadata so the user does not need to
- * re-pair on every page load. Backed by the ReactiveStorageAdapter.
+ * re-pair on every page load. Backed by the StorageAdapter.
  */
 export type SsoSessionStore = {
   /** Save session metadata, overwriting any existing entry. */
@@ -88,7 +88,7 @@ function deserialize(data: Uint8Array): PersistedSessionMeta | undefined {
   }
 }
 
-export function createSsoSessionStore(storage: ReactiveStorageAdapter): SsoSessionStore {
+export function createSsoSessionStore(storage: StorageAdapter): SsoSessionStore {
   return {
     async save(session: PersistedSessionMeta): Promise<void> {
       await storage.write(SESSION_KEY, serialize(session));

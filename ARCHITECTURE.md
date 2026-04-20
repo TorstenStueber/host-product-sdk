@@ -602,14 +602,14 @@ up to max, process as tokens refill).
 
 ### 2.3 Storage Adapters (`storage/`)
 
-`StorageAdapter` interface: async `read(key)`, `write(key, value)`, `clear(key)` for Uint8Array values.
+`StorageAdapter` interface: async `read(key)`, `write(key, value)`, `clear(key)` for Uint8Array values, plus
+`subscribe(key, callback)` for per-key change notifications. Listeners fire synchronously on `write` (with the new
+value) and `clear` (with `undefined`). Used by the SSO session manager to watch for session changes.
 
-`ReactiveStorageAdapter` extends `StorageAdapter` with `subscribe(key, callback)` for per-key change notifications.
-Listeners fire synchronously on `write` (with the new value) and `clear` (with `undefined`). Used by the SSO session
-manager to watch for session changes.
-
-- `createMemoryStorageAdapter()`: Map-backed, for testing. Returns `ReactiveStorageAdapter`.
-- `createLocalStorageAdapter(prefix)`: browser localStorage, base64, prefix-scoped. Returns `ReactiveStorageAdapter`.
+- `createMemoryStorageAdapter()`: Map-backed, for testing.
+- `createLocalStorageAdapter(prefix)`: browser localStorage, base64, prefix-scoped. Same-tab writes notify subscribers
+  synchronously; cross-tab changes are picked up via a lazy `window` `'storage'` event listener that attaches on the
+  first `subscribe()` and detaches when the last listener unsubscribes.
 
 ### 2.4 Auth (`auth/`)
 
@@ -635,7 +635,7 @@ their implementation files.
 **`sso/sessionStore.ts`**: Defines `PersistedSessionMeta` (minimal session data surviving page reloads: sessionId,
 address, displayName, sessionKey, remoteAccountId) and `SsoSessionStore` (persistence interface: `save`, `load`,
 `clear`, `subscribe`). Also provides the concrete implementation `createSsoSessionStore(storage)` backed by a
-`ReactiveStorageAdapter`, serializing to JSON bytes. Subscriptions delegate to the underlying reactive storage.
+`StorageAdapter`, serializing to JSON bytes. Subscriptions delegate to the underlying storage.
 
 **`sso/manager.ts`**: `createSsoManager(config)` — drives the QR-based pairing lifecycle:
 
@@ -755,7 +755,7 @@ sdk.dispose();
 - A lazy polkadot-api client from the required `peopleChainProvider` (transport-agnostic — works with WebSocket or
   Smoldot), shared for statement store and identity resolution
 - `StatementStoreClient` wrapping the polkadot-api client
-- `SsoSessionStore` and `SecretStore` backed by the required `ssoStorage` (ReactiveStorageAdapter)
+- `SsoSessionStore` and `SecretStore` backed by the required `ssoStorage` (StorageAdapter)
 - `SsoManager` with `PairingExecutor`
 - `IdentityResolver` backed by `createChainIdentityProvider` (queries `Resources.Consumers`)
 - Statement store handlers are wired to the `StatementStoreClient`'s adapter
@@ -772,10 +772,10 @@ Statement store `handleStatementStoreCreateProof` is wired to sign with the sr25
 
 `clearSession()` calls `ssoManager.unpair()` to clear both session metadata and secrets.
 
-**`types.ts`**: `HostSdkConfig` with all options: `appId`, `ssoStorage` (ReactiveStorageAdapter, required),
-`productStorage` (factory: `(productId: string) => StorageAdapter`, required), `peopleChainProvider`, `pairingMetadata`
-(required — URL to `{ name, icon }` JSON; treated as a hard pairing dependency by the wallet), `chainProvider`, signing
-callbacks, permission callbacks, UI callbacks.
+**`types.ts`**: `HostSdkConfig` with all options: `appId`, `ssoStorage` (StorageAdapter, required), `productStorage`
+(factory: `(productId: string) => StorageAdapter`, required), `peopleChainProvider`, `pairingMetadata` (required — URL
+to `{ name, icon }` JSON; treated as a hard pairing dependency by the wallet), `chainProvider`, signing callbacks,
+permission callbacks, UI callbacks.
 
 **`constants.ts`**: `PEOPLE_PARACHAIN_ENDPOINTS` — default WebSocket endpoints for the People parachain (POP3 testnet).
 

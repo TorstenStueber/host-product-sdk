@@ -2,12 +2,12 @@
  * In-memory storage adapter.
  *
  * Useful for testing or non-persistent scenarios.
- * Supports reactive subscriptions: listeners are notified on write and clear.
+ * Listeners are notified on write and clear.
  */
 
-import type { ReactiveStorageAdapter } from './types.js';
+import type { StorageAdapter } from './types.js';
 
-export function createMemoryStorageAdapter(initial?: Record<string, Uint8Array>): ReactiveStorageAdapter {
+export function createMemoryStorageAdapter(initial?: Record<string, Uint8Array>): StorageAdapter {
   const storage = new Map<string, Uint8Array>(initial ? Object.entries(initial) : []);
   const listeners = new Map<string, Set<(value: Uint8Array | undefined) => void>>();
 

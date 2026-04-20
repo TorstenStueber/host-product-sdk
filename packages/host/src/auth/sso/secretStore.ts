@@ -3,15 +3,15 @@
  *
  * Stores the cryptographic secrets (sr25519 secret, P-256 secret, entropy)
  * needed to re-establish the encrypted channel after page reload. Backed
- * by a ReactiveStorageAdapter.
+ * by a StorageAdapter.
  *
  * Triangle-js-sdks encrypts secrets before storage. For simplicity we
- * store them as JSON — the ReactiveStorageAdapter (typically backed by
+ * store them as JSON — the StorageAdapter (typically backed by
  * localStorage) provides the same security level as triangle-js-sdks'
  * approach since both end up in browser storage.
  */
 
-import type { ReactiveStorageAdapter } from '../../storage/types.js';
+import type { StorageAdapter } from '../../storage/types.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -68,7 +68,7 @@ function deserialize(data: Uint8Array): PersistedSecrets | undefined {
 // Factory
 // ---------------------------------------------------------------------------
 
-export function createSecretStore(storage: ReactiveStorageAdapter): SecretStore {
+export function createSecretStore(storage: StorageAdapter): SecretStore {
   const keyFor = (sessionId: string) => `sso_secrets_${sessionId}`;
 
   return {

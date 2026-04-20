@@ -429,7 +429,7 @@ const existing = await chain.statementStore.query([myTopic]);
 
 ## Storage Adapters
 
-The SDK uses `ReactiveStorageAdapter` for session persistence. Two implementations are provided:
+The SDK uses `StorageAdapter` for session persistence. Two implementations are provided:
 
 ```typescript
 import { createMemoryStorageAdapter, createLocalStorageAdapter } from '@polkadot/host';

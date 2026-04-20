@@ -26,7 +26,6 @@ export type {
   HostFacade,
   HandlersConfig,
   StorageAdapter,
-  ReactiveStorageAdapter,
 } from './types.js';
 
 // ---------------------------------------------------------------------------
