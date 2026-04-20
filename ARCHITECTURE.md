@@ -746,6 +746,60 @@ signals that the statement is too stale to stay in the store, which callers gene
 `Variant` fields in strictly ascending index order (proof=0, decryptionKey=1, expiry=2, channel=3, topic1–4=4–7,
 data=8). Only present fields are included. Topics are expanded from an array into individual `topic1`..`topic4` entries.
 
+#### 2.5a Session protocol (`statementStore/session/`)
+
+A symmetric bidirectional reliable encrypted request/response channel layered on top of the statement store.
+Triangle-js-sdks defines an implicit protocol on top of the raw store with a `StatementData` envelope —
+`::request { requestId, data: Vec<Bytes> }` for payloads and `::response { requestId, responseCode: u8 }` for ACKs. Both
+host and wallet have to speak it for any of the higher-level guarantees (ACKs, batching, channel replacement, recovery)
+to hold, so we ship our own role-agnostic implementation.
+
+Files:
+
+- **`session/types.ts`** — public types. `Session` methods (`request`, `submitRequestMessage`, `waitForResponseMessage`,
+  `submitResponseMessage`, `subscribe`, `waitForRequestMessage`, `dispose`), `LocalSessionAccount` /
+  `RemoteSessionAccount`, `Encryption` (sync `Result`-returning), `StatementProver`, `Message<T>` / `RequestMessage<T>`
+  / `ResponseMessage`, `ResponseCode` (`success | decryptionFailed | decodingFailed | unknown`), `SessionError` flat
+  union
+  (`DecodingFailed | DecryptionFailed | UnknownResponse | MessageTooBig | CodecEncodeFailed | StatementStore | NoIncomingRequest | Disposed | EncryptionFailed | Unknown`).
+- **`session/statementData.ts`** — SCALE codec for the envelope. Matches triangle byte-for-byte.
+- **`session/channels.ts`** — `createSessionId(sharedSecret, accountA, accountB)` (pins optional),
+  `createRequestChannel`, `createResponseChannel`. Matches `sso-protocol.md §4.1` — symmetric under account swap.
+- **`session/prover.ts`** — `createSr25519Prover(localSigner, remotePublicKey)`. `generateMessageProof` signs the `data`
+  field; `verifyMessageProof` accepts only `proof.tag === 'Sr25519'` with `signer === remotePublicKey`. Integrity of the
+  signature itself is delegated to the substrate node's ingest validation; our check is peer authentication and is what
+  filters self-echoes on the outgoing topic.
+- **`session/messageMapper.ts`** — translates a decoded `StatementData` into per-subscriber `Message<T>[]`, decoding
+  `request` payloads through the subscriber's codec and tagging each as `parsed` or `failed` without throwing.
+- **`session/session.ts`** — `createSession(params)`. Implements:
+  - **ACK protocol.** `request()` submits, waits for the peer's `StatementData::response`, resolves on `success`;
+    rejects with the matching `SessionError` for `decodingFailed` / `decryptionFailed` / `unknown`.
+    `submitResponseMessage(id, code)` emits the ACK for an incoming request.
+  - **Batching.** With one outgoing request in flight, new payloads coalesce into the current request's `data` vector up
+    to `maxRequestSize` bytes (default 4096). The wire `requestId` is regenerated on every coalesce so channel
+    replacement supersedes the prior statement. Overflow queues until the current batch is ACKed.
+  - **Channel-based replacement.** Outgoing requests use `requestChannel`; ACKs use `responseChannel`. Substrate
+    replaces by `(account, channel)`.
+  - **Expiry monotonicity.** `nextExpiry` = `max(previousExpiry + 1, floor(now) + 7d)` so the store always accepts the
+    replacement even on clock skew. Seeded from the max expiry observed during init.
+  - **Init-time recovery.** On construction, both topics are queried. An un-ACKed outgoing request is restored into
+    `state.outgoingRequest` so later submits coalesce into it. An un-responded incoming request is surfaced so the app
+    can ACK + reply.
+  - **Statement dedup.** `seenStatements: Set<hex(data)>` skips duplicates; capped at 1024 entries.
+  - **Proof verification.** Applied to every incoming statement via the prover; non-peer signatures (including our own
+    echoes on the outgoing topic) are silently dropped.
+  - **Late-subscriber buffering.** `StatementData` values decoded before any `subscribe()` call is active are held and
+    replayed through the first subscriber's codec.
+  - **Clean dispose.** Tears down both upstream subscriptions, rejects every pending delivery with
+    `{ tag: 'Disposed' }`.
+  - Upstream subscriptions (to `incomingSessionId` and — with `responsesOnly=true` — to `outgoingSessionId` for peer
+    ACKs) are activated at the end of init and stay alive until dispose.
+- **`session/index.ts`** — public re-export surface.
+
+In SSO, `auth/sso/signRequestExecutor.ts` becomes a thin application layer: encode `RemoteMessage { SignRequest }`, call
+`session.request(RemoteMessageCodec, msg)`, `session.subscribe(RemoteMessageCodec, ...)` to match the peer's
+`SignResponse` by `respondingTo === messageId`, ACK via `submitResponseMessage`, return the signature.
+
 **`testing/memoryStatementStore.ts`**: `createMemoryStatementStore()` — in-memory `StatementStoreAdapter` for testing.
 All adapters created from the same factory share a single in-memory bus. Topic matching uses the same `matchAll`
 semantics as the real client (empty filter matches everything). `submit` and `query` return `okAsync(...)` for API

@@ -1,9 +1,12 @@
 /**
  * SSO cryptographic primitives.
  *
- * Provides encryption, key derivation, and topic computation used by
- * the pairing and signing protocols. Follows triangle-js-sdks' wire
- * format exactly for mobile wallet compatibility.
+ * Provides encryption, key derivation, and the handshake topic helper
+ * used by the pairing handshake. Session-topic and channel derivation
+ * moved to `statementStore/session/channels.ts` because they are
+ * protocol-level concerns shared with any StatementData-speaking peer.
+ *
+ * Follows triangle-js-sdks' wire format for mobile wallet compatibility.
  */
 
 import { gcm } from '@noble/ciphers/aes.js';
@@ -18,6 +21,8 @@ import {
   secretFromSeed as sr25519SecretFromSeed,
   sign as sr25519Sign,
 } from '@scure/sr25519';
+import { Result } from 'neverthrow';
+import type { Encryption, SessionError } from '../../statementStore/session/index.js';
 import { sr25519DeriveSecret } from '../hdkd.js';
 
 // ---------------------------------------------------------------------------
@@ -41,36 +46,40 @@ function concatBytes(...arrays: Uint8Array[]): Uint8Array {
 // AES-GCM encryption (compatible with triangle-js-sdks)
 // ---------------------------------------------------------------------------
 
-export type Encryption = {
-  encrypt(plaintext: Uint8Array): Uint8Array;
-  decrypt(encryptedMessage: Uint8Array): Uint8Array;
-};
-
 /**
  * Create an AES-GCM encryption/decryption pair from a shared secret.
  *
  * Key derivation: HKDF-SHA256 with empty salt and info, 32-byte output.
  * Wire format: [nonce(12B) || ciphertext].
+ *
+ * Returns a {@link Encryption} whose methods return `ResultAsync` so
+ * decrypt failures (auth-tag mismatch, truncated input) surface as a
+ * `SessionError` rather than a throw.
  */
 export function createEncryption(sharedSecret: Uint8Array): Encryption {
   const salt = new Uint8Array();
   const info = new Uint8Array();
   const aesKey = hkdf(sha256, sharedSecret, salt, info, 32);
 
-  return {
-    encrypt(plaintext: Uint8Array): Uint8Array {
-      const nonce = randomBytes(12);
-      const aes = gcm(aesKey, nonce);
-      return concatBytes(nonce, aes.encrypt(plaintext));
-    },
+  const encryptionFailed = (e: unknown): SessionError => ({
+    tag: 'EncryptionFailed',
+    detail: e instanceof Error ? e.message : String(e),
+  });
 
-    decrypt(encryptedMessage: Uint8Array): Uint8Array {
-      const nonce = encryptedMessage.slice(0, 12);
-      const ciphertext = encryptedMessage.slice(12);
-      const aes = gcm(aesKey, nonce);
-      return aes.decrypt(ciphertext);
-    },
-  };
+  const encrypt = Result.fromThrowable((plaintext: Uint8Array) => {
+    const nonce = randomBytes(12);
+    const aes = gcm(aesKey, nonce);
+    return concatBytes(nonce, aes.encrypt(plaintext));
+  }, encryptionFailed);
+
+  const decrypt = Result.fromThrowable((encryptedMessage: Uint8Array) => {
+    const nonce = encryptedMessage.slice(0, 12);
+    const ciphertext = encryptedMessage.slice(12);
+    const aes = gcm(aesKey, nonce);
+    return aes.decrypt(ciphertext);
+  }, encryptionFailed);
+
+  return { encrypt, decrypt };
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +87,7 @@ export function createEncryption(sharedSecret: Uint8Array): Encryption {
 // ---------------------------------------------------------------------------
 
 /**
- * blake2b_256 with key. Used for topic and session ID derivation.
+ * blake2b_256 with key. Used for the handshake-topic derivation.
  */
 export function khash(secret: Uint8Array, message: Uint8Array): Uint8Array {
   return blake2b(message, { dkLen: 32, key: secret });
@@ -139,44 +148,6 @@ export function createP256SharedSecret(secret: Uint8Array, publicKey: Uint8Array
  */
 export function createAccountId(publicKey: Uint8Array): Uint8Array {
   return publicKey.slice(0, 32);
-}
-
-// ---------------------------------------------------------------------------
-// Session ID derivation (matches triangle-js-sdks statement-store)
-// ---------------------------------------------------------------------------
-
-const pinSeparator = textEncoder.encode('/');
-
-/**
- * Derive a session ID from a shared secret and two session accounts.
- *
- * Formula: khash(sharedSecret, "session" || accountA || accountB || "/" || "/")
- * The account order determines direction: outgoing vs incoming.
- *
- * Pins are currently unused (always "/"), but the separator is included
- * for wire compatibility with triangle-js-sdks.
- */
-export function createSessionId(sharedSecret: Uint8Array, accountIdA: Uint8Array, accountIdB: Uint8Array): Uint8Array {
-  return khash(
-    sharedSecret,
-    concatBytes(textEncoder.encode('session'), accountIdA, accountIdB, pinSeparator, pinSeparator),
-  );
-}
-
-/**
- * Derive a request channel from a session ID.
- * channel = khash(sessionId, "request")
- */
-export function createRequestChannel(sessionId: Uint8Array): Uint8Array {
-  return khash(sessionId, textEncoder.encode('request'));
-}
-
-/**
- * Derive a response channel from a session ID.
- * channel = khash(sessionId, "response")
- */
-export function createResponseChannel(sessionId: Uint8Array): Uint8Array {
-  return khash(sessionId, textEncoder.encode('response'));
 }
 
 // ---------------------------------------------------------------------------

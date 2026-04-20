@@ -176,10 +176,11 @@ export function createPairingExecutor(config: PairingExecutorConfig): PairingExe
 
               // 9. Decrypt the sensitive data
               const encryption = createEncryption(symmetricKey);
-              const decrypted = encryption.decrypt(encrypted);
+              const decryptResult = encryption.decrypt(encrypted);
+              if (decryptResult.isErr()) continue;
 
               // 10. Extract remote P-256 public key and account ID
-              const [walletEncrPublicKey, walletAccountId] = HandshakeResponseSensitiveData.dec(decrypted);
+              const [walletEncrPublicKey, walletAccountId] = HandshakeResponseSensitiveData.dec(decryptResult.value);
 
               // 11. Derive the shared secret for the session
               const sharedSecret = createP256SharedSecret(encrSecret, walletEncrPublicKey);

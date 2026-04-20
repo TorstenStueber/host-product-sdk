@@ -105,6 +105,32 @@ export type { StatementStoreClient, PeopleChainClient } from './statementStore/c
 export { createStatementStoreClient } from './statementStore/client.js';
 export { PEOPLE_PARACHAIN_ENDPOINTS } from './constants.js';
 
+// Statement-store session protocol (ACK / batching / channels / init
+// recovery / dedup / proof verification / late-subscriber buffering)
+export {
+  createSession,
+  createSr25519Prover,
+  createSessionId,
+  createRequestChannel,
+  createResponseChannel,
+  StatementDataCodec,
+} from './statementStore/session/index.js';
+export type {
+  Session,
+  SessionError,
+  SessionParams,
+  LocalSessionAccount,
+  RemoteSessionAccount,
+  StatementProver,
+  Encryption,
+  ResponseCode,
+  Message,
+  RequestMessage,
+  ResponseMessage,
+  Filter,
+  StatementData,
+} from './statementStore/session/index.js';
+
 // ---------------------------------------------------------------------------
 // SSO
 // ---------------------------------------------------------------------------

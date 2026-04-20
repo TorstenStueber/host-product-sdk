@@ -13,7 +13,6 @@ import {
   createSsoSessionStore,
   createSecretStore,
   createMemoryStorageAdapter,
-  createMemoryStatementStore,
 } from '@polkadot/host';
 import type {
   PairingExecutor,
@@ -119,8 +118,6 @@ function hangingSignExecutor(): SignRequestExecutor {
 async function createPairedSetup(signExecutor?: SignRequestExecutor) {
   const storage = createMemoryStorageAdapter();
   const sessionStore = createSsoSessionStore(storage);
-  const bus = createMemoryStatementStore();
-  const adapter = bus.createAdapter();
   const manager = createSsoManager({
     sessionStore,
     secretStore: createSecretStore(storage),
@@ -130,14 +127,16 @@ async function createPairedSetup(signExecutor?: SignRequestExecutor) {
   manager.pair();
   await new Promise(r => setTimeout(r, 10));
 
+  // The ssoSigning tests stub the executor, so we pass an empty object
+  // for session — the executor never touches it.
   const signer = createRemoteSigner({
     manager,
-    statementStore: adapter,
+    session: {} as never,
     executor: signExecutor ?? immediateSignExecutor(),
     timeoutMs: 500,
   });
 
-  return { manager, signer, statementStore: adapter };
+  return { manager, signer };
 }
 
 // ---------------------------------------------------------------------------
@@ -150,8 +149,6 @@ describe('createRemoteSigner', () => {
   it('signPayload returns NotPaired when manager is not paired', async () => {
     const storage = createMemoryStorageAdapter();
     const sessionStore = createSsoSessionStore(storage);
-    const bus = createMemoryStatementStore();
-    const adapter = bus.createAdapter();
     const manager = createSsoManager({
       sessionStore,
       secretStore: createSecretStore(storage),
@@ -160,7 +157,7 @@ describe('createRemoteSigner', () => {
 
     const signer = createRemoteSigner({
       manager,
-      statementStore: adapter,
+      session: {} as never,
       executor: immediateSignExecutor(),
     });
 
@@ -172,8 +169,6 @@ describe('createRemoteSigner', () => {
   it('signRaw returns NotPaired when manager is not paired', async () => {
     const storage = createMemoryStorageAdapter();
     const sessionStore = createSsoSessionStore(storage);
-    const bus = createMemoryStatementStore();
-    const adapter = bus.createAdapter();
     const manager = createSsoManager({
       sessionStore,
       secretStore: createSecretStore(storage),
@@ -182,7 +177,7 @@ describe('createRemoteSigner', () => {
 
     const signer = createRemoteSigner({
       manager,
-      statementStore: adapter,
+      session: {} as never,
       executor: immediateSignExecutor(),
     });
 

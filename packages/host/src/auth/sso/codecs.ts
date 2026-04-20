@@ -3,9 +3,13 @@
  *
  * These must be byte-identical to triangle-js-sdks for mobile wallet
  * compatibility. The mobile app parses these exact SCALE encodings.
+ *
+ * The session-level `StatementData` envelope lives in
+ * `statementStore/session/statementData.ts` (protocol-level, shared
+ * between SSO and anything else layered on top of the session).
  */
 
-import { Bytes, Enum, Option, Result, Struct, Tuple, Vector, _void, enhanceCodec, str, u8, u32 } from 'scale-ts';
+import { Bytes, Enum, Option, Result, Struct, Tuple, Vector, _void, str, u32 } from 'scale-ts';
 import { Hex, OptionBool } from '@polkadot/api-protocol';
 
 // ---------------------------------------------------------------------------
@@ -76,49 +80,6 @@ export const SigningResponseCodec = Struct({
 });
 
 // ---------------------------------------------------------------------------
-// Statement data (session-level wrapper from triangle-js-sdks statement-store)
-// ---------------------------------------------------------------------------
-
-const ResponseCode = enhanceCodec<number, string>(
-  u8,
-  (status: string) => {
-    switch (status) {
-      case 'success':
-        return 0;
-      case 'decryptionFailed':
-        return 1;
-      case 'decodingFailed':
-        return 2;
-      default:
-        return 255;
-    }
-  },
-  (code: number) => {
-    switch (code) {
-      case 0:
-        return 'success';
-      case 1:
-        return 'decryptionFailed';
-      case 2:
-        return 'decodingFailed';
-      default:
-        return 'unknown';
-    }
-  },
-);
-
-export const StatementDataCodec = Enum({
-  request: Struct({
-    requestId: str,
-    data: Vector(Bytes()),
-  }),
-  response: Struct({
-    requestId: str,
-    responseCode: ResponseCode,
-  }),
-});
-
-// ---------------------------------------------------------------------------
 // Remote message (versioned envelope for SSO channel)
 // ---------------------------------------------------------------------------
 
@@ -143,3 +104,4 @@ export type SigningPayloadRequest = CodecType<typeof SigningPayloadRequestCodec>
 export type SigningRawRequest = CodecType<typeof SigningRawRequestCodec>;
 export type SigningPayloadResponseData = CodecType<typeof SigningPayloadResponseDataCodec>;
 export type SigningResponse = CodecType<typeof SigningResponseCodec>;
+export type RemoteMessage = CodecType<typeof RemoteMessageCodec>;

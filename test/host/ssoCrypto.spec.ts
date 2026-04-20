@@ -32,8 +32,8 @@ describe('createEncryption', () => {
     const enc = createEncryption(key);
     const plaintext = new TextEncoder().encode('hello world');
 
-    const encrypted = enc.encrypt(plaintext);
-    const decrypted = enc.decrypt(encrypted);
+    const encrypted = enc.encrypt(plaintext)._unsafeUnwrap();
+    const decrypted = enc.decrypt(encrypted)._unsafeUnwrap();
 
     expect(decrypted).toEqual(plaintext);
   });
@@ -43,7 +43,7 @@ describe('createEncryption', () => {
     const enc = createEncryption(key);
     const plaintext = new TextEncoder().encode('secret');
 
-    const encrypted = enc.encrypt(plaintext);
+    const encrypted = enc.encrypt(plaintext)._unsafeUnwrap();
     expect(encrypted).not.toEqual(plaintext);
     expect(encrypted.length).toBeGreaterThan(plaintext.length);
   });
@@ -53,27 +53,29 @@ describe('createEncryption', () => {
     const enc = createEncryption(key);
     const plaintext = new Uint8Array([1, 2, 3]);
 
-    const encrypted = enc.encrypt(plaintext);
+    const encrypted = enc.encrypt(plaintext)._unsafeUnwrap();
     // 12-byte nonce + ciphertext (at least as long as plaintext + 16-byte GCM tag)
     expect(encrypted.length).toBeGreaterThanOrEqual(12 + 3 + 16);
   });
 
-  it('decrypt with wrong key throws', () => {
+  it('decrypt with wrong key returns an EncryptionFailed error', () => {
     const key1 = new Uint8Array(32).fill(0x42);
     const key2 = new Uint8Array(32).fill(0x43);
     const enc1 = createEncryption(key1);
     const enc2 = createEncryption(key2);
 
-    const encrypted = enc1.encrypt(new TextEncoder().encode('test'));
-    expect(() => enc2.decrypt(encrypted)).toThrow();
+    const encrypted = enc1.encrypt(new TextEncoder().encode('test'))._unsafeUnwrap();
+    const result = enc2.decrypt(encrypted);
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().tag).toBe('EncryptionFailed');
   });
 
   it('handles empty plaintext', () => {
     const key = new Uint8Array(32).fill(0x42);
     const enc = createEncryption(key);
 
-    const encrypted = enc.encrypt(new Uint8Array(0));
-    const decrypted = enc.decrypt(encrypted);
+    const encrypted = enc.encrypt(new Uint8Array(0))._unsafeUnwrap();
+    const decrypted = enc.decrypt(encrypted)._unsafeUnwrap();
     expect(decrypted).toEqual(new Uint8Array(0));
   });
 
@@ -82,8 +84,8 @@ describe('createEncryption', () => {
     const enc = createEncryption(key);
     const large = new Uint8Array(10_000).fill(0xff);
 
-    const encrypted = enc.encrypt(large);
-    const decrypted = enc.decrypt(encrypted);
+    const encrypted = enc.encrypt(large)._unsafeUnwrap();
+    const decrypted = enc.decrypt(encrypted)._unsafeUnwrap();
     expect(decrypted).toEqual(large);
   });
 });

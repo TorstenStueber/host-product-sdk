@@ -10,9 +10,6 @@ import { describe, it, expect } from 'vitest';
 import {
   createAccountId,
   khash,
-  createSessionId,
-  createRequestChannel,
-  createResponseChannel,
   deriveHandshakeTopic,
   createSr25519Secret,
   deriveSr25519PublicKey,
@@ -21,6 +18,18 @@ import {
   createEncryption,
   concatBytes,
 } from '../../packages/host/src/auth/sso/crypto.js';
+import {
+  createSessionId as _createSessionId,
+  createRequestChannel,
+  createResponseChannel,
+} from '../../packages/host/src/statementStore/session/index.js';
+
+// The session helpers now take {accountId, pin?} objects. The tests
+// below were written for the pre-move API (raw Uint8Array inputs); wrap
+// here to keep the test intent clear.
+function createSessionId(sharedSecret: Uint8Array, a: Uint8Array, b: Uint8Array): Uint8Array {
+  return _createSessionId(sharedSecret, { accountId: a }, { accountId: b });
+}
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -210,8 +219,8 @@ describe('createEncryption (protocol compat)', () => {
     const sharedSecret = key(0x01);
     const enc = createEncryption(sharedSecret);
     const plaintext = textEncoder.encode('hello world');
-    const encrypted = enc.encrypt(plaintext);
-    const decrypted = enc.decrypt(encrypted);
+    const encrypted = enc.encrypt(plaintext)._unsafeUnwrap();
+    const decrypted = enc.decrypt(encrypted)._unsafeUnwrap();
     expect(decrypted).toEqual(plaintext);
   });
 
@@ -220,8 +229,8 @@ describe('createEncryption (protocol compat)', () => {
     const hostEnc = createEncryption(sharedSecret);
     const walletEnc = createEncryption(sharedSecret);
     const msg = textEncoder.encode('sign this');
-    const encrypted = hostEnc.encrypt(msg);
-    const decrypted = walletEnc.decrypt(encrypted);
+    const encrypted = hostEnc.encrypt(msg)._unsafeUnwrap();
+    const decrypted = walletEnc.decrypt(encrypted)._unsafeUnwrap();
     expect(decrypted).toEqual(msg);
   });
 });
