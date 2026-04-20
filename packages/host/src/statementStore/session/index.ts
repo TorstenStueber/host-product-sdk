@@ -24,7 +24,7 @@ export type { SessionParams } from './session.js';
 
 export { createSr25519Prover } from './prover.js';
 
-export { createSessionId, createRequestChannel, createResponseChannel } from './channels.js';
+export { khash, createSessionId, createRequestChannel, createResponseChannel } from './channels.js';
 
 export { StatementDataCodec } from './statementData.js';
 export type { StatementData } from './statementData.js';

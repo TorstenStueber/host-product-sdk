@@ -37,7 +37,12 @@ function concat(...arrays: Uint8Array[]): Uint8Array {
   return result;
 }
 
-function khash(key: Uint8Array, message: Uint8Array): Uint8Array {
+/**
+ * blake2b-256 with a key (Substrate's `khash`). The single shared
+ * implementation used by both session-level derivations below and by
+ * the SSO handshake-topic derivation in `auth/sso/crypto.ts`.
+ */
+export function khash(key: Uint8Array, message: Uint8Array): Uint8Array {
   return blake2b(message, { dkLen: 32, key });
 }
 

@@ -12,7 +12,6 @@
 import { gcm } from '@noble/ciphers/aes.js';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { blake2b } from '@noble/hashes/blake2.js';
 import { randomBytes } from '@noble/hashes/utils.js';
 import { p256 } from '@noble/curves/nist.js';
 import { entropyToMiniSecret, generateMnemonic, mnemonicToEntropy } from '@polkadot-labs/hdkd-helpers';
@@ -23,6 +22,7 @@ import {
 } from '@scure/sr25519';
 import { Result } from 'neverthrow';
 import type { Encryption, SessionError } from '../../statementStore/session/index.js';
+import { khash } from '../../statementStore/session/index.js';
 import { sr25519DeriveSecret } from '../hdkd.js';
 
 // ---------------------------------------------------------------------------
@@ -83,15 +83,12 @@ export function createEncryption(sharedSecret: Uint8Array): Encryption {
 }
 
 // ---------------------------------------------------------------------------
-// blake2b keyed hash (khash)
+// blake2b keyed hash (khash) — re-exported for the existing SSO callers.
+// The single implementation lives in `statementStore/session/channels.ts`
+// because the session layer needs it to derive session IDs and channels.
 // ---------------------------------------------------------------------------
 
-/**
- * blake2b_256 with key. Used for the handshake-topic derivation.
- */
-export function khash(secret: Uint8Array, message: Uint8Array): Uint8Array {
-  return blake2b(message, { dkLen: 32, key: secret });
-}
+export { khash };
 
 // ---------------------------------------------------------------------------
 // Sr25519 key derivation
